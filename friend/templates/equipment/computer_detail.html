@@ -1,0 +1,321 @@
+{% extends 'equipment/base.html' %}
+
+{% block title %}{{ computer.hostname }}{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-pc-display me-2"></i>{{ computer.hostname }}</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Computer info cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-pc-display fs-1 text-primary"></i>
+                <h6 class="mt-2 mb-0 text-muted">Сетевое имя</h6>
+                <strong>{{ computer.hostname }}</strong>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-ethernet fs-1 text-info"></i>
+                <h6 class="mt-2 mb-0 text-muted">IP / MAC</h6>
+                <small><code>{{ computer.ip_address|default:"—" }}</code></small><br>
+                <small class="text-muted">{{ computer.mac_address }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-cpu fs-1 text-success"></i>
+                <h6 class="mt-2 mb-0 text-muted">Процессор</h6>
+                <strong>{{ computer.cpu|default:"—" }}</strong>
+                {% if computer.ram_gb %}
+                <br><small class="text-muted">{{ computer.ram_gb }} ГБ ОЗУ</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-hdd fs-1 text-warning"></i>
+                <h6 class="mt-2 mb-0 text-muted">Диск</h6>
+                <strong>{{ computer.storage_gb|default:"—" }} ГБ</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3" id="computerTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab">
+            <i class="bi bi-info-circle me-1"></i> Информация
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="events-tab" data-bs-toggle="tab" data-bs-target="#events" type="button" role="tab">
+            <i class="bi bi-clock-history me-1"></i> События SIEM
+            {% if events|length > 0 %}<span class="badge bg-primary ms-1">{{ events|length }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="incidents-tab" data-bs-toggle="tab" data-bs-target="#incidents" type="button" role="tab">
+            <i class="bi bi-exclamation-triangle me-1"></i> Инциденты
+            {% if incidents|length > 0 %}<span class="badge bg-danger ms-1">{{ incidents|length }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments" type="button" role="tab">
+            <i class="bi bi-link-45deg me-1"></i> Назначения
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="computerTabsContent">
+    <!-- Info tab -->
+    <div class="tab-pane fade show active" id="info" role="tabpanel">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="card table-card">
+                    <div class="card-header"><h6 class="mb-0">Аппаратное обеспечение</h6></div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted" style="width:40%">Процессор</td><td>{{ computer.cpu|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">ОЗУ</td><td>{{ computer.ram_gb|default:"—" }} ГБ</td></tr>
+                            <tr><td class="text-muted">Диск</td><td>{{ computer.storage_gb|default:"—" }} ГБ</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card table-card">
+                    <div class="card-header"><h6 class="mb-0">Программное обеспечение</h6></div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted" style="width:40%">ОС</td><td>{{ computer.os|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Версия</td><td>{{ computer.os_version|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Антивирус</td><td>{{ computer.antivirus_engine|default:"—" }}</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card table-card">
+                    <div class="card-header"><h6 class="mb-0">Сетевая информация</h6></div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted" style="width:40%">Имя в сети</td><td><strong>{{ computer.hostname }}</strong></td></tr>
+                            <tr><td class="text-muted">IP-адрес</td><td><code>{{ computer.ip_address|default:"—" }}</code></td></tr>
+                            <tr><td class="text-muted">MAC-адрес</td><td><code>{{ computer.mac_address }}</code></td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card table-card">
+                    <div class="card-header"><h6 class="mb-0">Расположение</h6></div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted" style="width:40%">Место</td><td>{{ computer.place|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Кабинет</td><td>{{ computer.location|default:"—" }}</td></tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security status -->
+        <div class="card table-card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Статус безопасности</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                {% if computer.antivirus_active %}
+                                <i class="bi bi-shield-check fs-3 text-success"></i>
+                                {% else %}
+                                <i class="bi bi-shield-x fs-3 text-danger"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h6 class="mb-0">Антивирус</h6>
+                                <small class="text-muted">{{ computer.antivirus_engine|default:"Не настроен" }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                {% if computer.is_secured %}
+                                <i class="bi bi-patch-check fs-3 text-success"></i>
+                                {% else %}
+                                <i class="bi bi-patch-exclamation fs-3 text-warning"></i>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h6 class="mb-0">Общий статус</h6>
+                                <small class="text-muted">{% if computer.is_secured %}Защищён{% else %}Требует внимания{% endif %}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Events tab -->
+    <div class="tab-pane fade" id="events" role="tabpanel">
+        <div class="card table-card">
+            <div class="card-body p-0">
+                {% if events %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Тип</th>
+                                <th>Серьёзность</th>
+                                <th>Описание</th>
+                                <th>Решено</th>
+                                <th>Время</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in events %}
+                            <tr>
+                                <td>{{ event.get_event_type_display }}</td>
+                                <td>
+                                    {% if event.severity == 'critical' %}
+                                    <span class="badge bg-danger severity-badge">Крит</span>
+                                    {% elif event.severity == 'warning' %}
+                                    <span class="badge bg-warning text-dark severity-badge">Пред</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary severity-badge">Инфо</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ event.description|truncatewords:10 }}</td>
+                                <td>
+                                    {% if event.is_resolved %}
+                                    <span class="badge bg-success">Да</span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark">Нет</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ event.occurred_at|date:"d.m.Y H:i" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">Событий нет</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Incidents tab -->
+    <div class="tab-pane fade" id="incidents" role="tabpanel">
+        <div class="card table-card">
+            <div class="card-body p-0">
+                {% if incidents %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Заголовок</th>
+                                <th>Серьёзность</th>
+                                <th>Статус</th>
+                                <th>Создан</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for incident in incidents %}
+                            <tr>
+                                <td>{{ incident.title }}</td>
+                                <td>
+                                    {% if incident.severity == 'critical' %}
+                                    <span class="badge bg-danger severity-badge">Крит</span>
+                                    {% elif incident.severity == 'high' %}
+                                    <span class="badge bg-warning text-dark severity-badge">Высокий</span>
+                                    {% elif incident.severity == 'medium' %}
+                                    <span class="badge bg-info severity-badge">Средний</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary severity-badge">Низкий</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if incident.status == 'open' %}
+                                    <span class="badge bg-danger">Открыт</span>
+                                    {% elif incident.status == 'investigating' %}
+                                    <span class="badge bg-warning text-dark">Расследуется</span>
+                                    {% elif incident.status == 'resolved' %}
+                                    <span class="badge bg-success">Решён</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Закрыт</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ incident.created_at|date:"d.m.Y H:i" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">Инцидентов нет</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Assignments tab -->
+    <div class="tab-pane fade" id="assignments" role="tabpanel">
+        <div class="card table-card">
+            <div class="card-body p-0">
+                {% if assignments %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Пользователь</th>
+                                <th>Назначен</th>
+                                <th>Возвращён</th>
+                                <th>Статус</th>
+                                <th>Примечание</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for assignment in assignments %}
+                            <tr>
+                                <td>{{ assignment.user.get_full_name|default:assignment.user.username }}</td>
+                                <td class="text-nowrap">{{ assignment.assigned_at|date:"d.m.Y" }}</td>
+                                <td class="text-nowrap">{{ assignment.returned_at|date:"d.m.Y"|default:"—" }}</td>
+                                <td>
+                                    {% if assignment.is_active %}
+                                    <span class="badge bg-success">Активно</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Возвращено</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ assignment.notes|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">Назначений нет</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

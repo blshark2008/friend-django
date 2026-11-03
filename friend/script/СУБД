@@ -1,0 +1,10 @@
+-- Создаём пользователя (роль) для Django
+CREATE USER friend_user WITH PASSWORD '!fjeHrnErt_12';
+
+-- Создаём базу данных и назначаем владельца
+CREATE DATABASE friend_db OWNER friend_user;
+
+-- (Опционально) Даём права явно (если нужно)
+GRANT ALL PRIVILEGES ON DATABASE friend_db TO friend_user;
+
+\q

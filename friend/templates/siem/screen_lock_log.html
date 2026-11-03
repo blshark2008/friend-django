@@ -1,0 +1,208 @@
+{% extends "siem/base.html" %}
+
+{% block title %}Журнал блокировок — SIEM{% endblock %}
+
+{% block sidebar %}
+    <li class="mb-2">
+        <a href="{% url 'siem:dashboard' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-speedometer2 me-2"></i>Дашборд
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:hosts' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-pc-display me-2"></i>Хосты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:events' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-shield-exclamation me-2"></i>События
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:login_history' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-box-arrow-in-right me-2"></i>История входов
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:screen_lock_log' %}" class="text-decoration-none text-light">
+            <i class="bi bi-lock-fill me-2"></i>Журнал блокировок
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-calendar-x me-2"></i>Отсутствия
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-bell-exclamation me-2"></i>Алерты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:report_security' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>Отчёты
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-lock-fill me-2"></i>Журнал блокировок экрана</h2>
+</div>
+
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <h3 class="text-primary">{{ logs.paginator.count }}</h3>
+                <small class="text-muted">Всего за период</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h3 class="text-danger">{{ logs.paginator.count|default:0 }}</h3>
+                <small class="text-muted">Блокировок</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h3 class="text-success">{{ logs.paginator.count|default:0 }}</h3>
+                <small class="text-muted">Разблокировок</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <h3 class="text-info">{{ logs.paginator.count|default:0 }}</h3>
+                <small class="text-muted">Хостов</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-3">
+        <input type="text" name="search" class="form-control" placeholder="Поиск по логину/хосту..." value="{{ search }}">
+    </div>
+    <div class="col-md-2">
+        <input type="text" name="host" class="form-control" placeholder="Имя хоста" value="{{ host_filter }}">
+    </div>
+    <div class="col-md-2">
+        <select name="action" class="form-select">
+            <option value="">Все</option>
+            <option value="lock" {% if action == 'lock' %}selected{% endif %}>Блокировка</option>
+            <option value="unlock" {% if action == 'unlock' %}selected{% endif %}>Разблокировка</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <select name="days" class="form-select">
+            <option value="7" {% if days == 7 %}selected{% endif %}>7 дней</option>
+            <option value="14" {% if days == 14 %}selected{% endif %}>14 дней</option>
+            <option value="30" {% if days == 30 %}selected{% endif %}>30 дней</option>
+            <option value="90" {% if days == 90 %}selected{% endif %}>90 дней</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-secondary w-100">Применить</button>
+    </div>
+    <div class="col-md-1">
+        <a href="{% url 'siem:screen_lock_log' %}" class="btn btn-outline-secondary w-100" title="Сбросить фильтры">
+            <i class="bi bi-x-lg"></i>
+        </a>
+    </div>
+</form>
+
+<!-- Таблица -->
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Время</th>
+                    <th>Действие</th>
+                    <th>Логин</th>
+                    <th>Хост</th>
+                    <th>Сессия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in logs %}
+                <tr>
+                    <td class="text-nowrap">{{ entry.timestamp|date:"d.m.Y H:i:s" }}</td>
+                    <td>
+                        {% if entry.action == 'lock' %}
+                            <span class="badge bg-danger">
+                                <i class="bi bi-lock-fill me-1"></i>Блокировка
+                            </span>
+                        {% else %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-unlock-fill me-1"></i>Разблокировка
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if entry.username %}
+                            <strong>{{ entry.username }}</strong>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'siem:host_detail' entry.host.pk %}" class="text-decoration-none">
+                            <i class="bi bi-pc-display me-1"></i>{{ entry.host.hostname }}
+                        </a>
+                    </td>
+                    <td>
+                        {% if entry.session_id %}
+                            <code>{{ entry.session_id }}</code>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        <i class="bi bi-search me-2"></i>Записей не найдено
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Пагинация -->
+{% if is_paginated %}
+<nav class="mt-3">
+    <ul class="pagination">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page=1&search={{ search }}&host={{ host_filter }}&action={{ action }}&days={{ days }}">Первая</a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search }}&host={{ host_filter }}&action={{ action }}&days={{ days }}">Предыдущая</a>
+        </li>
+        {% endif %}
+        <li class="page-item disabled">
+            <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search }}&host={{ host_filter }}&action={{ action }}&days={{ days }}">Следующая</a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&search={{ search }}&host={{ host_filter }}&action={{ action }}&days={{ days }}">Последняя</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

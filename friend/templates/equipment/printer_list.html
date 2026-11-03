@@ -1,0 +1,97 @@
+{% extends 'equipment/base.html' %}
+
+{% block title %}Принтеры{% endblock %}
+
+{% block page_title %}
+{% if dept_name %}
+<div class="d-flex align-items-center">
+    <h4 class="mb-0 me-3"><i class="bi bi-printer me-2"></i>Принтеры</h4>
+    <span class="badge bg-info"><i class="bi bi-building me-1"></i>{{ dept_name }}</span>
+    <a href="{% url 'equipment:printers' %}" class="btn btn-sm btn-outline-secondary ms-2"><i class="bi bi-x"></i> Сбросить</a>
+</div>
+{% else %}
+<h4 class="mb-0"><i class="bi bi-printer me-2"></i>Принтеры</h4>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card table-card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <form method="get" class="d-flex gap-2 flex-wrap">
+            <input type="text" name="search" class="form-control" placeholder="Поиск..." value="{{ search }}">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i></button>
+            {% if search %}
+            <a href="{% url 'equipment:printers' %}" class="btn btn-outline-secondary">Сбросить</a>
+            {% endif %}
+        </form>
+        <a href="#" class="btn btn-success"><i class="bi bi-plus-lg"></i> Добавить</a>
+    </div>
+    <div class="card-body p-0">
+        {% if printers %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Модель</th>
+                        <th>IP</th>
+                        <th>MAC</th>
+                        <th>Кабинет</th>
+                        <th>Статус</th>
+                        <th>Активен</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for printer in printers %}
+                    <tr>
+                        <td><strong>{{ printer.name }}</strong></td>
+                        <td>{{ printer.model }}</td>
+                        <td><code>{{ printer.ip_address|default:"—" }}</code></td>
+                        <td><code>{{ printer.mac_address|default:"—" }}</code></td>
+                        <td>{{ printer.location|default:"—" }}</td>
+                        <td>
+                            {% if printer.status == 'online' %}
+                            <span class="badge bg-success">Онлайн</span>
+                            {% elif printer.status == 'offline' %}
+                            <span class="badge bg-secondary">Оффлайн</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">Обслуживание</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if printer.is_active %}
+                            <i class="bi bi-check-circle text-success"></i>
+                            {% else %}
+                            <i class="bi bi-x-circle text-muted"></i>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-printer fs-1 d-block mb-3"></i>
+            <p class="mb-0">Принтеры не найдены</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if is_paginated %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?page=1&search={{ search }}">Первая</a></li>
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search }}">Предыдущая</a></li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search }}">Следующая</a></li>
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&search={{ search }}">Последняя</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

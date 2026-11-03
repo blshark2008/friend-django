@@ -1,0 +1,582 @@
+{% extends 'siem/base.html' %}
+
+{% block title %}{{ host.hostname }}{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0">
+    <i class="bi bi-pc-display me-2"></i>
+    {{ host.hostname }}
+</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'siem:dashboard' %}">Дашборд</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'siem:hosts' %}">Хосты</a></li>
+        <li class="breadcrumb-item active">{{ host.hostname }}</li>
+    </ol>
+</nav>
+
+<!-- Host info cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <i class="bi bi-pc-display fs-1 text-primary"></i>
+                <h6 class="mt-2 mb-0 text-muted">Статус</h6>
+                {% if host.is_active %}
+                <span class="badge bg-success fs-6">Онлайн</span>
+                {% else %}
+                <span class="badge bg-danger fs-6">Оффлайн</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <i class="bi bi-list-ul fs-1 text-warning"></i>
+                <h6 class="mt-2 mb-0 text-muted">Всего событий</h6>
+                <h3 class="mb-0">{{ total_events }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <i class="bi bi-exclamation-triangle fs-1 text-danger"></i>
+                <h6 class="mt-2 mb-0 text-muted">Критические</h6>
+                <h3 class="mb-0 text-danger">{{ critical_events }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <i class="bi bi-clock-history fs-1 text-info"></i>
+                <h6 class="mt-2 mb-0 text-muted">Последний контакт</h6>
+                <small class="d-block">{{ host.last_seen|date:"d.m.Y H:i" }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3" id="hostTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab">
+            <i class="bi bi-info-circle me-1"></i> Информация
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="events-tab" data-bs-toggle="tab" data-bs-target="#events" type="button" role="tab">
+            <i class="bi bi-list-ul me-1"></i> События
+            {% if recent_events|length > 0 %}<span class="badge bg-primary ms-1">{{ recent_events|length }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="logins-tab" data-bs-toggle="tab" data-bs-target="#logins" type="button" role="tab">
+            <i class="bi bi-box-arrow-in-right me-1"></i> Входы
+            {% if recent_logins|length > 0 %}<span class="badge bg-info ms-1">{{ recent_logins|length }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button" role="tab">
+            <i class="bi bi-hdd-stack me-1"></i> Инвентаризация
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="browser-tab" data-bs-toggle="tab" data-bs-target="#browser" type="button" role="tab">
+            <i class="bi bi-globe me-1"></i> Браузер
+            {% if browser_history|length > 0 %}<span class="badge bg-warning ms-1">{{ browser_history|length }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="locks-tab" data-bs-toggle="tab" data-bs-target="#locks" type="button" role="tab">
+            <i class="bi bi-lock-fill me-1"></i> Блокировки
+            {% if screen_lock_logs|length > 0 %}<span class="badge bg-danger ms-1">{{ screen_lock_logs|length }}</span>{% endif %}
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="hostTabsContent">
+    <!-- Info tab -->
+    <div class="tab-pane fade show active" id="info" role="tabpanel">
+        <div class="card table-card">
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Сетевая информация</h6>
+                        <table class="table table-sm">
+                            <tr><td class="text-muted" style="width:40%">Имя хоста:</td><td><strong>{{ host.hostname }}</strong></td></tr>
+                            <tr><td class="text-muted">IP-адрес:</td><td><code>{{ host.ip_address|default:"—" }}</code></td></tr>
+                            <tr><td class="text-muted">MAC-адрес:</td><td>{{ host.mac_address|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Версия агента:</td><td>{{ host.agent_version|default:"—" }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Системная информация</h6>
+                        <table class="table table-sm">
+                            <tr><td class="text-muted" style="width:40%">Наименование ОС:</td><td>{{ host.os_name|default:host.os_info|default:"—" }}</td></tr>
+                            {% if host.os_info and host.os_name %}
+                            <tr><td class="text-muted">Версия ОС:</td><td>{{ host.os_info }}</td></tr>
+                            {% endif %}
+                            <tr><td class="text-muted">Ядро:</td><td>{{ raw_data.kernel|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Создан:</td><td>{{ host.created_at|date:"d.m.Y H:i" }}</td></tr>
+                            <tr><td class="text-muted">Обновлён:</td><td>{{ host.updated_at|date:"d.m.Y H:i" }}</td></tr>
+                            <tr><td class="text-muted">Последний контакт:</td><td>{{ host.last_seen|date:"d.m.Y H:i" }}</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Последний вход -->
+                <div class="row g-4 mt-2">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3"><i class="bi bi-clock-history me-1"></i>Последний вход</h6>
+                        <table class="table table-sm">
+                            {% if latest_login %}
+                            <tr><td class="text-muted" style="width:40%">Время:</td><td>{{ latest_login.login_time|date:"d.m.Y H:i:s" }}</td></tr>
+                            <tr><td class="text-muted">Логин:</td><td>
+                                <strong>{{ latest_login.username }}</strong>
+                                {% if last_login_fullname %}
+                                    <a href="{% url 'accounts:user_general' last_login_user.pk %}" class="text-decoration-none" title="Профиль сотрудника">
+                                        <small class="text-success">({{ last_login_fullname|striptags }})</small>
+                                    </a>
+                                {% elif not latest_login.is_matched %}
+                                    <span class="badge bg-warning text-dark ms-1">Неизвестный</span>
+                                {% endif %}
+                            </td></tr>
+                            <tr><td class="text-muted">Источник:</td><td>
+                                {% if latest_login.source %}
+                                    <span class="badge bg-secondary">{{ latest_login.source }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Console</span>
+                                {% endif %}
+                            </td></tr>
+                            {% else %}
+                            <tr><td class="text-muted" colspan="2">Данных о входах нет</td></tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3"><i class="bi bi-people me-1"></i>Текущие пользователи</h6>
+                        {% if current_users %}
+                        <table class="table table-sm">
+                            {% for cu in current_users %}
+                            <tr>
+                                <td class="text-muted" style="width:40%">Логин:</td>
+                                <td>
+                                    <strong>{{ cu.username }}</strong>
+                                    {% if cu.fullname %}
+                                        <a href="/admin/accounts/user/{{ cu.user.id }}/change/" class="text-decoration-none" title="Перейти к пользователю">
+                                            <small class="text-success">({{ cu.fullname|striptags }})</small>
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        {% else %}
+                        <div class="text-muted">Нет активных сессий</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Hardware & Security info from raw -->
+        {% if raw_data %}
+        <div class="card table-card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-hdd-stack me-2"></i>Железо, система и безопасность</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Процессор и память</h6>
+                        <table class="table table-sm">
+                            <tr><td class="text-muted" style="width:40%">Модель:</td><td>{{ raw_data.cpu_model|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">ОЗУ:</td><td>{% if latest_snapshot.ram_mb %}{{ latest_snapshot.ram_mb }} МБ{% else %}—{% endif %}</td></tr>
+                            <tr><td class="text-muted">Температура CPU:</td><td>{% if raw_data.temp_c %}{{ raw_data.temp_c }}°C{% else %}—{% endif %}</td></tr>
+                            <tr><td class="text-muted">Пакетов:</td><td>{{ latest_snapshot.packages_count|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Загрузка (1/5/15 мин):</td><td>{{ raw_data.load_avg|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Uptime:</td><td>{{ raw_data.uptime_display|default:"—" }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Система и безопасность</h6>
+                        <table class="table table-sm">
+                            <tr><td class="text-muted" style="width:40%">Модель ПК:</td><td>{{ raw_data.model|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Ядро:</td><td>{{ raw_data.kernel|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Дисков:</td><td>{{ raw_data.disk_count|default:0 }}</td></tr>
+                            <tr><td class="text-muted">Пользователей онлайн:</td><td>{{ raw_data.users_online|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Антивирус:</td><td>
+                                {% if host.antivirus_installed %}
+                                    <span class="badge bg-success">{{ host.antivirus_name|default:"установлен" }}</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Не установлен</span>
+                                {% endif %}
+                            </td></tr>
+                            {% if host.antivirus_installed %}
+                            <tr><td class="text-muted">Версия:</td><td>{{ host.antivirus_version|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Обновлён:</td><td>{% if host.antivirus_last_update %}{{ host.antivirus_last_update|date:"d.m.Y H:i" }}{% else %}—{% endif %}</td></tr>
+                            {% endif %}
+                            <tr><td class="text-muted">Блокировка экрана:</td><td>{% if host.screen_lock_timeout %}{{ host.screen_lock_timeout }} мин{% else %}—{% endif %}</td></tr>
+                            <tr><td class="text-muted">root login:</td><td>{{ raw_data.permit_root_login|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Мин. длина пароля:</td><td>{{ raw_data.pass_min_len|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">SUID-файлы:</td><td>{{ raw_data.suid_count|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Дата установки ОС:</td><td>{{ raw_data.install_date|default:"—" }}</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Additional info -->
+                {% if raw_data.ip or raw_data.serial %}
+                <div class="mt-3">
+                    <h6 class="text-muted mb-2">Дополнительная информация</h6>
+                    <div class="p-3 bg-light rounded">
+                        {% if raw_data.ip %}
+                        <p class="mb-1"><strong>IP-адреса:</strong> {{ raw_data.ip }}</p>
+                        {% endif %}
+                        {% if raw_data.serial %}
+                        <p class="mb-1"><strong>Серийный номер:</strong> {{ raw_data.serial }}</p>
+                        {% endif %}
+                        {% if raw_data.min_len %}
+                        <p class="mb-0"><strong>Мин. длина пароля:</strong> {{ raw_data.min_len }} символов</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Ports and services -->
+        {% if raw_data.ports_list or raw_data.services_list %}
+        <div class="card table-card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-plug me-2"></i>Порты и сервисы</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-4">
+                    {% if raw_data.ports_list %}
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Открытые порты</h6>
+                        <div class="p-3 bg-light rounded">
+                            {% for port in raw_data.ports_list %}
+                            <span class="badge bg-primary me-1 mb-1">{{ port }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if raw_data.services_list %}
+                    <div class="col-md-6">
+                        <h6 class="text-muted mb-3">Сервисы</h6>
+                        <div class="p-3 bg-light rounded">
+                            {% for svc in raw_data.services_list %}
+                            <span class="badge bg-info me-1 mb-1">{{ svc }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Events by type -->
+        {% if events_by_type %}
+        <div class="card table-card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>События по типам</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    {% for type_label, count in events_by_type.items %}
+                    <div class="col-md-4">
+                        <div class="d-flex justify-content-between align-items-center p-2 rounded bg-light">
+                            <span>{{ type_label }}</span>
+                            <span class="badge bg-primary">{{ count }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Events tab -->
+    <div class="tab-pane fade" id="events" role="tabpanel">
+        <div class="card table-card">
+            <div class="card-body p-0">
+                {% if recent_events %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Тип</th>
+                                <th>Серьёзность</th>
+                                <th>Сообщение</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in recent_events %}
+                            <tr>
+                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ event.occurred_at|date:"d.m.Y H:i" }}</td>
+                                <td>{{ event.get_event_type_display }}</td>
+                                <td>
+                                    {% if event.severity == 'critical' %}
+                                    <span class="badge bg-danger severity-badge">Крит</span>
+                                    {% elif event.severity == 'warning' %}
+                                    <span class="badge bg-warning text-dark severity-badge">Пред</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary severity-badge">Инфо</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'siem:event_detail' event.id %}" class="text-decoration-none">
+                                        {{ event.message|truncatewords:10 }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">Событий нет</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Logins tab -->
+    <div class="tab-pane fade" id="logins" role="tabpanel">
+        {% if recent_logins %}
+        <div class="card table-card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Время входа</th>
+                                <th>Пользователь</th>
+                                <th>Сотрудник</th>
+                                <th>Источник</th>
+                                <th>Экран</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in recent_logins %}
+                            <tr>
+                                <td class="text-nowrap">{{ entry.login_time|date:"d.m.Y H:i:s" }}</td>
+                                <td>
+                                    <strong>{{ entry.username }}</strong>
+                                </td>
+                                <td>
+                                    {% if entry.matched_user %}
+                                        <a href="{% url 'accounts:user_general' entry.matched_user.pk %}" class="text-decoration-none">
+                                            <small>{{ entry.matched_user.last_name }} {{ entry.matched_user.first_name|truncatechars:15 }}</small>
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if entry.source %}
+                                        <span class="badge bg-secondary">{{ entry.source }}</span>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if entry.is_screen_locked %}
+                                        <span class="badge bg-danger" title="Экран заблокирован">
+                                            <i class="bi bi-lock-fill me-1"></i>
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success" title="Экран разблокирован">
+                                            <i class="bi bi-unlock-fill me-1"></i>
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if entry.is_matched %}
+                                        <span class="badge bg-success">Сопоставлен</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Неизвестный</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card table-card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-person-check fs-1 d-block mb-3"></i>
+                <p>История входов отсутствует</p>
+                <small class="text-muted">Данные появятся после получения первого события "login" от агента</small>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Inventory tab -->
+    <div class="tab-pane fade" id="inventory" role="tabpanel">
+        {% if snapshots %}
+        <div class="card table-card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Дата сбора</th>
+                                <th>Процессор</th>
+                                <th>ОЗУ</th>
+                                <th>Дисков</th>
+                                <th>Пакетов</th>
+                                <th>Портов</th>
+                                <th>Температура</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for snap in snapshots %}
+                            <tr>
+                                <td class="text-nowrap">{{ snap.collected_at|date:"d.m.Y H:i" }}</td>
+                                <td>{{ snap.cpu_model|default:"—" }}</td>
+                                <td>{% if snap.ram_mb %}{{ snap.ram_mb|floatformat:0 }} МБ{% else %}—{% endif %}</td>
+                                <td>{{ snap.disk_info|length }}</td>
+                                <td>{{ snap.packages_count|default:"—" }}</td>
+                                <td>{{ snap.open_ports|length }}</td>
+                                <td>{% if snap.cpu_temperature %}{{ snap.cpu_temperature }}°C{% else %}—{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card table-card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-hdd-stack fs-1 d-block mb-3"></i>
+                <p>Данные инвентаризации отсутствуют</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Browser tab -->
+    <div class="tab-pane fade" id="browser" role="tabpanel">
+        {% if browser_history %}
+        <div class="card table-card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:180px">Время</th>
+                                <th>Заголовок</th>
+                                <th>URL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for bh in browser_history %}
+                            <tr>
+                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ bh.visited|default:"—" }}</td>
+                                <td>{{ bh.title|default:"—" }}</td>
+                                <td>
+                                    <a href="{{ bh.url }}" target="_blank" class="text-decoration-none text-break" title="{{ bh.url }}">
+                                        {{ bh.url|truncatechars:80 }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card table-card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-globe fs-1 d-block mb-3"></i>
+                <p>История браузеров отсутствует</p>
+                <small class="text-muted">Данные появятся после получения первого события "browser_history" от агента</small>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Screen locks tab -->
+    <div class="tab-pane fade" id="locks" role="tabpanel">
+        {% if screen_lock_logs %}
+        <div class="card table-card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Действие</th>
+                                <th>Логин</th>
+                                <th>Сессия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for lock in screen_lock_logs %}
+                            <tr>
+                                <td class="text-nowrap">{{ lock.timestamp|date:"d.m.Y H:i:s" }}</td>
+                                <td>
+                                    {% if lock.action == 'lock' %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-lock-fill me-1"></i>Блокировка
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-unlock-fill me-1"></i>Разблокировка
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if lock.username %}
+                                        <strong>{{ lock.username }}</strong>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if lock.session_id %}
+                                        <code>{{ lock.session_id }}</code>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card table-card">
+            <div class="card-body text-center text-muted py-5">
+                <i class="bi bi-lock-fill fs-1 d-block mb-3"></i>
+                <p>Журнал блокировок пуст</p>
+                <small class="text-muted">Данные появятся после первого события "screen_lock_log" от агента</small>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

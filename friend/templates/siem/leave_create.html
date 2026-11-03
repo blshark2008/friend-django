@@ -1,0 +1,115 @@
+{% extends "siem/base.html" %}
+
+{% block title %}Добавить отсутствие — SIEM{% endblock %}
+
+{% block sidebar %}
+    <li class="mb-2">
+        <a href="{% url 'siem:dashboard' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-speedometer2 me-2"></i>Дашборд
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:hosts' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-pc-display me-2"></i>Хосты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:events' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-shield-exclamation me-2"></i>События
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-light">
+            <i class="bi bi-calendar-x me-2"></i>Отсутствия
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-bell-exclamation me-2"></i>Алерты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:screen_lock_log' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-lock-fill me-2"></i>Журнал блокировок
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:report_security' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>Отчёты
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-muted">
+        <i class="bi bi-arrow-left me-1"></i>Назад к списку
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Новый период отсутствия</h5>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="employee_id" class="form-label">Сотрудник *</label>
+                        <select name="employee_id" id="employee_id" class="form-select" required>
+                            <option value="">— Выберите сотрудника —</option>
+                            {% for emp in employees %}
+                            <option value="{{ emp.id }}" data-domain="{{ emp.domain_account|escapejs }}">
+                                {{ emp.last_name }} {{ emp.first_name }} {{ emp.patronymic }} (@{{ emp.username }})
+                                {% if emp.domain_account %}| {{ emp.domain_account }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="leave_type" class="form-label">Тип отсутствия *</label>
+                        <select name="leave_type" id="leave_type" class="form-select" required>
+                            <option value="">— Выберите тип —</option>
+                            <option value="vacation">Отпуск</option>
+                            <option value="sick_leave">Больничный</option>
+                            <option value="business_trip">Командировка</option>
+                            <option value="unpaid_leave">Без содержания</option>
+                            <option value="educational_leave">Учебный отпуск</option>
+                        </select>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="start_date" class="form-label">Дата начала *</label>
+                            <input type="date" name="start_date" id="start_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="end_date" class="form-label">Дата окончания *</label>
+                            <input type="date" name="end_date" id="end_date" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">Причина / комментарий</label>
+                        <textarea name="reason" id="reason" class="form-control" rows="3"></textarea>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>Создать
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

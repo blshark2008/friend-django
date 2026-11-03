@@ -1,0 +1,125 @@
+{% extends 'siem/base.html' %}
+
+{% block title %}События{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-list-ul me-2"></i>События безопасности</h4>
+{% endblock %}
+
+{% block content %}
+<div class="card table-card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <form method="get" class="d-flex gap-2 flex-wrap">
+            <input type="text" name="search" class="form-control" placeholder="Поиск..." value="{{ search }}">
+            <select name="severity" class="form-select">
+                <option value="">Все уровни</option>
+                <option value="critical" {% if severity == 'critical' %}selected{% endif %}>Критично</option>
+                <option value="warning" {% if severity == 'warning' %}selected{% endif %}>Предупреждение</option>
+                <option value="error" {% if severity == 'error' %}selected{% endif %}>Ошибка</option>
+                <option value="info" {% if severity == 'info' %}selected{% endif %}>Инфо</option>
+            </select>
+            <select name="event_type" class="form-select">
+                <option value="">Все типы</option>
+                <option value="auth_failed" {% if event_type == 'auth_failed' %}selected{% endif %}>Неудачный вход</option>
+                <option value="auth_success" {% if event_type == 'auth_success' %}selected{% endif %}>Успешный вход</option>
+                <option value="file_changed" {% if event_type == 'file_changed' %}selected{% endif %}>Изменение файла</option>
+                <option value="uid0_added" {% if event_type == 'uid0_added' %}selected{% endif %}>UID 0</option>
+                <option value="suid_added" {% if event_type == 'suid_added' %}selected{% endif %}>SUID</option>
+                <option value="cron_changed" {% if event_type == 'cron_changed' %}selected{% endif %}>Cron</option>
+                <option value="new_port" {% if event_type == 'new_port' %}selected{% endif %}>Новый порт</option>
+                <option value="disk_full" {% if event_type == 'disk_full' %}selected{% endif %}>Диск</option>
+                <option value="kernel_error" {% if event_type == 'kernel_error' %}selected{% endif %}>Ядро</option>
+                <option value="agent_alive" {% if event_type == 'agent_alive' %}selected{% endif %}>Агент</option>
+            </select>
+            <select name="days" class="form-select" style="width: auto;">
+                <option value="1" {% if days == 1 %}selected{% endif %}>1 день</option>
+                <option value="14" {% if days == 14 %}selected{% endif %}>14 дней</option>
+                <option value="30" {% if days == 30 %}selected{% endif %}>30 дней</option>
+                <option value="90" {% if days == 90 %}selected{% endif %}>90 дней</option>
+            </select>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i></button>
+            {% if search or severity or event_type %}
+            <a href="{% url 'siem:events' %}" class="btn btn-outline-secondary">Сбросить</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="card-body p-0">
+        {% if events %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Хост</th>
+                        <th>Тип</th>
+                        <th>Серьёзность</th>
+                        <th>Сообщение</th>
+                        <th>Время</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'siem:host_detail' event.host_id %}" class="text-decoration-none fw-bold">
+                                {{ event.host__hostname }}
+                            </a>
+                        </td>
+                        <td>{{ event.get_event_type_display }}</td>
+                        <td>
+                            {% if event.severity == 'critical' %}
+                            <span class="badge bg-danger severity-badge">Крит</span>
+                            {% elif event.severity == 'warning' %}
+                            <span class="badge bg-warning text-dark severity-badge">Пред</span>
+                            {% elif event.severity == 'error' %}
+                            <span class="badge bg-danger severity-badge">Ошибка</span>
+                            {% else %}
+                            <span class="badge bg-secondary severity-badge">Инфо</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'siem:event_detail' event.id %}" class="text-decoration-none">
+                                {{ event.message|truncatewords:10 }}
+                            </a>
+                        </td>
+                        <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ event.occurred_at|date:"d.m.Y H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-list-ul fs-1 d-block mb-3"></i>
+            <p class="mb-0">События не найдены</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if is_paginated %}
+<nav class="mt-3">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page=1&search={{ search }}&severity={{ severity }}&event_type={{ event_type }}&days={{ days }}">Первая</a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search }}&severity={{ severity }}&event_type={{ event_type }}&days={{ days }}">Предыдущая</a>
+        </li>
+        {% endif %}
+        <li class="page-item disabled">
+            <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search }}&severity={{ severity }}&event_type={{ event_type }}&days={{ days }}">Следующая</a>
+        </li>
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&search={{ search }}&severity={{ severity }}&event_type={{ event_type }}&days={{ days }}">Последняя</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

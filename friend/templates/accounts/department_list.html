@@ -1,0 +1,52 @@
+{% extends "accounts/base.html" %}
+
+{% block title %}Список подразделений — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-building me-2"></i>Список подразделений</h4>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if dept_tree %}
+        <div class="list-group list-group-flush">
+            {% for dept_entry in dept_tree %}
+                {% include "accounts/_dept_node.html" with dept=dept_entry.obj children=dept_entry.children positions=dept_entry.positions indent=0 %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-building fs-1 d-block mb-2"></i>
+            Подразделения отсутствуют
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function toggleDept(btn) {
+    const target = document.getElementById(btn.dataset.target);
+    const icon = btn.querySelector('i');
+    if (target.style.display === 'none') {
+        target.style.display = 'block';
+        icon.className = 'bi bi-chevron-down text-primary';
+    } else {
+        target.style.display = 'none';
+        icon.className = 'bi bi-chevron-right text-muted';
+    }
+}
+
+function togglePositions(btn) {
+    const target = document.getElementById(btn.dataset.target);
+    const icon = btn.querySelector('i');
+    if (target.style.display === 'none') {
+        target.style.display = 'block';
+        icon.className = 'bi bi-chevron-down text-primary';
+    } else {
+        target.style.display = 'none';
+        icon.className = 'bi bi-chevron-right text-muted';
+    }
+}
+</script>
+{% endblock %}

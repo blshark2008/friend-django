@@ -1,0 +1,132 @@
+{% extends "siem/base.html" %}
+
+{% block title %}Отсутствия сотрудников — SIEM{% endblock %}
+
+{% block sidebar %}
+    <li class="mb-2">
+        <a href="{% url 'siem:dashboard' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-speedometer2 me-2"></i>Дашборд
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:hosts' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-pc-display me-2"></i>Хосты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:events' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-shield-exclamation me-2"></i>События
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-light">
+            <i class="bi bi-calendar-x me-2"></i>Отсутствия
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-bell-exclamation me-2"></i>Алерты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:screen_lock_log' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-lock-fill me-2"></i>Журнал блокировок
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:report_security' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>Отчёты
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-calendar-x me-2"></i>Отсутствия сотрудников</h2>
+    <a href="{% url 'siem:leave_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Добавить
+    </a>
+</div>
+
+<!-- Фильтры -->
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-4">
+        <input type="text" name="search" class="form-control" placeholder="Поиск по ФИО..." value="{{ search }}">
+    </div>
+    <div class="col-md-3">
+        <select name="status" class="form-select">
+            <option value="">Все статусы</option>
+            <option value="active" {% if status == 'active' %}selected{% endif %}>Активные</option>
+            <option value="pending" {% if status == 'pending' %}selected{% endif %}>Ожидают согласования</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-secondary w-100">Применить</button>
+    </div>
+</form>
+
+<!-- Таблица -->
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Сотрудник</th>
+                    <th>Тип</th>
+                    <th>Период</th>
+                    <th>Статус</th>
+                    <th>Согласовал</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for leave in leaves %}
+                <tr>
+                    <td>
+                        <strong>{{ leave.employee.last_name }} {{ leave.employee.first_name|truncatechars:20 }}</strong><br>
+                        <small class="text-muted">@{{ leave.employee.username }}</small>
+                    </td>
+                    <td>
+                        <span class="badge bg-{{ leave.leave_type|yesno:'primary,secondary,danger,warning,info' }}">
+                            {{ leave.get_leave_type_display }}
+                        </span>
+                    </td>
+                    <td>{{ leave.start_date|date:"d.m.Y" }} — {{ leave.end_date|date:"d.m.Y" }}</td>
+                    <td>
+                        {% if leave.is_active %}
+                            <span class="badge bg-success">Активно</span>
+                        {% elif leave.is_approved %}
+                            <span class="badge bg-info">Согласовано</span>
+                        {% else %}
+                            <span class="badge bg-warning">Ожидает</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if leave.approved_by %}
+                            {{ leave.approved_by.last_name }} {{ leave.approved_by.first_name|truncatechars:15 }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'siem:leave_detail' pk=leave.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="{% url 'siem:leave_edit' pk=leave.pk %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'siem:leave_delete' pk=leave.pk %}" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">Нет записей об отсутствиях</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

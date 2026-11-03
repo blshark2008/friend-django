@@ -1,0 +1,187 @@
+{% extends 'siem/base.html' %}
+
+{% block title %}Отчёт по безопасности{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-shield-exclamation me-2"></i>Отчёт по безопасности</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Period selector -->
+<div class="card table-card mb-4">
+    <div class="card-header">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">С</label>
+                <input type="date" name="from" class="form-control" value="{{ from_date }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">По</label>
+                <input type="date" name="to" class="form-control" value="{{ to_date }}">
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i></button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Summary cards — кликабельные -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <a href="{% url 'siem:events' %}?days=30" class="text-decoration-none text-reset">
+            <div class="card stat-card text-center">
+                <div class="card-body">
+                    <h2 class="text-primary">{{ total_events }}</h2>
+                    <p class="mb-0 text-muted">Всего событий (30д)</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{% url 'siem:events' %}?severity=critical&days=30" class="text-decoration-none text-reset">
+            <div class="card stat-card text-center">
+                <div class="card-body">
+                    <h2 class="text-danger">{{ critical_events }}</h2>
+                    <p class="mb-0 text-muted">Критические</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{% url 'siem:events' %}?severity=warning&days=30" class="text-decoration-none text-reset">
+            <div class="card stat-card text-center">
+                <div class="card-body">
+                    <h2 class="text-warning">{{ warning_events }}</h2>
+                    <p class="mb-0 text-muted">Предупреждения</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{% url 'siem:hosts' %}" class="text-decoration-none text-reset">
+            <div class="card stat-card text-center">
+                <div class="card-body">
+                    <h2 class="text-success">{{ unique_hosts }}</h2>
+                    <p class="mb-0 text-muted">Хостов</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Events by type — кликабельные строки -->
+<div class="card table-card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>События по типам</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Тип события</th>
+                        <th>Кол-во</th>
+                        <th>Доля</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in events_by_type %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'siem:events' %}?event_type={{ item.value }}&days=30" class="text-decoration-none">
+                                {{ item.label }}
+                            </a>
+                        </td>
+                        <td>
+                            <a href="{% url 'siem:events' %}?event_type={{ item.value }}&days=30" class="text-decoration-none">
+                                <span class="badge bg-primary fs-6">{{ item.count }}</span>
+                            </a>
+                        </td>
+                        <td>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ type_percent|default:0 }}%">
+                                    {{ type_percent|default:0 }}%
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Top offending hosts — кликабельные -->
+<div class="card table-card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-pc-display me-2"></i>Топ хостов по событиям</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Хост</th>
+                        <th>Всего</th>
+                        <th>Крит.</th>
+                        <th>Предупр.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in top_offending_hosts %}
+                    <tr>
+                        <td><a href="{% url 'siem:host_detail' host.host__id %}" class="text-decoration-none fw-bold">{{ host.host__hostname }}</a></td>
+                        <td>{{ host.total }}</td>
+                        <td><span class="badge bg-danger">{{ host.critical }}</span></td>
+                        <td><span class="badge bg-warning text-dark">{{ host.warning }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Recent critical events — кликабельные -->
+<div class="card table-card">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Последние критические события</h6>
+    </div>
+    <div class="card-body p-0">
+        {% if recent_critical %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Время</th>
+                        <th>Хост</th>
+                        <th>Тип</th>
+                        <th>Сообщение</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in recent_critical %}
+                    <tr>
+                        <td class="text-nowrap">{{ event.occurred_at|date:"d.m.Y H:i" }}</td>
+                        <td>
+                            {% if event.host_id %}
+                            <a href="{% url 'siem:host_detail' event.host_id %}" class="text-decoration-none fw-bold">{{ event.host__hostname }}</a>
+                            {% else %}
+                            <span class="text-muted">{{ event.host__hostname }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ event.get_event_type_display }}</td>
+                        <td><a href="{% url 'siem:event_detail' event.id %}" class="text-decoration-none">{{ event.message }}</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">Критических событий не найдено</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

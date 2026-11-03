@@ -15,8 +15,26 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
+from rest_framework.routers import DefaultRouter
+from siem import views as siem_views
+
+router = DefaultRouter()
+router.register(r'api/siem/ingest', siem_views.IngestViewSet, basename='ingest')
+router.register(r'api/siem/ingest/inventory', siem_views.InventoryIngestViewSet, basename='inventory')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('accounts/', include('accounts.urls', namespace='accounts')),
+    path('equipment/', include('equipment.urls')),
+    path('siem/', include('siem.urls')),
 ]
+
+# API-маршруты для агентов
+urlpatterns += router.urls
+
+# Обслуживание статических файлов в режиме разработки
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0] if settings.STATICFILES_DIRS else None)

@@ -1,0 +1,208 @@
+{% extends "siem/base.html" %}
+
+{% block title %}{{ leave.employee }} — {{ leave.get_leave_type_display }}{% endblock %}
+
+{% block sidebar %}
+    <li class="mb-2">
+        <a href="{% url 'siem:dashboard' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-speedometer2 me-2"></i>Дашборд
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:hosts' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-pc-display me-2"></i>Хосты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:events' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-shield-exclamation me-2"></i>События
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-light">
+            <i class="bi bi-calendar-x me-2"></i>Отсутствия
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-bell-exclamation me-2"></i>Алерты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:screen_lock_log' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-lock-fill me-2"></i>Журнал блокировок
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:report_security' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>Отчёты
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-muted">
+        <i class="bi bi-arrow-left me-1"></i>Назад к списку
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Период отсутствия</h5>
+                <div>
+                    <a href="{% url 'siem:leave_edit' pk=leave.pk %}" class="btn btn-sm btn-outline-secondary me-2">
+                        <i class="bi bi-pencil me-1"></i>Редактировать
+                    </a>
+                    <a href="{% url 'siem:leave_delete' pk=leave.pk %}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash me-1"></i>Удалить
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <th style="width: 200px;">Сотрудник:</th>
+                        <td>
+                            <strong>{{ leave.employee.last_name }} {{ leave.employee.first_name }} {{ leave.employee.patronymic }}</strong><br>
+                            <small class="text-muted">@{{ leave.employee.username }} | {{ leave.employee.domain_account|default:"—" }}</small>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Тип отсутствия:</th>
+                        <td>
+                            <span class="badge bg-{{ leave.leave_type|yesno:'primary,secondary,danger,warning,info' }}">
+                                {{ leave.get_leave_type_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Период:</th>
+                        <td>{{ leave.start_date|date:"d.m.Y" }} — {{ leave.end_date|date:"d.m.Y" }} ({{ leave.start_date|date:"D" }} — {{ leave.end_date|date:"D" }})</td>
+                    </tr>
+                    <tr>
+                        <th>Дней:</th>
+                        <td>{{ leave.start_date|date:"U"|add:"0"|add:leave.end_date|date:"U"|add:"-1"|divisibleby:86400|yesno:"вычисляется","—" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Статус:</th>
+                        <td>
+                            {% if leave.is_active %}
+                                <span class="badge bg-success">Активно</span>
+                            {% elif leave.is_approved %}
+                                <span class="badge bg-info">Согласовано</span>
+                            {% else %}
+                                <span class="badge bg-warning">Ожидает согласования</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Согласовал:</th>
+                        <td>
+                            {% if leave.approved_by %}
+                                {{ leave.approved_by.last_name }} {{ leave.approved_by.first_name }}
+                            {% else %}
+                                <span class="text-muted">Не согласовано</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Причина:</th>
+                        <td>{{ leave.reason|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Создано:</th>
+                        <td>{{ leave.created_at|date:"d.m.Y H:i" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Обновлено:</th>
+                        <td>{{ leave.updated_at|date:"d.m.Y H:i" }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Алерты по этому отсутствию -->
+        {% if leave.alerts.exists %}
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-bell-exclamation me-2"></i>Алерты ({{ leave.alerts.count }})</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Время входа</th>
+                            <th>Хост</th>
+                            <th>Пользователь</th>
+                            <th>Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for alert in leave.alerts.all|slice:":10" %}
+                        <tr>
+                            <td>{{ alert.login_time|date:"d.m.Y H:i:s" }}</td>
+                            <td>{{ alert.host.hostname }}</td>
+                            <td>{{ alert.username }}{% if alert.domain_account %} ({{ alert.domain_account }}){% endif %}</td>
+                            <td>
+                                {% if alert.is_acknowledged %}
+                                    <span class="badge bg-success">Подтверждён</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Новый</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">Информация о сотруднике</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Подразделение:</strong> {{ leave.employee.department|default:"—" }}</p>
+                <p><strong>Должность:</strong> {{ leave.employee.position|default:"—" }}</p>
+                <p><strong>Табельный номер:</strong> {{ leave.employee.tab_number|default:"—" }}</p>
+                <p><strong>Корп. телефон:</strong> {{ leave.employee.corporate_phone|default:"—" }}</p>
+                <p><strong>Корп. Email:</strong> {{ leave.employee.corporate_email|default:"—" }}</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Другие отсутствия</h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    {% for other_leave in leave.employee.leaves.all|slice:":10" %}
+                    {% if other_leave.pk != leave.pk %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'siem:leave_detail' pk=other_leave.pk %}" class="text-decoration-none">
+                                {{ other_leave.start_date|date:"d.m" }} — {{ other_leave.end_date|date:"d.m.Y" }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ other_leave.leave_type|yesno:'primary,secondary,danger,warning,info' }}">
+                                {{ other_leave.get_leave_type_display|truncatechars:10 }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% empty %}
+                    <tr><td colspan="2" class="text-muted">Нет других записей</td></tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "siem/base.html" %}
+
+{% block title %}Удалить отсутствие — SIEM{% endblock %}
+
+{% block sidebar %}
+    <li class="mb-2">
+        <a href="{% url 'siem:dashboard' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-speedometer2 me-2"></i>Дашборд
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:hosts' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-pc-display me-2"></i>Хосты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:events' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-shield-exclamation me-2"></i>События
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-light">
+            <i class="bi bi-calendar-x me-2"></i>Отсутствия
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-bell-exclamation me-2"></i>Алерты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:screen_lock_log' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-lock-fill me-2"></i>Журнал блокировок
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:report_security' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>Отчёты
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'siem:leave_detail' pk=leave.pk %}" class="text-decoration-none text-muted">
+        <i class="bi bi-arrow-left me-1"></i>Назад к деталям
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Удаление записи</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">Вы уверены, что хотите удалить период отсутствия:</p>
+                <div class="alert alert-light border">
+                    <strong>{{ leave.employee.last_name }} {{ leave.employee.first_name }}</strong><br>
+                    {{ leave.get_leave_type_display }}: {{ leave.start_date|date:"d.m.Y" }} — {{ leave.end_date|date:"d.m.Y" }}
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash me-1"></i>Удалить
+                        </button>
+                        <a href="{% url 'siem:leave_detail' pk=leave.pk %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

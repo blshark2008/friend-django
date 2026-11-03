@@ -1,0 +1,306 @@
+{% extends 'equipment/equipment_detail_base.html' %}
+{% load static %}
+
+{% block top_cards %}
+    {% if instance.hostname %}
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-hdd-network fs-1 text-info"></i>
+                <h6 class="mt-2 mb-0 text-muted">Сетевое имя</h6>
+                <strong>{{ instance.hostname }}</strong>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if instance.ip_address %}
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-ethernet fs-1 text-info"></i>
+                <h6 class="mt-2 mb-0 text-muted">IP / MAC</h6>
+                <small><code>{{ instance.ip_address }}</code></small>
+                {% if instance.mac_address %}
+                <br><small class="text-muted">{{ instance.mac_address }}</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if instance.cpu %}
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-cpu fs-1 text-success"></i>
+                <h6 class="mt-2 mb-0 text-muted">Процессор</h6>
+                <strong>{{ instance.cpu }}</strong>
+                {% if instance.ram_gb %}
+                <br><small class="text-muted">{{ instance.ram_gb }} ГБ ОЗУ</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if instance.storage_gb %}
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-hdd fs-1 text-warning"></i>
+                <h6 class="mt-2 mb-0 text-muted">Диск</h6>
+                <strong>{{ instance.storage_gb }} ГБ</strong>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}
+
+{% block info_tabs %}
+<div class="row g-4">
+    <!-- Основная информация -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Основная информация</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted" style="width:40%">Инв. номер</td><td><strong>{{ instance.inventory_number|default:"—" }}</strong></td></tr>
+                    <tr><td class="text-muted">Серийный номер</td><td>{{ instance.serial_number|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Название</td><td>{{ instance.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Бренд</td><td>{{ instance.brand|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Модель</td><td>{{ instance.model|default:"—" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Аппаратное обеспечение -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Аппаратное обеспечение</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted" style="width:40%">Процессор</td><td>{{ instance.cpu|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">ОЗУ</td><td>{{ instance.ram_gb|default:"—" }} ГБ</td></tr>
+                    <tr><td class="text-muted">Диск</td><td>{{ instance.storage_gb|default:"—" }} ГБ</td></tr>
+                    <tr><td class="text-muted">Диагональ экрана</td><td>{{ instance.screen_size|default:"—" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Программное обеспечение -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Программное обеспечение</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted" style="width:40%">ОС</td><td>{{ instance.os|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Версия ОС</td><td>{{ instance.os_version|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Антивирус</td><td>{{ instance.antivirus_engine|default:"—" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Сетевая информация -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Сетевая информация</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted" style="width:40%">Имя в сети</td><td><strong>{{ instance.hostname|default:"—" }}</strong></td></tr>
+                    <tr><td class="text-muted">IP-адрес</td><td><code>{{ instance.ip_address|default:"—" }}</code></td></tr>
+                    <tr><td class="text-muted">MAC-адрес</td><td><code>{{ instance.mac_address|default:"—" }}</code></td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Расположение -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Расположение</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted" style="width:40%">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Место</td><td>{{ instance.place|default:"—" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Статус оборудования -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Статус оборудования</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted" style="width:40%">Активен</td>
+                        <td>
+                            {% if instance.is_active %}
+                            <span class="badge bg-success">Да</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Нет</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">В архиве</td>
+                        <td>
+                            {% if instance.archived %}
+                            <span class="badge bg-warning text-dark">Да</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Нет</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if instance.last_scan %}
+                    <tr><td class="text-muted">Последний скан</td><td>{{ instance.last_scan|date:"d.m.Y H:i" }}</td></tr>
+                    {% else %}
+                    <tr><td class="text-muted">Последний скан</td><td>—</td></tr>
+                    {% endif %}
+                    <tr><td class="text-muted">Создан</td><td>{{ instance.created_at|date:"d.m.Y H:i" }}</td></tr>
+                    <tr><td class="text-muted">Обновлён</td><td>{{ instance.updated_at|date:"d.m.Y H:i" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Закреплённый сотрудник -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-person-badge me-1"></i> Закреплённый сотрудник</h6>
+                <div class="btn-group btn-group-sm">
+                    {% if instance.assigned_user %}
+                    <button type="button" class="btn btn-outline-warning" onclick="openReplaceUserModal('assigned', {{ instance.pk }}, '{{ equipment_type }}')">
+                        <i class="bi bi-arrow-repeat"></i> Заменить
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="clearAssignedUser('{{ equipment_type }}', {{ instance.pk }})">
+                        <i class="bi bi-x"></i>
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-outline-primary" onclick="openAddUserModal('assigned', {{ instance.pk }}, '{{ equipment_type }}')">
+                        <i class="bi bi-person-plus"></i> Добавить
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted" style="width:40%">ФИО</td>
+                        <td>
+                            {% if instance.assigned_user %}
+                            <strong>{{ instance.assigned_user.last_name }} {{ instance.assigned_user.first_name }} {{ instance.assigned_user.patronymic|default:"—" }}</strong>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if instance.assigned_user %}
+                    <tr><td class="text-muted">Табельный номер</td><td>{{ instance.assigned_user.tab_number|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Подразделение</td><td>{{ instance.assigned_user.department.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Должность</td><td>{{ instance.assigned_user.position.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Корп. Email</td><td>{{ instance.assigned_user.corporate_email|default:"—" }}</td></tr>
+                    {% else %}
+                    <tr><td class="text-muted">Табельный номер</td><td>—</td></tr>
+                    <tr><td class="text-muted">Подразделение</td><td>—</td></tr>
+                    <tr><td class="text-muted">Должность</td><td>—</td></tr>
+                    <tr><td class="text-muted">Email</td><td>—</td></tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОЛ (Материально ответственное лицо) -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-person-check me-1"></i> Материально ответственное лицо (МОЛ)</h6>
+                <div class="btn-group btn-group-sm">
+                    {% if instance.responsible_user %}
+                    <button type="button" class="btn btn-outline-warning" onclick="openReplaceUserModal('responsible', {{ instance.pk }}, '{{ equipment_type }}')">
+                        <i class="bi bi-arrow-repeat"></i> Заменить
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="clearResponsibleUser('{{ equipment_type }}', {{ instance.pk }})">
+                        <i class="bi bi-x"></i>
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-outline-primary" onclick="openAddUserModal('responsible', {{ instance.pk }}, '{{ equipment_type }}')">
+                        <i class="bi bi-person-plus"></i> Добавить
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted" style="width:40%">ФИО</td>
+                        <td>
+                            {% if instance.responsible_user %}
+                            <strong>{{ instance.responsible_user.last_name }} {{ instance.responsible_user.first_name }} {{ instance.responsible_user.patronymic|default:"—" }}</strong>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if instance.responsible_user %}
+                    <tr><td class="text-muted">Табельный номер</td><td>{{ instance.responsible_user.tab_number|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Подразделение</td><td>{{ instance.responsible_user.department.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Должность</td><td>{{ instance.responsible_user.position.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Корп. Email</td><td>{{ instance.responsible_user.corporate_email|default:"—" }}</td></tr>
+                    {% else %}
+                    <tr><td class="text-muted">Табельный номер</td><td>—</td></tr>
+                    <tr><td class="text-muted">Подразделение</td><td>—</td></tr>
+                    <tr><td class="text-muted">Должность</td><td>—</td></tr>
+                    <tr><td class="text-muted">Email</td><td>—</td></tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статус безопасности -->
+<div class="card table-card mt-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Статус безопасности</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        {% if instance.antivirus_active %}
+                        <i class="bi bi-shield-check fs-3 text-success"></i>
+                        {% else %}
+                        <i class="bi bi-shield-x fs-3 text-danger"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0">Антивирус</h6>
+                        <small class="text-muted">{{ instance.antivirus_engine|default:"Не настроен" }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        {% if instance.is_secured %}
+                        <i class="bi bi-patch-check fs-3 text-success"></i>
+                        {% else %}
+                        <i class="bi bi-patch-exclamation fs-3 text-warning"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0">Общий статус</h6>
+                        <small class="text-muted">{% if instance.is_secured %}Защищён{% else %}Требует внимания{% endif %}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

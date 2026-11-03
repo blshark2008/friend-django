@@ -1,0 +1,496 @@
+{% extends 'equipment/base.html' %}
+{% load static %}
+
+{% block content %}
+{% csrf_token %}
+
+<!-- ===== КНОПКИ УПРАВЛЕНИЯ И ТИП УСТРОЙСТВА ===== -->
+<div class="row g-3 mb-4 align-items-center">
+    <div class="col-auto">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="{{ type_icon }} fs-1 text-primary"></i>
+                <h6 class="mt-2 mb-0 text-muted">Тип</h6>
+                <strong>{{ type_label }}</strong>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="d-flex gap-2 flex-wrap justify-content-end">
+            <a href="{% url 'equipment:list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Назад
+            </a>
+            <a href="{% url 'equipment:edit' equipment_type instance.pk %}" class="btn btn-primary">
+                <i class="bi bi-pencil me-1"></i> Редактировать
+            </a>
+            {% if instance.serial_number %}
+            <button type="button" class="btn btn-success" id="syncFromSiemBtn"
+                    data-equipment-type="{{ equipment_type }}"
+                    data-equipment-pk="{{ instance.pk }}"
+                    data-serial="{{ instance.serial_number }}">
+                <i class="bi bi-arrow-repeat me-1"></i> Синхронизировать с SIEM
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-secondary" disabled title="Укажите серийный номер в настройках">
+                <i class="bi bi-arrow-repeat me-1"></i> Синхронизировать с SIEM
+            </button>
+            {% endif %}
+            {% if instance.serial_number %}
+            <a href="{% url 'equipment:siem_host_redirect' instance.serial_number %}?equipment_type={{ equipment_type }}&equipment_pk={{ instance.pk }}"
+               class="btn btn-info">
+                <i class="bi bi-box-arrow-up-right me-1"></i> Перейти в SIEM
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ===== КАРТОЧКИ СВЕРХУ ===== -->
+<div class="row g-3 mb-4">
+    {% block top_cards %}{% endblock %}
+</div>
+
+<!-- ===== ТАБЫ ===== -->
+<ul class="nav nav-tabs mb-3" id="detailTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab">
+            <i class="bi bi-info-circle me-1"></i> Информация
+        </button>
+    </li>
+    {% if events|length > 0 %}
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="events-tab" data-bs-toggle="tab" data-bs-target="#events" type="button" role="tab">
+            <i class="bi bi-clock-history me-1"></i> События SIEM
+            <span class="badge bg-primary ms-1">{{ events|length }}</span>
+        </button>
+    </li>
+    {% endif %}
+    {% if incidents|length > 0 %}
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="incidents-tab" data-bs-toggle="tab" data-bs-target="#incidents" type="button" role="tab">
+            <i class="bi bi-exclamation-triangle me-1"></i> Инциденты
+            <span class="badge bg-danger ms-1">{{ incidents|length }}</span>
+        </button>
+    </li>
+    {% endif %}
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments" type="button" role="tab">
+            <i class="bi bi-link-45deg me-1"></i> Назначения
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="detailTabsContent">
+    <!-- TAB: Информация -->
+    <div class="tab-pane fade show active" id="info" role="tabpanel">
+        {% block info_tabs %}{% endblock %}
+    </div>
+
+    <!-- TAB: События SIEM -->
+    {% if events %}
+    <div class="tab-pane fade" id="events" role="tabpanel">
+        <div class="card table-card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Тип</th><th>Серьёзность</th><th>Описание</th><th>Решено</th><th>Время</th></tr></thead>
+                        <tbody>
+                            {% for event in events %}
+                            <tr>
+                                <td>{{ event.get_event_type_display }}</td>
+                                <td>
+                                    {% if event.severity == 'critical' %}<span class="badge bg-danger">Крит</span>
+                                    {% elif event.severity == 'warning' %}<span class="badge bg-warning text-dark">Пред</span>
+                                    {% else %}<span class="badge bg-secondary">Инфо</span>{% endif %}
+                                </td>
+                                <td>{{ event.description|truncatewords:10 }}</td>
+                                <td>{% if event.is_resolved %}<span class="badge bg-success">Да</span>{% else %}<span class="badge bg-warning text-dark">Нет</span>{% endif %}</td>
+                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ event.occurred_at|date:"d.m.Y H:i" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- TAB: Инциденты -->
+    {% if incidents %}
+    <div class="tab-pane fade" id="incidents" role="tabpanel">
+        <div class="card table-card">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Заголовок</th><th>Серьёзность</th><th>Статус</th><th>Создан</th></tr></thead>
+                        <tbody>
+                            {% for incident in incidents %}
+                            <tr>
+                                <td>{{ incident.title }}</td>
+                                <td>
+                                    {% if incident.severity == 'critical' %}<span class="badge bg-danger">Крит</span>
+                                    {% elif incident.severity == 'high' %}<span class="badge bg-warning text-dark">Высокий</span>
+                                    {% elif incident.severity == 'medium' %}<span class="badge bg-info">Средний</span>
+                                    {% else %}<span class="badge bg-secondary">Низкий</span>{% endif %}
+                                </td>
+                                <td>
+                                    {% if incident.status == 'open' %}<span class="badge bg-danger">Открыт</span>
+                                    {% elif incident.status == 'investigating' %}<span class="badge bg-warning text-dark">Расследуется</span>
+                                    {% elif incident.status == 'resolved' %}<span class="badge bg-success">Решён</span>
+                                    {% else %}<span class="badge bg-secondary">Закрыт</span>{% endif %}
+                                </td>
+                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ incident.created_at|date:"d.m.Y H:i" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- TAB: Назначения -->
+    <div class="tab-pane fade" id="assignments" role="tabpanel">
+        <div class="card table-card">
+            <div class="card-body p-0">
+                {% if assignments %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Пользователь</th><th>Назначен</th><th>Возвращён</th><th>Статус</th><th>Примечание</th></tr></thead>
+                        <tbody>
+                            {% for a in assignments %}
+                            <tr>
+                                <td>{{ a.user.get_full_name|default:a.user.username }}</td>
+                                <td class="text-nowrap">{{ a.assigned_at|date:"d.m.Y" }}</td>
+                                <td class="text-nowrap">{{ a.returned_at|date:"d.m.Y"|default:"—" }}</td>
+                                <td>{% if a.is_active %}<span class="badge bg-success">Активно</span>{% else %}<span class="badge bg-secondary">Возвращено</span>{% endif %}</td>
+                                <td>{{ a.notes|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">Назначений нет</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальные окна -->
+<div class="modal fade" id="changeAssignedUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Закрепить за сотрудником</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Пользователь</label>
+                    <select class="form-select" id="detailAssignedUserSelect">
+                        <option value="">— Не выбран —</option>
+                        {% for user in all_users %}
+                        <option value="{{ user.id }}">{{ user.last_name }} {{ user.first_name }} ({{ user.username }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="detailAssignedSaveBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="changeResponsibleUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Назначить МОЛ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Материально ответственное лицо</label>
+                    <select class="form-select" id="detailResponsibleUserSelect">
+                        <option value="">— Снять МОЛ —</option>
+                        {% for user in all_users %}
+                        <option value="{{ user.id }}">{{ user.last_name }} {{ user.first_name }} {{ user.patronymic }} ({{ user.username }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="detailResponsibleSaveBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно: поиск и выбор пользователя -->
+<div class="modal fade" id="userSearchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userSearchModalTitle">Поиск сотрудника</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="userSearchFio" placeholder="Фамилия, Имя...">
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="userSearchTab" placeholder="Табельный номер">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="button" class="btn btn-primary w-100" id="userSearchBtn">
+                            <i class="bi bi-search me-1"></i> Найти
+                        </button>
+                    </div>
+                </div>
+                <div id="userSearchResults" class="table-responsive">
+                    <div class="text-center text-muted py-4">Введите параметры поиска и нажмите "Найти"</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="confirmUserAssignBtn" style="display:none;">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // SIEM sync
+    const siemBtn = document.getElementById('syncFromSiemBtn');
+    if (siemBtn && !siemBtn.disabled) {
+        siemBtn.addEventListener('click', function() {
+            const et = this.dataset.equipmentType;
+            const ek = this.dataset.equipmentPk;
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Синхронизация...';
+            fetch('/equipment/update-siem/' + et + '/' + ek + '/', {
+                method: 'POST',
+                headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) location.reload();
+                else { alert('Ошибка: ' + data.error); siemBtn.disabled = false; siemBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Синхронизировать с SIEM'; }
+            })
+            .catch(err => { alert('Ошибка: ' + err.message); siemBtn.disabled = false; siemBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Синхронизировать с SIEM'; });
+        });
+    }
+
+    // Assign user
+    document.getElementById('detailAssignedSaveBtn').addEventListener('click', function() {
+        const userId = document.getElementById('detailAssignedUserSelect').value;
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+        fetch('/equipment/assign/{{ equipment_type }}/{{ instance.pk }}/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+            body: new URLSearchParams({'user': userId}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) location.reload();
+            else { alert('Ошибка: ' + data.error); btn.disabled = false; btn.innerHTML = 'Сохранить'; }
+        })
+        .catch(err => { alert('Ошибка'); btn.disabled = false; btn.innerHTML = 'Сохранить'; });
+    });
+
+    // Assign MOL
+    document.getElementById('detailResponsibleSaveBtn').addEventListener('click', function() {
+        const userId = document.getElementById('detailResponsibleUserSelect').value;
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+        fetch('/equipment/assign-mol/{{ equipment_type }}/{{ instance.pk }}/', {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+            body: new URLSearchParams({'user': userId}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) location.reload();
+            else { alert('Ошибка: ' + data.error); btn.disabled = false; btn.innerHTML = 'Сохранить'; }
+        })
+        .catch(err => { alert('Ошибка'); btn.disabled = false; btn.innerHTML = 'Сохранить'; });
+    });
+
+    // User search modal
+    let currentAssignType = '';
+    let currentEquipPk = 0;
+    let currentEquipType = '';
+
+    window.openAddUserModal = function(type, equipPk, equipType) {
+        currentAssignType = type;
+        currentEquipPk = equipPk;
+        currentEquipType = equipType;
+        document.getElementById('userSearchModalTitle').textContent = type === 'assigned' ? 'Добавить закрепённого сотрудника' : 'Добавить МОЛ';
+        document.getElementById('userSearchFio').value = '';
+        document.getElementById('userSearchTab').value = '';
+        document.getElementById('userSearchResults').innerHTML = '<div class="text-center text-muted py-4">Введите параметры поиска и нажмите "Найти"</div>';
+        document.getElementById('confirmUserAssignBtn').style.display = 'none';
+        new bootstrap.Modal(document.getElementById('userSearchModal')).show();
+    };
+
+    window.openReplaceUserModal = function(type, equipPk, equipType) {
+        currentAssignType = type;
+        currentEquipPk = equipPk;
+        currentEquipType = equipType;
+        document.getElementById('userSearchModalTitle').textContent = type === 'assigned' ? 'Заменить закрепённого сотрудника' : 'Заменить МОЛ';
+        document.getElementById('userSearchFio').value = '';
+        document.getElementById('userSearchTab').value = '';
+        document.getElementById('userSearchResults').innerHTML = '<div class="text-center text-muted py-4">Введите параметры поиска и нажмите "Найти"</div>';
+        document.getElementById('confirmUserAssignBtn').style.display = 'none';
+        new bootstrap.Modal(document.getElementById('userSearchModal')).show();
+    };
+
+    document.getElementById('userSearchBtn').addEventListener('click', function() {
+        const fio = document.getElementById('userSearchFio').value.trim();
+        const tab = document.getElementById('userSearchTab').value.trim();
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Поиск...';
+
+        const params = new URLSearchParams();
+        if (fio) params.append('fio', fio);
+        if (tab) params.append('tab', tab);
+        const url = '/equipment/search-users/?' + params.toString();
+        console.log('Search URL:', url);
+        console.log('FIO:', fio, 'TAB:', tab);
+
+        fetch(url, {
+            method: 'GET',
+            headers: {'X-Requested-With': 'XMLHttpRequest'},
+        })
+        .then(r => {
+            console.log('Response status:', r.status, r.statusText);
+            return r.text().then(text => {
+                console.log('Response text:', text);
+                try {
+                    return JSON.parse(text);
+                } catch(e) {
+                    console.error('JSON parse error:', e);
+                    return {error: 'Invalid JSON: ' + text};
+                }
+            });
+        })
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-search me-1"></i> Найти';
+            console.log('Parsed data:', data);
+            if (data.error) {
+                alert('Ошибка: ' + data.error);
+                return;
+            }
+            if (!data.users || data.users.length === 0) {
+                document.getElementById('userSearchResults').innerHTML = '<div class="text-center text-muted py-4">Никого не найдено</div>';
+                return;
+            }
+            let html = '<table class="table table-hover"><thead><tr><th>ФИО</th><th>Табельный</th><th>Подразделение</th><th>Действие</th></tr></thead><tbody>';
+            data.users.forEach(u => {
+                html += `<tr>
+                    <td><strong>${u.last_name} ${u.first_name} ${u.patronymic || ''}</strong></td>
+                    <td>${u.tab_number || '—'}</td>
+                    <td>${u.department || '—'}</td>
+                    <td><button type="button" class="btn btn-sm btn-primary" onclick="selectUserForAssign(${u.id}, '${u.last_name} ${u.first_name}')">Выбрать</button></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('userSearchResults').innerHTML = html;
+        })
+        .catch(err => {
+            console.error('Fetch error:', err);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-search me-1"></i> Найти';
+            alert('Ошибка поиска: ' + err.message);
+        });
+    });
+
+    window.selectUserForAssign = function(userId, userName) {
+        const confirmBtn = document.getElementById('confirmUserAssignBtn');
+        confirmBtn.style.display = 'inline-block';
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Подтвердить назначение';
+        confirmBtn.onclick = function() {
+            confirmUserAssign(userId);
+        };
+    };
+
+    function confirmUserAssign(userId) {
+        const url = currentAssignType === 'assigned'
+            ? `/equipment/assign/${currentEquipType}/${currentEquipPk}/`
+            : `/equipment/assign-mol/${currentEquipType}/${currentEquipPk}/`;
+        fetch(url, {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+            body: new URLSearchParams({'user': userId}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) location.reload();
+            else alert('Ошибка: ' + data.error);
+        })
+        .catch(err => alert('Ошибка: ' + err.message));
+    }
+
+    window.clearAssignedUser = function(equipType, equipPk) {
+        if (!confirm('Снять закреплённого сотрудника?')) return;
+        fetch(`/equipment/clear-assign/${equipType}/${equipPk}/`, {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) location.reload();
+            else alert('Ошибка: ' + data.error);
+        })
+        .catch(err => alert('Ошибка: ' + err.message));
+    };
+
+    window.clearResponsibleUser = function(equipType, equipPk) {
+        if (!confirm('Снять МОЛ?')) return;
+        fetch(`/equipment/clear-mol/${equipType}/${equipPk}/`, {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) location.reload();
+            else alert('Ошибка: ' + data.error);
+        })
+        .catch(err => alert('Ошибка: ' + err.message));
+    };
+});
+</script>
+{% endblock %}

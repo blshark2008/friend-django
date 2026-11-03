@@ -1,0 +1,215 @@
+{% extends 'equipment/base.html' %}
+
+{% block title %}Справочник категорий{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-book me-2"></i>Справочник категорий</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Общая статистика -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="icon-box bg-primary bg-opacity-10 text-primary me-3">
+                    <i class="bi bi-pc-display"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Всего единиц</div>
+                    <div class="h4 mb-0">{{ category_stats.values|length }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="icon-box bg-success bg-opacity-10 text-success me-3">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Закреплено</div>
+                    <div class="h4 mb-0">{{ assigned_count }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="icon-box bg-warning bg-opacity-10 text-warning me-3">
+                    <i class="bi bi-person-x"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">Не закреплено</div>
+                    <div class="h4 mb-0">{{ unassigned_count }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center">
+                <div class="icon-box bg-info bg-opacity-10 text-info me-3">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">С защитой</div>
+                    <div class="h4 mb-0">{{ secured_count }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Категории оборудования -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <h5 class="mb-3"><i class="bi bi-tags me-2"></i>Категории и подтипы</h5>
+    </div>
+    {% for cat_label, cat_data in category_stats.items %}
+    <div class="col-lg-6 col-xl-4">
+        <div class="card table-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    {% if cat_data.value == 'computer' %}
+                    <i class="bi bi-pc-display me-2 text-primary"></i>
+                    {% elif cat_data.value == 'printer' %}
+                    <i class="bi bi-printer me-2 text-info"></i>
+                    {% elif cat_data.value == 'periphery' %}
+                    <i class="bi bi-hdd-stack me-2 text-warning"></i>
+                    {% else %}
+                    <i class="bi bi-circle me-2 text-secondary"></i>
+                    {% endif %}
+                    {{ cat_label }}
+                </h6>
+                <span class="badge bg-primary rounded-pill">{{ cat_data.count }}</span>
+            </div>
+            <div class="card-body p-0">
+                {% if cat_data.subtypes %}
+                <table class="table table-hover mb-0">
+                    <tbody>
+                        {% for sub_label, sub_count in cat_data.subtypes.items %}
+                        <tr>
+                            <td>
+                                <i class="bi bi-circle-fill text-muted me-2" style="font-size: 6px;"></i>
+                                {{ sub_label }}
+                            </td>
+                            <td class="text-end">
+                                <span class="badge bg-light text-dark border">{{ sub_count }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-3 text-center text-muted">
+                    <small>Нет подтипов</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Статусы оборудования -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <h5 class="mb-3"><i class="bi bi-signpost-split me-2"></i>Статусы</h5>
+    </div>
+    <div class="col-md-4">
+        <div class="card table-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span><i class="bi bi-check-circle-fill text-success me-2"></i>Активно</span>
+                    <span class="badge bg-success">{{ status_stats.Активно|default:0 }}</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-success" role="progressbar"
+                         style="width: {% if status_stats.Активно %}{{ status_stats.Активно|floatformat:0 }}{% else %}0{% endif %}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card table-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span><i class="bi bi-tools text-warning me-2"></i>Обслуживание</span>
+                    <span class="badge bg-warning text-dark">{{ status_stats.Обслуживание|default:0 }}</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-warning" role="progressbar"
+                         style="width: {% if status_stats.Обслуживание %}{{ status_stats.Обслуживание|floatformat:0 }}{% else %}0{% endif %}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card table-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span><i class="bi bi-trash text-danger me-2"></i>Списано</span>
+                    <span class="badge bg-danger">{{ status_stats.Списано|default:0 }}</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-danger" role="progressbar"
+                         style="width: {% if status_stats.Списано %}{{ status_stats.Списано|floatformat:0 }}{% else %}0{% endif %}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Закрепление и защита -->
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-person-check me-2"></i>Закрепление за пользователями</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-success bg-opacity-10 rounded">
+                            <div class="h4 mb-0 text-success">{{ assigned_count }}</div>
+                            <small class="text-muted">Закреплено</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-warning bg-opacity-10 rounded">
+                            <div class="h4 mb-0 text-warning">{{ unassigned_count }}</div>
+                            <small class="text-muted">Не закреплено</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-shield-check me-2"></i>Антивирусная защита</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-info bg-opacity-10 rounded">
+                            <div class="h4 mb-0 text-info">{{ secured_count }}</div>
+                            <small class="text-muted">Защищено</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-center p-3 bg-danger bg-opacity-10 rounded">
+                            <div class="h4 mb-0 text-danger">{{ unsecured_count }}</div>
+                            <small class="text-muted">Не защищено</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,175 @@
+{% extends "accounts/base.html" %}
+
+{% block title %}Редактирование — {{ user.get_full_name }} — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-pencil me-2"></i>Редактирование: {{ user.last_name }} {{ user.first_name }} {{ user.patronymic|default:"—" }}</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Back button -->
+<a href="{% url 'accounts:user_general' user.pk %}" class="btn btn-outline-secondary btn-sm mb-4">
+    <i class="bi bi-arrow-left me-1"></i>Назад к профилю
+</a>
+
+<!-- Edit form -->
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Редактирование профиля</h5>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <!-- ФИО -->
+            <h6 class="text-muted small text-uppercase mb-3 border-bottom pb-2">
+                <i class="bi bi-person me-1"></i>Основные данные
+            </h6>
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Фамилия</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Имя</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Отчество</label>
+                    {{ form.patronymic }}
+                    {% if form.patronymic.errors %}<div class="text-danger small">{{ form.patronymic.errors }}</div>{% endif %}
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Табельный номер</label>
+                    {{ form.tab_number }}
+                    {% if form.tab_number.errors %}<div class="text-danger small">{{ form.tab_number.errors }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Логин</label>
+                    {{ form.username }}
+                    {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <!-- Подразделение и должность -->
+            <h6 class="text-muted small text-uppercase mb-3 border-bottom pb-2 mt-4">
+                <i class="bi bi-building me-1"></i>Рабочая информация
+            </h6>
+            <div class="row mb-3 g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Подразделение</label>
+                    <div style="max-width: 100%;">
+                        {{ form.department }}
+                        {% if form.department.errors %}<div class="text-danger small">{{ form.department.errors }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Должность</label>
+                    <div style="max-width: 100%;">
+                        {{ form.position }}
+                        {% if form.position.errors %}<div class="text-danger small">{{ form.position.errors }}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-3 g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Дата приёма</label>
+                    <div style="max-width: 100%;">
+                        {{ form.hire_date }}
+                        {% if form.hire_date.errors %}<div class="text-danger small">{{ form.hire_date.errors }}</div>{% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Дата увольнения</label>
+                    <div style="max-width: 100%;">
+                        {{ form.fire_date }}
+                        {% if form.fire_date.errors %}<div class="text-danger small">{{ form.fire_date.errors }}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Контакты -->
+            <h6 class="text-muted small text-uppercase mb-3 border-bottom pb-2 mt-4">
+                <i class="bi bi-envelope me-1"></i>Контактные данные
+            </h6>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Корпоративный Email</label>
+                    {{ form.corporate_email }}
+                    {% if form.corporate_email.errors %}<div class="text-danger small">{{ form.corporate_email.errors }}</div>{% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Личный Email</label>
+                    {{ form.personal_email }}
+                    {% if form.personal_email.errors %}<div class="text-danger small">{{ form.personal_email.errors }}</div>{% endif %}
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Корпоративный телефон</label>
+                    {{ form.corporate_phone }}
+                    {% if form.corporate_phone.errors %}<div class="text-danger small">{{ form.corporate_phone.errors }}</div>{% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Личный телефон</label>
+                    {{ form.personal_phone }}
+                    {% if form.personal_phone.errors %}<div class="text-danger small">{{ form.personal_phone.errors }}</div>{% endif %}
+                </div>
+            </div>
+
+            <!-- Дополнительно -->
+            <h6 class="text-muted small text-uppercase mb-3 border-bottom pb-2 mt-4">
+                <i class="bi bi-shield-lock me-1"></i>Дополнительно
+            </h6>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">СНИЛС</label>
+                    {{ form.snils }}
+                    {% if form.snils.errors %}<div class="text-danger small">{{ form.snils.errors }}</div>{% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Доменная учётная запись</label>
+                    {{ form.domain_account }}
+                    {% if form.domain_account.errors %}<div class="text-danger small">{{ form.domain_account.errors }}</div>{% endif %}
+                </div>
+            </div>
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="form-check">
+                        {{ form.is_mol }}
+                        <label class="form-check-label" for="{{ form.is_mol.id_for_label }}">
+                            Материально-ответственное лицо (МОЛ)
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        {{ form.is_admin }}
+                        <label class="form-check-label" for="{{ form.is_admin.id_for_label }}">
+                            Администратор
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i>Сохранить
+                </button>
+                <a href="{% url 'accounts:user_general' user.pk %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg me-1"></i>Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

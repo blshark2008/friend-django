@@ -1,0 +1,209 @@
+{% extends "siem/base.html" %}
+
+{% block title %}Вход — SIEM{% endblock %}
+
+{% block sidebar %}
+    <li class="mb-2">
+        <a href="{% url 'siem:dashboard' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-speedometer2 me-2"></i>Дашборд
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:hosts' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-pc-display me-2"></i>Хосты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:events' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-shield-exclamation me-2"></i>События
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:login_history' %}" class="text-decoration-none text-light">
+            <i class="bi bi-box-arrow-in-right me-2"></i>История входов
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-calendar-x me-2"></i>Отсутствия
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-bell-exclamation me-2"></i>Алерты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:screen_lock_log' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-lock-fill me-2"></i>Журнал блокировок
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:report_security' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>Отчёты
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-box-arrow-in-right me-2"></i>Детали входа</h2>
+    <a href="{% url 'siem:login_history' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Назад к списку
+    </a>
+</div>
+
+<!-- Основная информация -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Информация о входе</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <th style="width: 40%;">Логин:</th>
+                        <td>
+                            <strong>{{ login.username }}</strong>
+                            {% if not login.is_matched %}
+                                <span class="badge bg-warning text-dark ms-2">Неизвестный пользователь</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Время входа:</th>
+                        <td>{{ login.login_time|date:"d.m.Y H:i:s" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Хост:</th>
+                        <td>
+                            <a href="{% url 'siem:host_detail' login.host.pk %}" class="text-decoration-none">
+                                <i class="bi bi-pc-display me-1"></i>{{ login.host.hostname }}
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Источник:</th>
+                        <td>
+                            {% if login.source %}
+                                <span class="badge bg-secondary">{{ login.source }}</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Сопоставлен:</th>
+                        <td>
+                            {% if login.is_matched %}
+                                <span class="badge bg-success">Да</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Нет</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Сотрудник</h5>
+            </div>
+            <div class="card-body">
+                {% if login.matched_user %}
+                    <a href="{% url 'accounts:user_general' login.matched_user.pk %}" class="text-decoration-none text-dark">
+                        <h5>{{ login.matched_user.last_name }} {{ login.matched_user.first_name|truncatechars:20 }}</h5>
+                    </a>
+                    <p class="mb-1 text-muted">@{{ login.matched_user.username }}</p>
+                    {% if login.matched_user.department %}
+                        <p class="mb-1"><i class="bi bi-building me-1"></i>{{ login.matched_user.department.name }}</p>
+                    {% endif %}
+                    {% if login.matched_user.position %}
+                        <p class="mb-1"><i class="bi bi-briefcase me-1"></i>{{ login.matched_user.position.name }}</p>
+                    {% endif %}
+                    {% if login.matched_user.corporate_phone %}
+                        <p class="mb-1"><i class="bi bi-telephone me-1"></i>{{ login.matched_user.corporate_phone }}</p>
+                    {% endif %}
+                    {% if login.matched_user.corporate_email %}
+                        <p class="mb-0"><i class="bi bi-envelope me-1"></i>{{ login.matched_user.corporate_email }}</p>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-person-x display-4 d-block mb-2"></i>
+                        <p>Пользователь не найден в системе Accounts</p>
+                        <p class="small">Логин: <strong>{{ login.username }}</strong></p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- События LOGIN_UNKNOWN -->
+{% if not login.is_matched %}
+<div class="card mb-4 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <i class="bi bi-exclamation-triangle me-1"></i>Событие: неизвестный пользователь
+    </div>
+    <div class="card-body">
+        <p>Пользователь <strong>{{ login.username }}</strong> не найден в системе Accounts. Создано событие безопасности.</p>
+        <a href="{% url 'siem:events' %}?search={{ login.username }}" class="btn btn-sm btn-outline-warning">
+            <i class="bi bi-search me-1"></i>Найти события по этому логину
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<!-- Предыдущие входы этого пользователя на этом хосте -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-clock-history me-1"></i>Входы {{ login.username }} на {{ login.host.hostname }}
+        </h5>
+        <small class="text-muted">{{ related_logins.count }} записей</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Время</th>
+                        <th>Логин</th>
+                        <th>Источник</th>
+                        <th>Сопоставлен</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in related_logins %}
+                    <tr {% if entry.pk == login.pk %}class="table-active"{% endif %}>
+                        <td>{{ entry.login_time|date:"d.m.Y H:i:s" }}</td>
+                        <td>{{ entry.username }}</td>
+                        <td>
+                            {% if entry.source %}
+                                <span class="badge bg-secondary">{{ entry.source }}</span>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if entry.is_matched %}
+                                <span class="badge bg-success">Да</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Нет</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-3">Нет записей</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

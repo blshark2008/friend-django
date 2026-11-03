@@ -1,0 +1,18 @@
+{% extends 'equipment/base.html' %}
+
+{% block title %}Дашборд{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-grid-1x2 me-2"></i>Статистика оборудования</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Кнопка загрузки основных средств -->
+<div class="mb-4">
+    <a href="{% url 'equipment:upload_os' %}" class="btn btn-outline-primary">
+        <i class="bi bi-upload me-2"></i>Загрузка основных средств (CSV)
+    </a>
+</div>
+
+<!-- Общее количество -->
+{% endblock %}

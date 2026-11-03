@@ -1,0 +1,450 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}{{ type_label }} — Редактирование{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Mobile optimization */
+    @media (max-width: 768px) {
+        .main-content {
+            padding: 1rem !important;
+            margin-left: 0 !important;
+        }
+        .card {
+            margin-bottom: 1rem !important;
+        }
+        .assign-info-item {
+            margin-bottom: 1.25rem !important;
+        }
+        .assign-info-item .form-label {
+            margin-bottom: 0.25rem !important;
+        }
+        .assign-info-item .btn {
+            width: 100%;
+            text-align: left;
+        }
+        .assign-info-item .btn i {
+            margin-right: 0.5rem;
+        }
+        .assign-info-item .remove-btn {
+            width: auto !important;
+            flex-shrink: 0;
+        }
+        .assign-info-item .remove-btn i {
+            margin-right: 0;
+        }
+        .form-control, .form-select {
+            font-size: 16px; /* Prevents iOS zoom */
+        }
+        .btn-group-mobile {
+            flex-direction: column;
+        }
+        .btn-group-mobile .btn {
+            width: 100%;
+        }
+        /* Modal mobile */
+        .modal-body {
+            padding: 1rem !important;
+        }
+        .modal-dialog {
+            margin: 0.5rem;
+        }
+        #assignSearchFio, #assignSearchTab, #assignSearchDept, #assignSearchBtn {
+            width: 100%;
+        }
+        #assignSearchFio, #assignSearchTab, #assignSearchDept {
+            margin-bottom: 0.75rem;
+        }
+        #assignSearchBtn {
+            margin-bottom: 0.75rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block page_title %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Редактирование {{ type_label }}</h4>
+    <a href="{% if from_inventory %}{% url 'equipment:inventory' %}{% else %}{% url 'equipment:detail' equipment_type instance.pk %}{% endif %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Назад
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Информация о закреплении -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h6 class="mb-0"><i class="bi bi-people me-2"></i>Закрепление</h6>
+    </div>
+    <div class="card-body">
+        <div class="assign-info-item mb-3">
+            <label class="form-label fw-semibold mb-1">Закреплён за:</label>
+            <div>
+                {% if assigned_user %}
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span>
+                        <i class="bi bi-person-fill me-1 text-primary"></i>
+                        {{ assigned_user.last_name }} {{ assigned_user.first_name|slice:":1" }}. {{ assigned_user.patronymic|slice:":1" }}.
+                        {% if assigned_user.department %}
+                        <br><small class="text-muted">{{ assigned_user.department.name }}</small>
+                        {% endif %}
+                    </span>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-btn"
+                            data-role="user"
+                            data-equipment-type="{{ equipment_type }}"
+                            data-equipment-pk="{{ instance.pk }}"
+                            title="Удалить">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                {% else %}
+                <span class="text-muted">Не закреплено</span>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-outline-primary mt-2 assign-btn"
+                        data-role="user"
+                        data-equipment-type="{{ equipment_type }}"
+                        data-equipment-pk="{{ instance.pk }}"
+                        data-current-user-id="{{ assigned_user.id|default:'' }}"
+                        data-bs-toggle="modal"
+                        data-bs-target="#assignModal"
+                        title="Изменить">
+                    <i class="bi bi-pencil-square"></i> Изменить
+                </button>
+            </div>
+        </div>
+        <div class="assign-info-item">
+            <label class="form-label fw-semibold mb-1">МОЛ:</label>
+            <div>
+                {% if mol_assignment %}
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span>
+                        <i class="bi bi-person-check-fill me-1"></i>
+                        {{ mol_assignment.mol.last_name }} {{ mol_assignment.mol.first_name|slice:":1" }}. {{ mol_assignment.mol.patronymic|slice:":1" }}.
+                        {% if mol_assignment.mol.department %}
+                        <br><small class="text-muted">{{ mol_assignment.mol.department.name }}</small>
+                        {% endif %}
+                    </span>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-btn"
+                            data-role="mol"
+                            data-equipment-type="{{ equipment_type }}"
+                            data-equipment-pk="{{ instance.pk }}"
+                            title="Удалить">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                {% else %}
+                <span class="text-muted">Не назначено</span>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2 assign-btn"
+                        data-role="mol"
+                        data-equipment-type="{{ equipment_type }}"
+                        data-equipment-pk="{{ instance.pk }}"
+                        data-current-mol-id="{{ mol_assignment.mol.id|default:'' }}"
+                        data-bs-toggle="modal"
+                        data-bs-target="#assignModal"
+                        title="Изменить">
+                    <i class="bi bi-pencil-square"></i> Изменить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Форма редактирования -->
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                {% for error in form.non_field_errors %}
+                {{ error }}
+                {% endfor %}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endif %}
+
+            {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label fw-semibold">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                <div class="invalid-feedback d-block">{{ field.errors.0 }}</div>
+                {% endif %}
+                {% if field.help_text %}
+                <div class="form-text">{{ field.help_text }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <div class="d-flex gap-2 btn-group-mobile">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i> Сохранить
+                </button>
+                <a href="{% if from_inventory %}{% url 'equipment:inventory' %}{% else %}{% url 'equipment:detail' equipment_type instance.pk %}{% endif %}" class="btn btn-secondary">
+                    <i class="bi bi-x-lg me-1"></i> Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Hidden field for redirect target -->
+<input type="hidden" id="redirectTarget" value="{% if from_inventory %}inventory{% else %}detail{% endif %}">
+
+<!-- Modal: Assign User/MOL -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assignModalTitle">
+                    <i class="bi bi-person-plus me-2"></i>Выбрать сотрудника
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">ФИО</label>
+                    <input type="text" class="form-control" id="assignSearchFio" placeholder="Введите ФИО...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Табельный номер</label>
+                    <input type="text" class="form-control" id="assignSearchTab" placeholder="Табельный №">
+                </div>
+                <button type="button" class="btn btn-primary w-100 mb-3" id="assignSearchBtn">
+                    <i class="bi bi-search me-1"></i> Найти
+                </button>
+
+                <div id="assignResults" class="table-responsive">
+                    <table class="table table-hover table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 100px;"></th>
+                                <th>ФИО</th>
+                                <th>Табельный №</th>
+                                <th>Подразделение</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assignUsersList"></tbody>
+                    </table>
+                </div>
+                <div id="assignEmpty" class="text-center text-muted py-4">
+                    <i class="bi bi-person-circle" style="font-size: 2rem;"></i>
+                    <p class="mt-2">Введите параметры поиска</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const assignModal = document.getElementById('assignModal');
+    if (!assignModal) return;
+
+    let currentRole = '';
+    let currentEquipmentType = '';
+    let currentEquipmentPk = '';
+
+    assignModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        currentRole = button.dataset.role;
+        currentEquipmentType = button.dataset.equipmentType;
+        currentEquipmentPk = button.dataset.equipmentPk;
+
+        const title = document.getElementById('assignModalTitle');
+        if (currentRole === 'mol') {
+            title.innerHTML = '<i class="bi bi-person-badge me-2"></i>Выбрать МОЛ';
+        } else {
+            title.innerHTML = '<i class="bi bi-person-plus me-2"></i>Выбрать сотрудника';
+        }
+
+        // Reset search
+        document.getElementById('assignSearchFio').value = '';
+        document.getElementById('assignSearchTab').value = '';
+        document.getElementById('assignUsersList').innerHTML = '';
+        document.getElementById('assignEmpty').classList.remove('d-none');
+    });
+
+    // Search
+    document.getElementById('assignSearchBtn').addEventListener('click', function() {
+        const fio = document.getElementById('assignSearchFio').value.trim();
+        const tab = document.getElementById('assignSearchTab').value.trim();
+
+        if (!fio && !tab) {
+            alert('Введите параметры поиска');
+            return;
+        }
+
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        const params = new URLSearchParams();
+        if (fio) params.set('fio', fio);
+        if (tab) params.set('tab_number', tab);
+
+        fetch(`/equipment/quick-assign-users/?${params.toString()}`)
+            .then(r => r.json())
+            .then(data => {
+                const listDiv = document.getElementById('assignUsersList');
+                const emptyDiv = document.getElementById('assignEmpty');
+
+                if (data.users.length === 0) {
+                    listDiv.innerHTML = '';
+                    emptyDiv.classList.remove('d-none');
+                    emptyDiv.innerHTML = '<i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i><p class="mt-2">Пользователи не найдены</p>';
+                    return;
+                }
+
+                emptyDiv.classList.add('d-none');
+                listDiv.innerHTML = data.users.map(u => `
+                    <tr>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-success assign-user-btn"
+                                    data-user-id="${u.id}"
+                                    data-user-name="${u.last_name} ${u.first_name}">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                        </td>
+                        <td>${u.last_name} ${u.first_name} ${u.patronymic}</td>
+                        <td>${u.tab_number || '—'}</td>
+                        <td>${u.department || '—'}</td>
+                    </tr>
+                `).join('');
+
+                // Click handlers
+                listDiv.querySelectorAll('.assign-user-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const userId = this.dataset.userId;
+                        const endpoint = currentRole === 'mol'
+                            ? `/equipment/assign-mol/${currentEquipmentType}/${currentEquipmentPk}/`
+                            : `/equipment/assign/${currentEquipmentType}/${currentEquipmentPk}/`;
+
+                        this.disabled = true;
+                        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                        fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken'),
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            body: new URLSearchParams({ 'user': userId }),
+                        })
+                        .then(async r => {
+                            const data = await r.json();
+                            if (r.ok && data.success) {
+                                const target = document.getElementById('redirectTarget').value;
+                                if (target === 'inventory') {
+                                    location.href = '{% url "equipment:inventory" %}';
+                                } else {
+                                    location.reload();
+                                }
+                            } else {
+                                alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                                this.disabled = false;
+                                this.innerHTML = '<i class="bi bi-check-lg"></i> Выбрать';
+                            }
+                        })
+                        .catch(err => {
+                            alert('Ошибка: ' + err.message);
+                            this.disabled = false;
+                            this.innerHTML = '<i class="bi bi-check-lg"></i> Выбрать';
+                        });
+                    });
+                });
+            })
+            .catch(err => {
+                console.error('Search error:', err);
+                alert('Ошибка при поиске');
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-search"></i> Найти';
+            });
+    });
+
+    // Enter key search
+    ['assignSearchFio', 'assignSearchTab'].forEach(id => {
+        document.getElementById(id).addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('assignSearchBtn').click();
+            }
+        });
+    });
+
+    // Remove buttons
+    document.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const role = this.dataset.role;
+            const equipmentType = this.dataset.equipmentType;
+            const equipmentPk = this.dataset.equipmentPk;
+            const roleLabel = role === 'user' ? 'сотрудника' : 'МОЛ';
+
+            if (!confirm(`Снять ${roleLabel} с оборудования?`)) {
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            const endpoint = role === 'mol'
+                ? `/equipment/assign-mol/${equipmentType}/${equipmentPk}/`
+                : `/equipment/assign/${equipmentType}/${equipmentPk}/`;
+
+            fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: new URLSearchParams({ 'user': '' }),
+            })
+            .then(async r => {
+                const data = await r.json();
+                if (r.ok && data.success) {
+                    const target = document.getElementById('redirectTarget').value;
+                    if (target === 'inventory') {
+                        location.href = '{% url "equipment:inventory" %}';
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                    this.disabled = false;
+                    this.innerHTML = '<i class="bi bi-x-lg"></i>';
+                }
+            })
+            .catch(err => {
+                alert('Ошибка: ' + err.message);
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-x-lg"></i>';
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

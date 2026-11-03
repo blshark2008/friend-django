@@ -1,0 +1,191 @@
+{% extends 'equipment/base.html' %}
+{% load static %}
+
+{% block content %}
+{% csrf_token %}
+
+<!-- Модальное окно: смена пользователя -->
+<div class="modal fade" id="changeAssignedUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Закрепить за сотрудником</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Пользователь</label>
+                    <select class="form-select" id="detailAssignedUserSelect">
+                        <option value="">— Не выбран —</option>
+                        {% for user in all_users %}
+                        <option value="{{ user.id }}">{{ user.last_name }} {{ user.first_name }} ({{ user.username }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="detailAssignedSaveBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно: смена МОЛ -->
+<div class="modal fade" id="changeResponsibleUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Назначить материально ответственное лицо</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Материально ответственное лицо</label>
+                    <select class="form-select" id="detailResponsibleUserSelect">
+                        <option value="">— Снять МОЛ —</option>
+                        {% for user in all_users %}
+                        <option value="{{ user.id }}">{{ user.last_name }} {{ user.first_name }} {{ user.patronymic }} ({{ user.username }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="detailResponsibleSaveBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function clearAssignedUser(equipmentType, equipmentPk) {
+    if (!confirm('Снять пользователя с оборудования?')) return;
+    fetch('/equipment/clear-assign/' + equipmentType + '/' + equipmentPk + '/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else alert('Ошибка: ' + data.error);
+    })
+    .catch(err => alert('Ошибка: ' + err.message));
+}
+
+function clearResponsibleUser(equipmentType, equipmentPk) {
+    if (!confirm('Снять МОЛ с оборудования?')) return;
+    fetch('/equipment/clear-mol/' + equipmentType + '/' + equipmentPk + '/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else alert('Ошибка: ' + data.error);
+    })
+    .catch(err => alert('Ошибка: ' + err.message));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // SIEM update button
+    const siemBtn = document.getElementById('updateFromSiemBtn');
+    if (siemBtn) {
+        siemBtn.addEventListener('click', function() {
+            const equipmentType = this.dataset.equipmentType;
+            const equipmentPk = this.dataset.equipmentPk;
+            const serial = this.dataset.serial;
+            if (!serial) { alert('У оборудования не указан серийный номер'); return; }
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Обновление...';
+            fetch('/equipment/update-siem/' + equipmentType + '/' + equipmentPk + '/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) location.reload();
+                else { alert('Ошибка: ' + data.error); siemBtn.disabled = false; siemBtn.innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Обновить из SIEM'; }
+            })
+            .catch(err => { alert('Ошибка: ' + err.message); siemBtn.disabled = false; siemBtn.innerHTML = '<i class="bi bi-cloud-arrow-up"></i> Обновить из SIEM'; });
+        });
+    }
+
+    // Assign user modal
+    const assignedModal = document.getElementById('changeAssignedUserModal');
+    if (assignedModal) {
+        document.getElementById('detailAssignedSaveBtn').addEventListener('click', function() {
+            const userId = document.getElementById('detailAssignedUserSelect').value;
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+            fetch('/equipment/assign/{{ equipment_type }}/{{ instance.pk }}/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: new URLSearchParams({'user': userId}),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) location.reload();
+                else { alert('Ошибка: ' + data.error); btn.disabled = false; btn.innerHTML = 'Сохранить'; }
+            })
+            .catch(err => { alert('Ошибка при сохранении'); btn.disabled = false; btn.innerHTML = 'Сохранить'; });
+        });
+    }
+
+    // Responsible user modal
+    const responsibleModal = document.getElementById('changeResponsibleUserModal');
+    if (responsibleModal) {
+        document.getElementById('detailResponsibleSaveBtn').addEventListener('click', function() {
+            const userId = document.getElementById('detailResponsibleUserSelect').value;
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+            fetch('/equipment/assign-mol/{{ equipment_type }}/{{ instance.pk }}/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: new URLSearchParams({'user': userId}),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) location.reload();
+                else { alert('Ошибка: ' + data.error); btn.disabled = false; btn.innerHTML = 'Сохранить'; }
+            })
+            .catch(err => { alert('Ошибка при назначении МОЛ'); btn.disabled = false; btn.innerHTML = 'Сохранить'; });
+        });
+    }
+});
+</script>
+{% endblock %}

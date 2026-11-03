@@ -1,0 +1,133 @@
+{% extends 'equipment/base.html' %}
+
+{% block title %}Настройки полей{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-gear me-2"></i>Настройки полей оборудования</h4>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-info mb-4">
+    <i class="bi bi-info-circle me-2"></i>
+    Настройте, какие поля отображаются и редактируются для каждого подтипа оборудования.
+    Изменения применяются ко всем страницам просмотра и редактирования оборудования.
+</div>
+
+<form method="post" id="fieldSettingsForm">
+    {% csrf_token %}
+    
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" id="subtypeTabs" role="tablist">
+        {% for subtype_value, subtype_data in settings_data.items %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if forloop.first %}active{% endif %}"
+                    id="{{ subtype_value }}-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#{{ subtype_value }}"
+                    type="button"
+                    role="tab"
+                    aria-controls="{{ subtype_value }}"
+                    aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">
+                {{ subtype_data.label }}
+            </button>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <!-- Tab content -->
+    <div class="tab-content" id="subtypeTabContent">
+        {% for subtype_value, subtype_data in settings_data.items %}
+        <div class="tab-pane fade {% if forloop.first %}show active{% endif %}"
+             id="{{ subtype_value }}"
+             role="tabpanel"
+             aria-labelledby="{{ subtype_value }}-tab">
+            <div class="card table-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="bi bi-tags me-2"></i>{{ subtype_data.label }}
+                    </h6>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                onclick="toggleAll('{{ subtype_value }}', true)">
+                            <i class="bi bi-check-all me-1"></i>Все видимые
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                onclick="toggleAll('{{ subtype_value }}', false)">
+                            <i class="bi bi-eye-slash me-1"></i>Все скрытые
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 200px;">Поле</th>
+                                    <th style="width: 120px;">Группа</th>
+                                    <th style="width: 100px;" class="text-center">Видимое</th>
+                                    <th style="width: 100px;" class="text-center">Редактируемое</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for field in subtype_data.fields %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-medium">{{ field.label }}</div>
+                                        <small class="text-muted">{{ field.name }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">{{ field.group }}</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="form-check form-switch d-flex justify-content-center">
+                                            <input class="form-check-input" type="checkbox" role="switch"
+                                                   name="visible_{{ subtype_value }}_{{ field.name }}"
+                                                   id="visible_{{ subtype_value }}_{{ field.name }}"
+                                                   {% if field.is_visible %}checked{% endif %}>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="form-check form-switch d-flex justify-content-center">
+                                            <input class="form-check-input" type="checkbox" role="switch"
+                                                   name="editable_{{ subtype_value }}_{{ field.name }}"
+                                                   id="editable_{{ subtype_value }}_{{ field.name }}"
+                                                   {% if field.is_editable %}checked{% endif %}>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i> Сохранить настройки
+        </button>
+        <a href="{% url 'equipment:categories_reference' %}" class="btn btn-secondary">
+            <i class="bi bi-x-lg me-1"></i> Отмена
+        </a>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleAll(subtype, visible) {
+    const visibleFields = document.querySelectorAll(`[name^="visible_${subtype}_"]`);
+    visibleFields.forEach(checkbox => {
+        checkbox.checked = visible;
+    });
+    
+    const editableFields = document.querySelectorAll(`[name^="editable_${subtype}_"]`);
+    editableFields.forEach(checkbox => {
+        checkbox.checked = visible;
+    });
+}
+</script>
+{% endblock %}

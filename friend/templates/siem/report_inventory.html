@@ -1,0 +1,89 @@
+{% extends 'siem/base.html' %}
+
+{% block title %}Отчёт по инвентаризации{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-hdd-stack me-2"></i>Отчёт по инвентаризации</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-primary">{{ total_hosts }}</h2>
+                <p class="mb-0 text-muted">Всего хостов</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-success">{{ hosts_with_snapshot }}</h2>
+                <p class="mb-0 text-muted">С данными</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-info">{{ total_snapshots }}</h2>
+                <p class="mb-0 text-muted">Снимков</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Host inventory table -->
+<div class="card table-card">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-table me-2"></i>Инвентарь хостов</h6>
+    </div>
+    <div class="card-body p-0">
+        {% if inventory_data %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Хост</th>
+                        <th>ОС</th>
+                        <th>Процессор</th>
+                        <th>ОЗУ</th>
+                        <th>Диски</th>
+                        <th>Пакетов</th>
+                        <th>Портов</th>
+                        <th>Последний снимок</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in inventory_data %}
+                    <tr>
+                        <td><strong>{{ item.hostname }}</strong></td>
+                        <td>{{ item.os_info|default:"—" }}</td>
+                        <td>{{ item.cpu_model|default:"—" }}</td>
+                        <td>{% if item.ram_mb %}{{ item.ram_mb|floatformat:0 }} МБ{% else %}—{% endif %}</td>
+                        <td>
+                            {% if item.disk_count > 0 %}
+                            {{ item.disk_count }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>{{ item.packages_count|default:"—" }}</td>
+                        <td>{{ item.open_ports_count|default:0 }}</td>
+                        <td class="text-nowrap">{{ item.last_snapshot_date|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-hdd-stack fs-1 d-block mb-3"></i>
+            <p class="mb-0">Данные инвентаризации отсутствуют</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

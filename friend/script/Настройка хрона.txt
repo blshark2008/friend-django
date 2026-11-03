@@ -1,0 +1,17 @@
+
+sudo tee /etc/cron.d/siem-agent <<'EOF'
+# SIEM-агент: события каждые 5 минут, порты раз в час, инвентарь раз в сутки
+*/5 * * * *  root  /opt/siem/agent.sh normal     >/dev/null 2>&1
+0 * * * *    root  /opt/siem/agent.sh hourly     >/dev/null 2>&1
+30 3 * * *   root  /opt/siem/agent.sh inventory  >/dev/null 2>&1
+EOF
+
+
+
+cd ~/script
+sudo tee siem-agent-cron <<'EOF'
+# SIEM-агент: события каждые 5 минут, порты раз в час, инвентарь раз в сутки
+*/5 * * * *  root  /opt/siem/agent.sh normal     >/dev/null 2>&1
+0 * * * *    root  /opt/siem/agent.sh hourly     >/dev/null 2>&1
+30 3 * * *   root  /opt/siem/agent.sh inventory  >/dev/null 2>&1
+EOF

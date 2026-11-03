@@ -1,0 +1,157 @@
+{% extends "siem/base.html" %}
+
+{% block title %}Алерты — SIEM{% endblock %}
+
+{% block sidebar %}
+    <li class="mb-2">
+        <a href="{% url 'siem:dashboard' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-speedometer2 me-2"></i>Дашборд
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:hosts' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-pc-display me-2"></i>Хосты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:events' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-shield-exclamation me-2"></i>События
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-light">
+            <i class="bi bi-calendar-x me-2"></i>Отсутствия
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none text-light">
+            <i class="bi bi-bell-exclamation me-2"></i>Алерты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:screen_lock_log' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-lock-fill me-2"></i>Журнал блокировок
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:report_security' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>Отчёты
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-bell-exclamation me-2"></i>Алерты: вход в период отсутствия</h2>
+</div>
+
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h3 class="text-danger">{{ alerts|length }}</h3>
+                <small class="text-muted">Всего алертов</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <h3 class="text-warning">{{ alerts|length }}</h3>
+                <small class="text-muted">Не подтверждено</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h3 class="text-success">{{ alerts|length }}</h3>
+                <small class="text-muted">Подтверждено</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-4">
+        <input type="text" name="search" class="form-control" placeholder="Поиск по ФИО/логину..." value="{{ search }}">
+    </div>
+    <div class="col-md-3">
+        <select name="ack" class="form-select">
+            <option value="">Все</option>
+            <option value="no" {% if acknowledged == 'no' %}selected{% endif %}>Не подтверждённые</option>
+            <option value="yes" {% if acknowledged == 'yes' %}selected{% endif %}>Подтверждённые</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-outline-secondary w-100">Применить</button>
+    </div>
+</form>
+
+<!-- Таблица -->
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Время входа</th>
+                    <th>Сотрудник</th>
+                    <th>Доменная учётка</th>
+                    <th>Хост</th>
+                    <th>Тип отсутствия</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in alerts %}
+                <tr class="{% if not alert.is_acknowledged %}table-danger{% endif %}">
+                    <td>{{ alert.login_time|date:"d.m.Y H:i:s" }}</td>
+                    <td>
+                        <strong>{{ alert.employee.last_name }} {{ alert.employee.first_name|truncatechars:20 }}</strong><br>
+                        <small class="text-muted">@{{ alert.employee.username }}</small>
+                    </td>
+                    <td>{{ alert.domain_account|default:"—" }}</td>
+                    <td>{{ alert.host.hostname }}</td>
+                    <td>
+                        {% if alert.leave %}
+                            <span class="badge bg-{{ alert.leave.leave_type|yesno:'primary,secondary,danger,warning,info' }}">
+                                {{ alert.leave.get_leave_type_display }}
+                            </span>
+                            <br><small class="text-muted">{{ alert.leave.start_date|date:"d.m" }} — {{ alert.leave.end_date|date:"d.m.Y" }}</small>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if alert.is_acknowledged %}
+                            <span class="badge bg-success">Подтверждён</span>
+                            {% if alert.acknowledged_by %}
+                                <br><small class="text-muted">{{ alert.acknowledged_by.last_name }}</small>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-danger">Новый</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not alert.is_acknowledged %}
+                        <a href="{% url 'siem:alert_ack' pk=alert.pk %}" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-check-lg"></i> Подтвердить
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        <i class="bi bi-check-circle me-2"></i>Алертов нет — всё под контролем!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,183 @@
+{% extends "accounts/base.html" %}
+
+{% block title %}{{ user.get_full_name }} — Общая информация — «Друг»{% endblock %}
+
+{% block page_title %}
+<div class="d-flex align-items-center gap-3">
+    <h4 class="mb-0"><i class="bi bi-person me-2"></i>{{ user.last_name }} {{ user.first_name }} {{ user.patronymic|default:"—" }}</h4>
+    <a href="{% url 'accounts:user_edit' user.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-pencil me-1"></i>Редактировать
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Horizontal tabs -->
+<div class="d-flex gap-2 mb-4 flex-wrap">
+    <a href="{% url 'accounts:user_general' user.pk %}" class="btn btn-sm {% if request.resolver_match.url_name == 'user_general' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-person me-1"></i>Общая информация
+    </a>
+    <a href="{% url 'accounts:user_trainings' user.pk %}" class="btn btn-sm {% if request.resolver_match.url_name == 'user_trainings' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-mortarboard me-1"></i>Обучения
+    </a>
+    <a href="{% url 'accounts:user_equipment' user.pk %}" class="btn btn-sm {% if request.resolver_match.url_name == 'user_equipment' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-pc-display me-1"></i>Закрепленное оборудование
+    </a>
+    <a href="{% url 'accounts:user_access' user.pk %}" class="btn btn-sm {% if request.resolver_match.url_name == 'user_access' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-shield-lock me-1"></i>Доступы
+    </a>
+</div>
+
+<!-- Back button -->
+<a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm mb-4">
+    <i class="bi bi-arrow-left me-1"></i>Назад к списку
+</a>
+
+<!-- ====== ВИДЖЕТ: Профиль ====== -->
+<div class="row g-4 mb-4">
+    <!-- Основной профиль -->
+    <div class="col-12">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0"><i class="bi bi-person-circle me-2"></i>Профиль</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width:64px;height:64px;">
+                        <i class="bi bi-person-fill fs-4"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-1">{{ user.last_name }} {{ user.first_name }} {{ user.patronymic|default:"—" }}</h5>
+                        <div class="text-muted small">{{ user.department.name|default:"Без подразделения" }}</div>
+                    </div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <div class="bg-light rounded p-2 text-center">
+                            <div class="text-muted small">Таб. номер</div>
+                            <div class="fw-semibold">{{ user.tab_number|default:"—" }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="bg-light rounded p-2 text-center">
+                            <div class="text-muted small">Логин</div>
+                            <div class="fw-semibold">{{ user.username|default:"—" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== ВИДЖЕТ: Работа ====== -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="bi bi-briefcase me-2"></i>Работа</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">Подразделение</div>
+                    <div class="fw-semibold">{{ user.department.name|default:"—" }}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">Должность</div>
+                    <div class="fw-semibold">{{ user.position.name|default:"—" }}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">Дата приёма</div>
+                    <div class="fw-semibold">{{ user.hire_date|date:"d.m.Y"|default:"—" }}</div>
+                </div>
+                <div>
+                    <div class="text-muted small mb-1">Дата увольнения</div>
+                    <div class="fw-semibold">{{ user.fire_date|date:"d.m.Y"|default:"—" }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Статус</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">Статус архивирования</div>
+                    {% if user.archive_status == user.STATUS_ARCHIVED %}
+                        <span class="badge bg-secondary fs-6">В архиве</span>
+                    {% elif user.archive_status == user.STATUS_MARKED %}
+                        <span class="badge bg-warning text-dark fs-6">Помечен</span>
+                    {% else %}
+                        <span class="badge bg-success fs-6">Активный</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    {% if user.is_mol %}
+                    <span class="badge bg-danger fs-6"><i class="bi bi-shield-check me-1"></i>МОЛ</span>
+                    {% endif %}
+                    {% if user.is_admin %}
+                    <span class="badge bg-primary fs-6"><i class="bi bi-shield-lock me-1"></i>Админ</span>
+                    {% endif %}
+                    {% if not user.is_mol and not user.is_admin %}
+                    <span class="text-muted small">Нет специальных прав</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== ВИДЖЕТ: Контакты ====== -->
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="bi bi-envelope-at me-2"></i>Контакты</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="row g-0">
+                    <div class="col-md-3 p-3 border-end">
+                        <div class="text-muted small mb-1"><i class="bi bi-envelope me-1"></i>Корп. Email</div>
+                        <div class="fw-semibold">{{ user.corporate_email|default:"—" }}</div>
+                    </div>
+                    <div class="col-md-3 p-3 border-end">
+                        <div class="text-muted small mb-1"><i class="bi bi-envelope me-1"></i>Личн. Email</div>
+                        <div class="fw-semibold">{{ user.personal_email|default:"—" }}</div>
+                    </div>
+                    <div class="col-md-3 p-3 border-end">
+                        <div class="text-muted small mb-1"><i class="bi bi-telephone me-1"></i>Корп. телефон</div>
+                        <div class="fw-semibold">{{ user.corporate_phone|default:"—" }}</div>
+                    </div>
+                    <div class="col-md-3 p-3">
+                        <div class="text-muted small mb-1"><i class="bi bi-telephone me-1"></i>Личн. телефон</div>
+                        <div class="fw-semibold">{{ user.personal_phone|default:"—" }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ====== ВИДЖЕТ: Дополнительно ====== -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <h6 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Дополнительно</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="text-muted small mb-1">СНИЛС</div>
+                    <div class="fw-semibold">{{ user.snils|default:"—" }}</div>
+                </div>
+                <div>
+                    <div class="text-muted small mb-1">Доменная учётная запись</div>
+                    <div class="fw-semibold">{{ user.domain_account|default:"—" }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

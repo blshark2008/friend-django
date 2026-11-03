@@ -1,0 +1,85 @@
+{% extends 'siem/base.html' %}
+
+{% block title %}Хосты{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-pc-display me-2"></i>Хосты</h4>
+{% endblock %}
+
+{% block content %}
+<div class="card table-card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <form method="get" class="d-flex gap-2 flex-wrap">
+            <input type="text" name="search" class="form-control" placeholder="Поиск..." value="{{ search }}">
+            <select name="status" class="form-select">
+                <option value="">Все</option>
+                <option value="online" {% if status == 'online' %}selected{% endif %}>Онлайн</option>
+                <option value="offline" {% if status == 'offline' %}selected{% endif %}>Оффлайн</option>
+            </select>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i></button>
+            {% if search or status %}
+            <a href="{% url 'siem:hosts' %}" class="btn btn-outline-secondary">Сбросить</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="card-body p-0">
+        {% if hosts %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Имя</th>
+                        <th>ОС</th>
+                        <th>IP</th>
+                        <th>Статус</th>
+                        <th>Последний контакт</th>
+                        <th>Событий</th>
+                        <th>Крит.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in hosts %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'siem:host_detail' host.id %}" class="text-decoration-none fw-bold">
+                                <i class="bi bi-pc-display me-1"></i>{{ host.hostname }}
+                            </a>
+                        </td>
+                        <td>{{ host.os_info|default:"—" }}</td>
+                        <td><code>{{ host.ip_address|default:"—" }}</code></td>
+                        <td>
+                            {% if host.is_active %}
+                            <span class="badge bg-success">Онлайн</span>
+                            {% else %}
+                            <span class="badge bg-danger">Оффлайн</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap">
+                            {% if host.last_seen %}
+                            {{ host.last_seen|date:"d.m.Y H:i" }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>{{ host.total_events }}</td>
+                        <td>
+                            {% if host.critical_events_count > 0 %}
+                            <span class="badge bg-danger">{{ host.critical_events_count }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary">0</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-pc-display fs-1 d-block mb-3"></i>
+            <p class="mb-0">Хосты не найдены</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

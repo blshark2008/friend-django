@@ -1,0 +1,201 @@
+{% extends 'siem/base.html' %}
+
+{% block title %}Событие #{{ event.id }}{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    Событие #{{ event.id }}
+</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'siem:dashboard' %}">Дашборд</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'siem:events' %}">События</a></li>
+        <li class="breadcrumb-item active">#{{ event.id }}</li>
+    </ol>
+</nav>
+
+<!-- Event details card -->
+<div class="card table-card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Информация о событии</h6>
+        <span class="badge {% if event.severity == 'critical' %}bg-danger{% elif event.severity == 'warning' %}bg-warning text-dark{% else %}bg-secondary{% endif %} fs-6">
+            {{ event.get_severity_display }}
+        </span>
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-md-6">
+                <h6 class="text-muted mb-3">Основная информация</h6>
+                <table class="table table-sm">
+                    <tr>
+                        <td class="text-muted" style="width: 40%">Тип события:</td>
+                        <td><strong>{{ event.get_event_type_display }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Серьёзность:</td>
+                        <td>
+                            {% if event.severity == 'critical' %}
+                            <span class="badge bg-danger">Критично</span>
+                            {% elif event.severity == 'warning' %}
+                            <span class="badge bg-warning text-dark">Предупреждение</span>
+                            {% elif event.severity == 'error' %}
+                            <span class="badge bg-danger">Ошибка</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Информация</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Время события:</td>
+                        <td class="text-nowrap">{{ event.occurred_at|date:"d.m.Y H:i:s" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Зарегистрировано:</td>
+                        <td class="text-nowrap">{{ event.created_at|date:"d.m.Y H:i:s" }}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="col-md-6">
+                <h6 class="text-muted mb-3">Хост</h6>
+                <table class="table table-sm">
+                    <tr>
+                        <td class="text-muted" style="width: 40%">Имя хоста:</td>
+                        <td>
+                            <a href="{% url 'siem:host_detail' event.host_id %}" class="text-decoration-none fw-bold">
+                                <i class="bi bi-pc-display me-1"></i>{{ event.host.hostname }}
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">ОС:</td>
+                        <td>{{ event.host.os_info|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">IP-адрес:</td>
+                        <td><code>{{ event.host.ip_address|default:"—" }}</code></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Статус:</td>
+                        <td>
+                            {% if event.host.is_active %}
+                            <span class="badge bg-success">Онлайн</span>
+                            {% else %}
+                            <span class="badge bg-danger">Оффлайн</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <h6 class="text-muted mb-3">Сообщение</h6>
+            <div class="p-3 bg-light rounded">
+                <p class="mb-0">{{ event.message }}</p>
+            </div>
+        </div>
+        
+        {% if event.details %}
+        <div class="mt-4">
+            <h6 class="text-muted mb-3">Детали</h6>
+            <div class="p-3 bg-light rounded">
+                <pre class="mb-0">{{ event.details|json_script:"event-details" }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Related events -->
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card table-card h-100">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>События вокруг (±1ч)</h6>
+                <span class="badge bg-primary">{{ related_events|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                {% if related_events %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Тип</th>
+                                <th>Сообщение</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ev in related_events %}
+                            <tr class="{% if ev.id == event.id %}table-active{% endif %}">
+                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ ev.occurred_at|date:"H:i:s" }}</td>
+                                <td>
+                                    {% if ev.severity == 'critical' %}
+                                    <span class="badge bg-danger severity-badge">Крит</span>
+                                    {% elif ev.severity == 'warning' %}
+                                    <span class="badge bg-warning text-dark severity-badge">Пред</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary severity-badge">Инфо</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'siem:event_detail' ev.id %}" class="text-decoration-none">
+                                        {{ ev.message|truncatewords:8 }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">Нет связанных событий</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card table-card h-100">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>События этого типа на хосте</h6>
+                <span class="badge bg-primary">{{ similar_events|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                {% if similar_events %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Сообщение</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ev in similar_events %}
+                            <tr class="{% if ev.id == event.id %}table-active{% endif %}">
+                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ ev.occurred_at|date:"d.m H:i" }}</td>
+                                <td>
+                                    <a href="{% url 'siem:event_detail' ev.id %}" class="text-decoration-none">
+                                        {{ ev.message|truncatewords:8 }}
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">Нет похожих событий</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

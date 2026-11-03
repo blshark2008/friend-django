@@ -1,0 +1,91 @@
+{% extends 'equipment/equipment_detail_base.html' %}
+{% load static %}
+
+{% block top_cards %}
+    {% if instance.name %}
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-camera-video fs-1 text-primary"></i>
+                <h6 class="mt-2 mb-0 text-muted">Название</h6>
+                <strong>{{ instance.name }}</strong>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if instance.location %}
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-geo-alt fs-1 text-info"></i>
+                <h6 class="mt-2 mb-0 text-muted">Кабинет</h6>
+                <strong>{{ instance.location }}</strong>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if instance.camera_count %}
+    <div class="col-md-6 col-xl-3">
+        <div class="card stat-card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-camera fs-1 text-success"></i>
+                <h6 class="mt-2 mb-0 text-muted">Камеры</h6>
+                <strong>{{ instance.camera_count }}</strong>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}
+
+{% block info_tabs %}
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Основная информация</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted" style="width:40%">Бренд</td><td>{{ instance.brand }}</td></tr>
+                    {% if instance.model %}
+                    <tr><td class="text-muted">Модель</td><td>{{ instance.model }}</td></tr>
+                    {% endif %}
+                    {% if instance.camera_count %}
+                    <tr><td class="text-muted">Количество камер</td><td>{{ instance.camera_count }}</td></tr>
+                    {% endif %}
+                    {% if instance.assigned_user %}
+                    <tr><td class="text-muted">Закреплён за</td><td>{{ instance.assigned_user.last_name }} {{ instance.assigned_user.first_name }}</td></tr>
+                    {% endif %}
+                    {% if instance.responsible_user %}
+                    <tr><td class="text-muted">Мат. ответственный</td><td>{{ instance.responsible_user.last_name }} {{ instance.responsible_user.first_name }}</td></tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Сетевая информация</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    {% if instance.ip_address %}
+                    <tr><td class="text-muted" style="width:40%">IP-адрес</td><td><code>{{ instance.ip_address }}</code></td></tr>
+                    {% endif %}
+                    {% if instance.mac_address %}
+                    <tr><td class="text-muted">MAC-адрес</td><td><code>{{ instance.mac_address }}</code></td></tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Расположение</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted" style="width:40%">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Место</td><td>{{ instance.place|default:"—" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

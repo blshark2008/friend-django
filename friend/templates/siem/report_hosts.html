@@ -1,0 +1,103 @@
+{% extends 'siem/base.html' %}
+
+{% block title %}Отчёт по хостам{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>Отчёт по хостам</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-primary">{{ total_hosts }}</h2>
+                <p class="mb-0 text-muted">Всего</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-success">{{ online_hosts }}</h2>
+                <p class="mb-0 text-muted">Онлайн</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-danger">{{ offline_hosts }}</h2>
+                <p class="mb-0 text-muted">Оффлайн</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-warning">{{ total_events }}</h2>
+                <p class="mb-0 text-muted">Событий</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hosts table -->
+<div class="card table-card">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-pc-display me-2"></i>Детализация по хостам</h6>
+    </div>
+    <div class="card-body p-0">
+        {% if hosts_data %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Хост</th>
+                        <th>ОС</th>
+                        <th>IP</th>
+                        <th>Статус</th>
+                        <th>Последний контакт</th>
+                        <th>Событий</th>
+                        <th>Крит.</th>
+                        <th>Предупр.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for host in hosts_data %}
+                    <tr>
+                        <td><strong>{{ host.hostname }}</strong></td>
+                        <td>{{ host.os_info|default:"—" }}</td>
+                        <td><code>{{ host.ip_address|default:"—" }}</code></td>
+                        <td>
+                            {% if host.is_active %}
+                            <span class="badge bg-success">Онлайн</span>
+                            {% else %}
+                            <span class="badge bg-danger">Оффлайн</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap">
+                            {% if host.last_seen %}
+                            {{ host.last_seen|date:"d.m.Y H:i" }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>{{ host.total_events }}</td>
+                        <td><span class="badge bg-danger">{{ host.critical_events }}</span></td>
+                        <td><span class="badge bg-warning text-dark">{{ host.warning_events }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-pc-display fs-1 d-block mb-3"></i>
+            <p class="mb-0">Данные отсутствуют</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,331 @@
+{% extends "accounts/base.html" %}
+
+{% block title %}Список пользователей — «Друг»{% endblock %}
+
+{% block page_title %}
+<div class="d-flex align-items-center gap-3 flex-wrap">
+    <h4 class="mb-0"><i class="bi bi-people me-2"></i>Список пользователей</h4>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#importModal">
+        <i class="bi bi-upload me-1"></i>Импорт из CSV
+    </button>
+    <div class="btn-group btn-group-sm">
+        <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-success {% if not show_archived %}active{% endif %}">
+            Активные
+        </a>
+        <a href="?show_archived=1" class="btn btn-outline-warning {% if show_archived %}active{% endif %}">
+            Помечены к архиву ({{ marked_count }})
+        </a>
+        <a href="?show_archived=2" class="btn btn-outline-danger {% if show_archived == '2' %}active{% endif %}">
+            В архиве ({{ archived_count }})
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Search widget -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-md-4">
+                <input type="text" name="q" class="form-control" placeholder="Поиск по ФИО, табельному номеру, email, подразделению…"
+                       value="{{ request.GET.q|default:'' }}">
+            </div>
+            <div class="col-md-3">
+                <select name="dept_id" class="form-select">
+                    <option value="">Все подразделения</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.pk }}" {% if current_dept_id == dept.pk|stringformat:"d" %}selected{% endif %}>
+                        {{ dept.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select name="mol" class="form-select">
+                    <option value="">Все</option>
+                    <option value="mol" {% if current_mol == 'mol' %}selected{% endif %}>МОЛ</option>
+                    <option value="not_mol" {% if current_mol == 'not_mol' %}selected{% endif %}>Не МОЛ</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-funnel me-1"></i>Фильтр
+                </button>
+                {% if request.GET.q or request.GET.dept_id or request.GET.mol %}
+                <a href="{% url 'accounts:user_list' %}{% if show_archived == '1' %}?show_archived=1{% elif show_archived == '2' %}?show_archived=2{% endif %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg me-1"></i>Сбросить
+                </a>
+                {% endif %}
+            </div>
+            <div class="col-md-2 text-muted small">
+                Найдено: <strong>{{ users.count }}</strong>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>
+                            <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=tab_number&order={% if current_sort == 'tab_number' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
+                               class="text-decoration-none text-dark">
+                                Таб. номер
+                                {% if current_sort == 'tab_number' %}
+                                    <i class="bi bi-caret-{% if current_order == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>Логин
+                            <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=username&order={% if current_sort == 'username' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
+                               class="text-decoration-none text-dark small">
+                                {% if current_sort == 'username' %}
+                                    <i class="bi bi-caret-{% if current_order == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=full_name&order={% if current_sort == 'full_name' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
+                               class="text-decoration-none text-dark">
+                                ФИО
+                                {% if current_sort == 'full_name' %}
+                                    <i class="bi bi-caret-{% if current_order == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=department&order={% if current_sort == 'department' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
+                               class="text-decoration-none text-dark">
+                                Подразделение
+                                {% if current_sort == 'department' %}
+                                    <i class="bi bi-caret-{% if current_order == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=position&order={% if current_sort == 'position' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
+                               class="text-decoration-none text-dark">
+                                Должность
+                                {% if current_sort == 'position' %}
+                                    <i class="bi bi-caret-{% if current_order == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th>Корп. Email</th>
+                        <th>Корп. телефон</th>
+                        <th>Личный Email</th>
+                        <th>Личный телефон</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr {% if user.archive_status == user.STATUS_MARKED %}class="table-warning"{% elif user.archive_status == user.STATUS_ARCHIVED %}class="table-secondary"{% endif %}>
+                        <td class="text-nowrap">{{ user.tab_number|default:"—" }}</td>
+                        <td class="text-nowrap text-muted">{{ user.username }}</td>
+                        <td class="text-nowrap">
+                            <a href="{% url 'accounts:user_general' user.pk %}" class="text-decoration-none fw-semibold">
+                                {{ user.last_name }} {{ user.first_name }}
+                                {% if user.patronymic %}{{ user.patronymic }}{% endif %}
+                            </a>
+                        </td>
+                        <td>{{ user.department.name|default:"—" }}</td>
+                        <td>{{ user.position.name|default:"—" }}</td>
+                        <td>{{ user.corporate_email|default:"—" }}</td>
+                        <td class="text-nowrap">{{ user.corporate_phone|default:"—" }}</td>
+                        <td>{{ user.personal_email|default:"—" }}</td>
+                        <td class="text-nowrap">{{ user.personal_phone|default:"—" }}</td>
+                        <td>
+                            {% if user.is_mol %}
+                                <span class="badge bg-danger">МОЛ</span>
+                            {% elif user.is_admin %}
+                                <span class="badge bg-primary">Админ</span>
+                            {% elif user.archive_status == user.STATUS_MARKED %}
+                                <span class="badge bg-warning text-dark">Помечен</span>
+                            {% elif user.archive_status == user.STATUS_ARCHIVED %}
+                                <span class="badge bg-secondary">В архиве</span>
+                            {% else %}
+                                <span class="badge bg-success">Активный</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap">
+                            {% if not user.is_admin %}
+                                {% if user.archive_status != user.STATUS_ARCHIVED %}
+                                <form method="post" action="{% url 'accounts:archive_user' user.pk %}" style="display:inline;" onsubmit="return confirm('Отправить в архив?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-warning" title="В архив">
+                                        <i class="bi bi-archive"></i>
+                                    </button>
+                                </form>
+                                {% else %}
+                                <form method="post" action="{% url 'accounts:restore_user' user.pk %}" style="display:inline;" onsubmit="return confirm('Восстановить?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Восстановить">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" class="text-center text-muted py-4">
+                            {% if request.GET.q %}Ничего не найдено по запросу «{{ request.GET.q }}»{% else %}Пользователи отсутствуют{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if is_paginated %}
+<div class="d-flex justify-content-center mt-4">
+    <nav>
+        <ul class="pagination">
+            {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort={{ current_sort }}&order={{ current_order }}&page=1">&laquo; Первая</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort={{ current_sort }}&order={{ current_order }}&page={{ page_obj.previous_page_number }}">Пред.</a>
+                </li>
+            {% endif %}
+
+            <li class="page-item disabled">
+                <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort={{ current_sort }}&order={{ current_order }}&page={{ page_obj.next_page_number }}">След.</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort={{ current_sort }}&order={{ current_order }}&page={{ page_obj.paginator.num_pages }}">Последняя &raquo;</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+{% endif %}
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Импорт сотрудников из CSV</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Выберите файл CSV</label>
+                        <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+                        <small class="text-muted">Формат: №,Сотрудник,Должность,Вид занятости</small>
+                    </div>
+                    <hr>
+                    <h6>Описание формата CSV:</h6>
+                    <ul class="small text-muted">
+                        <li>Строки, начинающиеся с цифры — сотрудники (табельный номер, ФИО, должность)</li>
+                        <li>Строки, начинающиеся с текста — наименование подразделения</li>
+                        <li>Сотрудники без подразделения будут пропущены</li>
+                        <li>Сотрудники, которых нет в файле, будут отправлены в архив</li>
+                    </ul>
+                    <div class="alert alert-info small mb-0">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Пример: <code>1,Иванов Иван Иванович,Менеджер,Основное место работы</code>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload me-1"></i>Загрузить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Import Result Modal -->
+{% if import_result %}
+<div class="modal fade show" id="resultModal" tabindex="-1" style="display:block; background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i>Результат импорта</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span>Создано сотрудников:</span>
+                        <strong class="text-success">{{ import_result.created_users }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span>Обновлено сотрудников:</span>
+                        <strong class="text-info">{{ import_result.updated_users }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span>Отправлено в архив:</span>
+                        <strong class="text-warning">{{ import_result.archived_users }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span>Создано подразделений:</span>
+                        <strong>{{ import_result.created_depts }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span>Создано должностей:</span>
+                        <strong>{{ import_result.created_positions }}</strong>
+                    </div>
+                    {% if import_result.skipped_no_dept %}
+                    <div class="d-flex justify-content-between py-2 border-bottom">
+                        <span>Пропущено (нет подразделения):</span>
+                        <strong class="text-warning">{{ import_result.skipped_no_dept }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if import_result.errors %}
+                <div class="alert alert-danger">
+                    <strong>Ошибки:</strong>
+                    <ul class="mb-0 small">
+                        {% for error in import_result.errors %}
+                        <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    var resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
+    resultModal.show();
+</script>
+{% endif %}
+{% endblock %}

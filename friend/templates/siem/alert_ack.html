@@ -1,0 +1,110 @@
+{% extends "siem/base.html" %}
+
+{% block title %}Подтвердить алерт — SIEM{% endblock %}
+
+{% block sidebar %}
+    <li class="mb-2">
+        <a href="{% url 'siem:dashboard' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-speedometer2 me-2"></i>Дашборд
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:hosts' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-pc-display me-2"></i>Хосты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:events' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-shield-exclamation me-2"></i>События
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:leaves_list' %}" class="text-decoration-none text-light">
+            <i class="bi bi-calendar-x me-2"></i>Отсутствия
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none text-light">
+            <i class="bi bi-bell-exclamation me-2"></i>Алерты
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:screen_lock_log' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-lock-fill me-2"></i>Журнал блокировок
+        </a>
+    </li>
+    <li class="mb-2">
+        <a href="{% url 'siem:report_security' %}" class="text-decoration-none text-muted">
+            <i class="bi bi-file-earmark-bar-graph me-2"></i>Отчёты
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none text-muted">
+        <i class="bi bi-arrow-left me-1"></i>Назад к алертам
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-bell-exclamation me-2"></i>Подтверждение алерта</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-light border mb-4">
+                    <h6>Детали алерта:</h6>
+                    <table class="table table-borderless mb-0">
+                        <tr>
+                            <th style="width: 150px;">Сотрудник:</th>
+                            <td><strong>{{ alert.employee.last_name }} {{ alert.employee.first_name }}</strong> (@{{ alert.employee.username }})</td>
+                        </tr>
+                        <tr>
+                            <th>Доменная учётка:</th>
+                            <td>{{ alert.domain_account|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Время входа:</th>
+                            <td>{{ alert.login_time|date:"d.m.Y H:i:s" }}</td>
+                        </tr>
+                        <tr>
+                            <th>Хост:</th>
+                            <td>{{ alert.host.hostname }}</td>
+                        </tr>
+                        <tr>
+                            <th>Период отсутствия:</th>
+                            <td>
+                                {% if alert.leave %}
+                                    {{ alert.leave.get_leave_type_display }}: {{ alert.leave.start_date|date:"d.m.Y" }} — {{ alert.leave.end_date|date:"d.m.Y" }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Комментарий к подтверждению</label>
+                        <textarea name="notes" id="notes" class="form-control" rows="3" placeholder="Почему сотрудник вошёл в период отсутствия?"></textarea>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-check-lg me-1"></i>Подтвердить алерт
+                        </button>
+                        <a href="{% url 'siem:alerts_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

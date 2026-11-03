@@ -1,0 +1,97 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}{{ instance }}{% endblock %}
+
+{% block page_title %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4 class="mb-0">
+        <i class="bi bi-pc-display me-2"></i>{{ instance.name|default:instance.get_subtype_display }}
+    </h4>
+    <div>
+        <a href="{% url 'equipment:edit' instance.category instance.pk %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i> Редактировать
+        </a>
+        <a href="{% url 'equipment:equipment_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Назад
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Основная информация -->
+<div class="card table-card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Основная информация</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for field in visible_fields %}
+            {% if field.group == 'Основное' %}
+            <div class="col-md-6 mb-3">
+                <div class="fw-semibold text-muted small">{{ field.label }}</div>
+                <div>{{ instance.get_field_value field.name|default:'—' }}</div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Группы полей -->
+{% regroup visible_fields|dictsort:"group" by group as field_groups %}
+{% for group in field_groups %}
+{% if group.grouper != 'Основное' %}
+<div class="card table-card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0">
+            <i class="bi bi-tags me-2"></i>{{ group.grouper }}
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for field in group.list %}
+            <div class="col-md-6 mb-3">
+                <div class="fw-semibold text-muted small">{{ field.label }}</div>
+                <div>{{ instance.get_field_value field.name|default:'—' }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<!-- Статус и расположение -->
+<div class="card table-card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Статус и расположение</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <div class="fw-semibold text-muted small">Статус</div>
+                <div>
+                    {% if instance.archived %}
+                    <span class="badge bg-secondary">В архиве</span>
+                    {% elif instance.status == 'active' %}
+                    <span class="badge bg-success">Активно</span>
+                    {% elif instance.status == 'maintenance' %}
+                    <span class="badge bg-warning text-dark">На обслуживании</span>
+                    {% else %}
+                    <span class="badge bg-danger">Списано</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="fw-semibold text-muted small">Кабинет</div>
+                <div>{{ instance.location|default:'—' }}</div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="fw-semibold text-muted small">Место</div>
+                <div>{{ instance.place|default:'—' }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

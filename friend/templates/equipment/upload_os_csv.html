@@ -1,0 +1,194 @@
+{% extends 'equipment/base.html' %}
+
+{% block title %}Загрузка основных средств{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-upload me-2"></i>Загрузка основных средств</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Форма загрузки и очистка в одну строку -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card table-card h-100">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Загрузить CSV файл</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">Выберите CSV файл (кодировка UTF-8)</label>
+                        <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                        <small class="text-muted">
+                            Файл должен содержать колонки: Наименование, МОЛ/Место хранения, Инвентарный номер, Состояние,
+                            Заводской номер, Тип НФА, Дата открытия
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload me-2"></i>Загрузить и обработать
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card table-card h-100 border-danger">
+            <div class="card-header bg-danger text-white">
+                <h6 class="mb-0"><i class="bi bi-trash me-2"></i>Очистить оборудование</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Удалит все записи из моделей оборудования. Это действие нельзя отменить.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="clear">
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены? Все данные об оборудовании будут удалены!')">
+                        <i class="bi bi-trash me-2"></i>Очистить все модели оборудования
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика -->
+{% if stats %}
+<div class="card table-card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-graph-up me-2"></i>Результаты загрузки</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h2 class="text-primary">{{ stats.total_rows }}</h2>
+                        <p class="mb-0 text-muted">Всего строк в файле</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h2 class="text-success">{{ stats.parsed_rows }}</h2>
+                        <p class="mb-0 text-muted">Обработано строк</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.ignored_rows }}</h2>
+                        <p class="mb-0 text-muted">Пропущено (некатегория)</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.new_equipment }}</h2>
+                        <p class="mb-0">Новое оборудование добавлено</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.updated_equipment }}</h2>
+                        <p class="mb-0">Оборудование обновлено</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.mol_updated }}</h2>
+                        <p class="mb-0">МОЛ обновлено</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.mol_cleared }}</h2>
+                        <p class="mb-0">МОЛ снято</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.archived_candidates }}</h2>
+                        <p class="mb-0">Кандидатов на перевод в архив</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <h2>{{ stats.errors }}</h2>
+                        <p class="mb-0">Ошибок при обработке</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Детали ошибок -->
+        {% if stats.error_details %}
+        <div class="mt-4">
+            <h6 class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Детали ошибок</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Строка</th>
+                            <th>Ошибка</th>
+                            <th>Данные</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for error in stats.error_details %}
+                        <tr>
+                            <td>{{ error.row }}</td>
+                            <td class="text-danger">{{ error.error }}</td>
+                            <td>
+                                <small>
+                                    {% for key, value in error.data.items %}
+                                    <strong>{{ key }}:</strong> {{ value }}<br>
+                                    {% endfor %}
+                                </small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Кандидаты на архив -->
+{% if stats.archived_candidates > 0 %}
+<div class="card table-card mb-4 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <h6 class="mb-0"><i class="bi bi-archive me-2"></i>Кандидаты на перевод в архив ({{ stats.archived_candidates }} ед.)</h6>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">
+            Оборудование, которое есть в базе, но отсутствует в загруженном файле. 
+            Рекомендуется проверить и перевести в архив.
+        </p>
+        <a href="{% url 'equipment:computers' %}?archived=0" class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-search me-2"></i>Просмотрить всё оборудование
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<a href="{% url 'equipment:dashboard' %}" class="btn btn-secondary">
+    <i class="bi bi-arrow-left me-2"></i>Вернуться на дашборд
+</a>
+{% endif %}
+{% endblock %}

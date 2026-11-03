@@ -1,0 +1,41 @@
+{% extends "accounts/base.html" %}
+
+{% block title %}{{ user.get_full_name }} — Обучения — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-mortarboard me-2"></i>{{ user.last_name }} {{ user.first_name }} {{ user.patronymic|default:"—" }}</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Horizontal tabs -->
+<div class="d-flex gap-2 mb-4 flex-wrap">
+    <a href="{% url 'accounts:user_general' user.pk %}" class="btn btn-sm {% if request.resolver_match.url_name == 'user_general' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-person me-1"></i>Общая информация
+    </a>
+    <a href="{% url 'accounts:user_trainings' user.pk %}" class="btn btn-sm {% if request.resolver_match.url_name == 'user_trainings' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-mortarboard me-1"></i>Обучения
+    </a>
+    <a href="{% url 'accounts:user_equipment' user.pk %}" class="btn btn-sm {% if request.resolver_match.url_name == 'user_equipment' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-pc-display me-1"></i>Закрепленное оборудование
+    </a>
+    <a href="{% url 'accounts:user_access' user.pk %}" class="btn btn-sm {% if request.resolver_match.url_name == 'user_access' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        <i class="bi bi-shield-lock me-1"></i>Доступы
+    </a>
+</div>
+
+<!-- Back button -->
+<a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm mb-4">
+    <i class="bi bi-arrow-left me-1"></i>Назад к списку
+</a>
+
+<!-- Trainings card -->
+<div class="card shadow-sm">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-mortarboard me-2"></i>Обучения</h5>
+    </div>
+    <div class="card-body text-center text-muted py-5">
+        <i class="bi bi-mortarboard display-1 d-block mb-3"></i>
+        <p class="mb-0">Информация об обучениях отсутствует</p>
+    </div>
+</div>
+{% endblock %}

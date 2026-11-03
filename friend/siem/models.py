@@ -87,41 +87,42 @@ class InventorySnapshot(models.Model):
 # ============================================================================
 
 class ScreenLockLog(models.Model):
-    """Журнал блокировок и разблокировок экрана."""
+    """Переходы состояния блокировки экрана (только смены состояния)."""
 
-    ACTION_CHOICES = [
-        ('lock', 'Блокировка'),
-        ('unlock', 'Разблокировка'),
+    STATE_CHOICES = [
+        ('locked', 'Заблокирован'),
+        ('unlocked', 'Разблокирован'),
     ]
 
     host = models.ForeignKey(
         Host, on_delete=models.CASCADE, related_name='screen_lock_logs',
         verbose_name='Хост',
     )
-    action = models.CharField('Действие', max_length=10, choices=ACTION_CHOICES, db_index=True)
+    state = models.CharField('Состояние', max_length=20, choices=STATE_CHOICES, db_index=True, default='unlocked')
+    timestamp = models.DateTimeField('Время перехода', db_index=True)
+    date = models.DateField('Дата', db_index=True, null=True, blank=True)
     username = models.CharField('Логин', max_length=100, blank=True)
-    timestamp = models.DateTimeField('Время', db_index=True)
     session_id = models.CharField('ID сессии', max_length=50, blank=True)
     created_at = models.DateTimeField('Создано', auto_now_add=True)
 
     class Meta:
-        verbose_name = 'Журнал блокировок'
-        verbose_name_plural = 'Журнал блокировок'
+        verbose_name = 'Переход блокировки'
+        verbose_name_plural = 'Переходы блокировки'
         ordering = ['-timestamp']
         constraints = [
             models.UniqueConstraint(
-                fields=['host', 'timestamp'],
-                name='uq_screenlocklog_host_timestamp',
+                fields=['host', 'date', 'state'],
+                name='uq_screenlocklog_host_date_state',
             ),
         ]
         indexes = [
             models.Index(fields=['host', 'timestamp']),
-            models.Index(fields=['action', 'timestamp']),
+            models.Index(fields=['state', 'timestamp']),
         ]
 
     def __str__(self):
-        action_text = dict(self.ACTION_CHOICES).get(self.action, self.action)
-        return f"{self.host.hostname} — {action_text} ({self.username}) — {self.timestamp:%Y-%m-%d %H:%M}"
+        state = 'заблокирован' if self.is_locked else 'разблокирован'
+        return f"{self.host.hostname} — {state} ({self.timestamp:%Y-%m-%d %H:%M})"
 
 
 class RecentLogin(models.Model):

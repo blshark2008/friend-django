@@ -1,6 +1,6 @@
 {% extends "siem/base.html" %}
 
-{% block title %}Журнал блокировок — SIEM{% endblock %}
+{% block title %}Блокировка экрана — SIEM{% endblock %}
 
 {% block sidebar %}
     <li class="mb-2">
@@ -25,7 +25,7 @@
     </li>
     <li class="mb-2">
         <a href="{% url 'siem:screen_lock_log' %}" class="text-decoration-none text-light">
-            <i class="bi bi-lock-fill me-2"></i>Журнал блокировок
+            <i class="bi bi-lock-fill me-2"></i>Блокировка экрана
         </a>
     </li>
     <li class="mb-2">
@@ -47,7 +47,7 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-lock-fill me-2"></i>Журнал блокировок экрана</h2>
+    <h2><i class="bi bi-lock-fill me-2"></i>Состояние блокировки экрана</h2>
 </div>
 
 <!-- Статистика -->
@@ -55,15 +55,15 @@
     <div class="col-md-3">
         <div class="card border-primary">
             <div class="card-body text-center">
-                <h3 class="text-primary">{{ logs.paginator.count }}</h3>
-                <small class="text-muted">Всего за период</small>
+                <h3 class="text-primary">{{ total_count }}</h3>
+                <small class="text-muted">Всего переходов</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card border-danger">
             <div class="card-body text-center">
-                <h3 class="text-danger">{{ logs.paginator.count|default:0 }}</h3>
+                <h3 class="text-danger">{{ locked_count }}</h3>
                 <small class="text-muted">Блокировок</small>
             </div>
         </div>
@@ -71,7 +71,7 @@
     <div class="col-md-3">
         <div class="card border-success">
             <div class="card-body text-center">
-                <h3 class="text-success">{{ logs.paginator.count|default:0 }}</h3>
+                <h3 class="text-success">{{ unlocked_count }}</h3>
                 <small class="text-muted">Разблокировок</small>
             </div>
         </div>
@@ -79,7 +79,7 @@
     <div class="col-md-3">
         <div class="card border-info">
             <div class="card-body text-center">
-                <h3 class="text-info">{{ logs.paginator.count|default:0 }}</h3>
+                <h3 class="text-info">{{ unique_hosts }}</h3>
                 <small class="text-muted">Хостов</small>
             </div>
         </div>
@@ -95,10 +95,10 @@
         <input type="text" name="host" class="form-control" placeholder="Имя хоста" value="{{ host_filter }}">
     </div>
     <div class="col-md-2">
-        <select name="action" class="form-select">
+        <select name="locked" class="form-select">
             <option value="">Все</option>
-            <option value="lock" {% if action == 'lock' %}selected{% endif %}>Блокировка</option>
-            <option value="unlock" {% if action == 'unlock' %}selected{% endif %}>Разблокировка</option>
+            <option value="locked" {% if locked == 'locked' %}selected{% endif %}>Блокировка</option>
+            <option value="unlocked" {% if locked == 'unlocked' %}selected{% endif %}>Разблокировка</option>
         </select>
     </div>
     <div class="col-md-2">
@@ -125,8 +125,8 @@
         <table class="table table-hover mb-0">
             <thead class="table-light">
                 <tr>
-                    <th>Время</th>
-                    <th>Действие</th>
+                    <th>Время перехода</th>
+                    <th>Состояние</th>
                     <th>Логин</th>
                     <th>Хост</th>
                     <th>Сессия</th>
@@ -137,13 +137,13 @@
                 <tr>
                     <td class="text-nowrap">{{ entry.timestamp|date:"d.m.Y H:i:s" }}</td>
                     <td>
-                        {% if entry.action == 'lock' %}
+                        {% if entry.state == 'locked' %}
                             <span class="badge bg-danger">
-                                <i class="bi bi-lock-fill me-1"></i>Блокировка
+                                <i class="bi bi-lock-fill me-1"></i>Заблокирован
                             </span>
                         {% else %}
                             <span class="badge bg-success">
-                                <i class="bi bi-unlock-fill me-1"></i>Разблокировка
+                                <i class="bi bi-unlock-fill me-1"></i>Разблокирован
                             </span>
                         {% endif %}
                     </td>
@@ -185,10 +185,10 @@
     <ul class="pagination">
         {% if page_obj.has_previous %}
         <li class="page-item">
-            <a class="page-link" href="?page=1&search={{ search }}&host={{ host_filter }}&action={{ action }}&days={{ days }}">Первая</a>
+            <a class="page-link" href="?page=1&search={{ search }}&host={{ host_filter }}&locked={{ locked }}&days={{ days }}">Первая</a>
         </li>
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search }}&host={{ host_filter }}&action={{ action }}&days={{ days }}">Предыдущая</a>
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&search={{ search }}&host={{ host_filter }}&locked={{ locked }}&days={{ days }}">Предыдущая</a>
         </li>
         {% endif %}
         <li class="page-item disabled">
@@ -196,10 +196,10 @@
         </li>
         {% if page_obj.has_next %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search }}&host={{ host_filter }}&action={{ action }}&days={{ days }}">Следующая</a>
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}&search={{ search }}&host={{ host_filter }}&locked={{ locked }}&days={{ days }}">Следующая</a>
         </li>
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&search={{ search }}&host={{ host_filter }}&action={{ action }}&days={{ days }}">Последняя</a>
+            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&search={{ search }}&host={{ host_filter }}&locked={{ locked }}&days={{ days }}">Последняя</a>
         </li>
         {% endif %}
     </ul>

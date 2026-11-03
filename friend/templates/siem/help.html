@@ -1,0 +1,196 @@
+{% extends "siem/base.html" %}
+
+{% block title %}Справка{% endblock %}
+
+{% block page_title %}
+<h4><i class="bi bi-question-circle"></i> Справка SIEM</h4>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="bi bi-info-circle text-primary"></i> О системе</h5>
+                <p class="text-muted">
+                    SIEM-система «Друг» предназначена для мониторинга безопасности,
+                    инвентаризации оборудования и контроля доступа сотрудников.
+                </p>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="bi bi-list-check text-success"></i> Типы событий</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Тип</th>
+                                <th>Описание</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>login</code></td>
+                                <td>Успешный вход пользователя на хост</td>
+                            </tr>
+                            <tr>
+                                <td><code>login_unknown</code></td>
+                                <td>Вход неизвестного пользователя (не найден в каталоге)</td>
+                            </tr>
+                            <tr>
+                                <td><code>screen_lock</code></td>
+                                <td>Блокировка / разблокировка экрана</td>
+                            </tr>
+                            <tr>
+                                <td><code>inventory</code></td>
+                                <td>Данные инвентаризации хоста</td>
+                            </tr>
+                            <tr>
+                                <td><code>browser_history</code></td>
+                                <td>История браузера (посещённые URL)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="bi bi-exclamation-triangle text-danger"></i> Классификация событий</h5>
+
+                <h6 class="mb-2"><span class="badge bg-danger severity-badge me-1"></span> Критические — немедленная реакция</h6>
+                <ul class="small text-muted mb-4">
+                    <li><code>file_changed</code> — изменён критичный файл (<code>/etc/passwd</code>, <code>/etc/shadow</code>, <code>/etc/sudoers</code>)</li>
+                    <li><code>uid0_added</code> — появился пользователь с UID 0 (кроме root)</li>
+                    <li><code>absence_login</code> — вход сотрудника в период отсутствия (отпуск / больничный)</li>
+                </ul>
+
+                <h6 class="mb-2"><span class="badge bg-warning text-dark severity-badge me-1"></span> Требуют внимания</h6>
+                <ul class="small text-muted mb-4">
+                    <li><code>auth_failed</code> — ≥5 неудачных SSH-входов за интервал (возможный brute-force)</li>
+                    <li><code>suspicious_process</code> — обнаружен подозрительный процесс</li>
+                    <li><code>suid_added</code> — появился новый SUID-файл</li>
+                    <li><code>packages_modified</code> — изменён список установленных пакетов</li>
+                    <li><code>new_port</code> — открыт новый сетевой порт</li>
+                    <li><code>new_connection</code> — новое сетевое соединение</li>
+                    <li><code>new_device</code> — подключено новое устройство</li>
+                    <li><code>firewall_changed</code> — изменены правила фаервола</li>
+                    <li><code>disk_full</code> — диск заполнен (порог 90%)</li>
+                    <li><code>cron_changed</code> — изменён список cron-задач</li>
+                    <li><code>sudo_failed</code> — неудачная попытка sudo</li>
+                    <li><code>kernel_error</code> — ошибка ядра Linux</li>
+                    <li><code>login_unknown</code> — вход неизвестного пользователя</li>
+                </ul>
+
+                <h6 class="mb-2"><span class="badge bg-info text-dark severity-badge me-1"></span> Информационные</h6>
+                <ul class="small text-muted mb-0">
+                    <li><code>login</code>, <code>logins_2d</code>, <code>logins_month</code> — входы пользователей</li>
+                    <li><code>agent_alive</code> — агент работает (heartbeat)</li>
+                    <li><code>inventory</code> — данные инвентаризации</li>
+                    <li><code>updates_pending</code> — требуют обновления пакетов</li>
+                    <li><code>browser_history</code> — история браузера</li>
+                    <li><code>screen_lock_log</code> — блокировки / разблокировки экрана</li>
+                    <li><code>sudo_used</code> — использован sudo</li>
+                    <li><code>account_changed</code> — изменение учётной записи</li>
+                    <li><code>parsec_events</code> — события Parsec</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="bi bi-shield-check text-primary"></i> Алерты отсутствия</h5>
+                <p class="text-muted mb-0">
+                    Если сотрудник входит в систему в период отпуска/больничного,
+                    автоматически создаётся алерт. Алерт можно подтвердить (acknowledge)
+                    с добавлением комментария.
+                </p>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="bi bi-gear text-secondary"></i> API для агентов</h5>
+                <p class="text-muted mb-3">Агенты отправляют данные на следующие эндпоинты:</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-font-monospace mb-0">
+                        <thead>
+                            <tr>
+                                <th>Эндпоинт</th>
+                                <th>Метод</th>
+                                <th>Описание</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>/siem/api/ingest/</code></td>
+                                <td><span class="badge bg-success">POST</span></td>
+                                <td>Приём событий (логины, алерты и т.д.)</td>
+                            </tr>
+                            <tr>
+                                <td><code>/siem/api/inventory/</code></td>
+                                <td><span class="badge bg-success">POST</span></td>
+                                <td>Приём снимков инвентаризации</td>
+                            </tr>
+                            <tr>
+                                <td><code>/siem/api/login-history/</code></td>
+                                <td><span class="badge bg-success">POST</span></td>
+                                <td>История входов</td>
+                            </tr>
+                            <tr>
+                                <td><code>/siem/api/extended-host/</code></td>
+                                <td><span class="badge bg-success">POST</span></td>
+                                <td>Расширенная информация о хосте</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="bi bi-lightning-charge text-info"></i> Быстрые ссылки</h5>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <a href="{% url 'siem:dashboard' %}" class="text-decoration-none">
+                            <i class="bi bi-grid-1x2 me-1"></i> Дашборд
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="{% url 'siem:events' %}" class="text-decoration-none">
+                            <i class="bi bi-list-ul me-1"></i> События
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="{% url 'siem:hosts' %}" class="text-decoration-none">
+                            <i class="bi bi-pc-display me-1"></i> Хосты
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="{% url 'siem:alerts_list' %}" class="text-decoration-none">
+                            <i class="bi bi-bell-exclamation me-1"></i> Алерты
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="bi bi-terminal text-secondary"></i> Статус системы</h5>
+                <ul class="list-unstyled mb-0 small text-muted">
+                    <li class="mb-1"><i class="bi bi-hdd text-success me-2"></i>Хостов: <strong>{{ hosts_total|default:"—" }}</strong></li>
+                    <li class="mb-1"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Оффлайн: <strong>{{ hosts_offline|default:"—" }}</strong></li>
+                    <li><i class="bi bi-shield-exclamation text-danger me-2"></i>Крит. событий сегодня: <strong>{{ events_critical_today|default:"—" }}</strong></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

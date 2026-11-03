@@ -164,83 +164,118 @@ fi
 date -Iseconds > "$STATE/logins_offset"
 
 # ===============================================================
-# БЛОК 2b. Журнал блокировок/разблокировок экрана
-# Собираем последние 20 событий из journalctl + loginctl
+# БЛОК 2b. Состояние блокировки экрана
+# Логика: 1 запись о блокировке в сутки. Разблокировка — только после блокировки или новых суток.
+# Состояния: "waiting_for_lock" (блокировка ещё не отправлена сегодня)
+#            "waiting_for_unlock" (блокировка отправлена, ждём разблокировку)
 # ===============================================================
 collect_screen_locks() {
     local LOCKS_JSON=""
     local EVENT_COUNT=0
+    local STATE_FILE="$STATE/screen_lock_state"
     
-    # Метод 1: journalctl - systemd-logind
-    if command -v journalctl >/dev/null 2>&1; then
-        # Ищем события блокировки/разблокировки
-        local LOCK_EVENTS
-        LOCK_EVENTS=$(journalctl -u systemd-logind --since="7 days ago" --no-pager 2>/dev/null \
-            | grep -iE "Session [0-9]+.*(Locked|Unlocked|locked|unlocked)" \
-            | tail -20)
-        
-        if [ -n "$LOCK_EVENTS" ]; then
-            while IFS= read -r line; do
-                local TIMESTAMP USER SESSION ACTION
-                
-                TIMESTAMP=$(echo "$line" | awk '{print $1" "$2" "$3}')
-                SESSION=$(echo "$line" | grep -oE "Session [0-9]+" | awk '{print $2}')
-                
-                if echo "$line" | grep -iq "Locked"; then
-                    ACTION="lock"
-                elif echo "$line" | grep -iq "Unlocked"; then
-                    ACTION="unlock"
-                else
-                    continue
-                fi
-                
-                USER=""
-                if [ -n "$SESSION" ]; then
-                    USER=$(loginctl show-session "$SESSION" -p Name --value 2>/dev/null || echo "")
-                fi
-                
-                local ISO_TS
-                ISO_TS=$(date -d "$TIMESTAMP" -Iseconds 2>/dev/null || echo "")
-                
-                if [ -n "$ISO_TS" ]; then
-                    LOCKS_JSON="$LOCKS_JSON{\"action\": \"$ACTION\", \"username\": \"$USER\", \"session_id\": \"$SESSION\", \"timestamp\": \"$ISO_TS\"},"
-                    EVENT_COUNT=$((EVENT_COUNT + 1))
-                fi
-            done <<< "$LOCK_EVENTS"
+    # Читаем предыдущее состояние: {"phase": "waiting_for_lock"|"waiting_for_unlock", "date": "YYYY-MM-DD"}
+    local PREV_PHASE="waiting_for_lock"
+    local PREV_DATE=""
+    if [ -f "$STATE_FILE" ]; then
+        PREV_PHASE=$(grep '"phase"' "$STATE_FILE" 2>/dev/null | sed 's/.*"phase": *"//;s/".*//')
+        PREV_DATE=$(grep '"date"' "$STATE_FILE" 2>/dev/null | sed 's/.*"date": *"//;s/".*//')
+        [ -z "$PREV_PHASE" ] && PREV_PHASE="waiting_for_lock"
+        [ -z "$PREV_DATE" ] && PREV_DATE=""
+    fi
+    
+    # Текущая дата
+    local TODAY
+    TODAY="$(date +%Y-%m-%d)"
+    local CURRENT_TS
+    CURRENT_TS="$(date -Iseconds)"
+    
+    # Определяем текущее состояние экрана (по всем активным сессиям)
+    local IS_LOCKED="false"
+    local ACTIVE_USER=""
+    local ACTIVE_SESSION=""
+    local SESSIONS
+    SESSIONS=$(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}')
+    
+    for SID in $SESSIONS; do
+        local LOCKED_HINT
+        LOCKED_HINT=$(loginctl show-session "$SID" -p LockedHint --value 2>/dev/null || echo "no")
+        if [ "$LOCKED_HINT" = "yes" ]; then
+            IS_LOCKED="true"
+            ACTIVE_USER=$(loginctl show-session "$SID" -p Name --value 2>/dev/null || echo "")
+            ACTIVE_SESSION="$SID"
+            break
+        fi
+    done
+    
+    # Если ни одна сессия не заблокирована — берём первую активную
+    if [ "$IS_LOCKED" = "false" ] && [ -n "$SESSIONS" ]; then
+        local FIRST_SID
+        FIRST_SID=$(echo "$SESSIONS" | head -1)
+        ACTIVE_USER=$(loginctl show-session "$FIRST_SID" -p Name --value 2>/dev/null || echo "")
+        ACTIVE_SESSION="$FIRST_SID"
+    fi
+    
+    # Определяем фазу и нужно ли отправлять
+    local PHASE="$PREV_PHASE"
+    local SHOULD_SEND="false"
+    local IS_NEW_DAY="false"
+    local IS_FIRST_RUN="false"
+    
+    # Проверяем первый запуск (нет state файла)
+    if [ ! -f "$STATE_FILE" ]; then
+        IS_FIRST_RUN="true"
+    fi
+    
+    # Новые сутки — сбрасываем фазу и отправляем текущее состояние
+    if [ "$PREV_DATE" != "$TODAY" ]; then
+        IS_NEW_DAY="true"
+        PHASE="waiting_for_lock"
+        SHOULD_SEND="true"
+    fi
+    
+    # Первый запуск — отправляем текущее состояние
+    if [ "$IS_FIRST_RUN" = "true" ]; then
+        SHOULD_SEND="true"
+    fi
+    
+    # Решаем, отправлять ли событие (если ещё не отправили по сутям/первому запуску)
+    if [ "$SHOULD_SEND" = "false" ]; then
+        if [ "$PHASE" = "waiting_for_lock" ]; then
+            # Блокировка → отправляем, переключаемся на ожидание разблокировки
+            if [ "$IS_LOCKED" = "true" ]; then
+                SHOULD_SEND="true"
+                PHASE="waiting_for_unlock"
+            fi
+            # Разблокировка → не отправляем (блокировки сегодня не было)
+        elif [ "$PHASE" = "waiting_for_unlock" ]; then
+            # Разблокировка → отправляем, переключаемся на ожидание блокировки
+            if [ "$IS_LOCKED" = "false" ]; then
+                SHOULD_SEND="true"
+                PHASE="waiting_for_lock"
+            fi
+            # Блокировка → не отправляем (уже была блокировка сегодня)
         fi
     fi
     
-    # Метод 2: loginctl - текущие сессии и их статус
-    # Если journalctl не дал результатов, используем loginctl
-    if [ "$EVENT_COUNT" -eq 0 ] && command -v loginctl >/dev/null 2>&1; then
-        local SESSIONS
-        SESSIONS=$(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}')
-        
-        for SID in $SESSIONS; do
-            local USER_NAME LOCKED_HINT SESSION_STATE
-            USER_NAME=$(loginctl show-session "$SID" -p Name --value 2>/dev/null || echo "")
-            LOCKED_HINT=$(loginctl show-session "$SID" -p LockedHint --value 2>/dev/null || echo "no")
-            SESSION_STATE=$(loginctl show-session "$SID" -p State --value 2>/dev/null || echo "unknown")
-            
-            # Записываем текущее состояние сессии
-            if [ "$LOCKED_HINT" = "yes" ]; then
-                LOCKS_JSON="$LOCKS_JSON{\"action\": \"lock\", \"username\": \"$USER_NAME\", \"session_id\": \"$SID\", \"timestamp\": \"$(date -Iseconds)\", \"state\": \"$SESSION_STATE\"},"
-                EVENT_COUNT=$((EVENT_COUNT + 1))
-            elif [ "$LOCKED_HINT" = "no" ] && [ "$SESSION_STATE" = "active" ]; then
-                LOCKS_JSON="$LOCKS_JSON{\"action\": \"unlock\", \"username\": \"$USER_NAME\", \"session_id\": \"$SID\", \"timestamp\": \"$(date -Iseconds)\", \"state\": \"$SESSION_STATE\"},"
-                EVENT_COUNT=$((EVENT_COUNT + 1))
-            fi
-        done
+    # Сохраняем состояние на следующий раз
+    printf '{"phase": "%s", "date": "%s"}' "$PHASE" "$TODAY" > "$STATE_FILE"
+    
+    if [ "$SHOULD_SEND" = "true" ]; then
+        LOCKS_JSON="{\"is_locked\": $IS_LOCKED, \"username\": \"$ACTIVE_USER\", \"session_id\": \"$ACTIVE_SESSION\", \"timestamp\": \"$CURRENT_TS\"}"
+        EVENT_COUNT=1
+        log "screen_lock_log: sent (phase=$PHASE, new_day=$IS_NEW_DAY, locked=$IS_LOCKED)"
+    else
+        log "collect_screen_locks: skip (phase=$PHASE, locked=$IS_LOCKED, new_day=$IS_NEW_DAY)"
     fi
     
     if [ -n "$LOCKS_JSON" ]; then
-        printf '{"locks": [%s]}' "${LOCKS_JSON%,}" | event screen_lock_log info "Журнал блокировок экрана"
+        printf '{"locks": [%s]}' "$LOCKS_JSON" | event screen_lock_log info "Состояние блокировки экрана"
         log "screen_lock_log sent: $EVENT_COUNT events"
-    else
-        log "collect_screen_locks: no events collected"
     fi
 }
 
+# Вызываем сбор журнала блокировок
 collect_screen_locks
 
 # ===============================================================

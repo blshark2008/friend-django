@@ -619,18 +619,18 @@ class IngestViewSet(viewsets.ViewSet):
                 )
 
     def _process_screen_locks(self, details, host, occurred_at):
-        """Извлекает данные о блокировках/разблокировках экрана и сохраняет в ScreenLockLog."""
+        """Извлекает переходы состояния блокировки экрана и сохраняет в ScreenLockLog."""
         locks = details.get('locks', [])
         if not locks:
             return
 
         for lock in locks:
-            action = lock.get('action', '')
+            is_locked = lock.get('is_locked', False)
             username = lock.get('username', '')
             session_id = lock.get('session_id', '')
             timestamp_str = lock.get('timestamp', '')
 
-            if not action or not timestamp_str:
+            if not timestamp_str:
                 continue
 
             try:
@@ -640,12 +640,16 @@ class IngestViewSet(viewsets.ViewSet):
             except (ValueError, AttributeError):
                 continue
 
-            # Создаём запись в журнале блокировок (уникально по host + timestamp)
+            # Определяем state
+            state = 'locked' if is_locked else 'unlocked'
+
+            # Создаём запись перехода (уникально по host + date + state)
             ScreenLockLog.objects.get_or_create(
                 host=host,
-                timestamp=timestamp,
+                date=timestamp.date(),
+                state=state,
                 defaults={
-                    'action': action,
+                    'timestamp': timestamp,
                     'username': username,
                     'session_id': session_id,
                 },
@@ -1265,10 +1269,10 @@ def login_history_detail(request, pk):
 # ============================================================================
 
 def screen_lock_log_list(request):
-    """Список всех блокировок/разблокировок экрана."""
+    """Список переходов состояния блокировки экрана."""
     search = request.GET.get('search', '')
     host_filter = request.GET.get('host', '')
-    action_filter = request.GET.get('action', '')
+    locked_filter = request.GET.get('locked', '')
     days = request.GET.get('days', 14)
 
     try:
@@ -1276,28 +1280,45 @@ def screen_lock_log_list(request):
     except (ValueError, TypeError):
         days = 14
 
-    logs = ScreenLockLog.objects.select_related('host').all()
+    logs_qs = ScreenLockLog.objects.select_related('host').all()
 
     if search:
-        logs = logs.filter(
+        logs_qs = logs_qs.filter(
             Q(username__icontains=search) |
             Q(host__hostname__icontains=search)
         )
 
     if host_filter:
-        logs = logs.filter(host__hostname__icontains=host_filter)
+        logs_qs = logs_qs.filter(host__hostname__icontains=host_filter)
 
-    if action_filter:
-        logs = logs.filter(action=action_filter)
+    if locked_filter == 'locked':
+        logs_qs = logs_qs.filter(state='locked')
+    elif locked_filter == 'unlocked':
+        logs_qs = logs_qs.filter(state='unlocked')
 
     cutoff = timezone.now() - timezone.timedelta(days=days)
-    logs = logs.filter(timestamp__gte=cutoff)
+    logs_qs = logs_qs.filter(timestamp__gte=cutoff)
 
-    logs = logs.order_by('-timestamp')
+    logs_qs = logs_qs.order_by('-timestamp')
+
+    # Считаем статистику по всем записям за период (без пагинации)
+    all_logs_qs = ScreenLockLog.objects.select_related('host').filter(timestamp__gte=cutoff)
+    if search:
+        all_logs_qs = all_logs_qs.filter(
+            Q(username__icontains=search) |
+            Q(host__hostname__icontains=search)
+        )
+    if host_filter:
+        all_logs_qs = all_logs_qs.filter(host__hostname__icontains=host_filter)
+
+    total_count = all_logs_qs.count()
+    locked_count = all_logs_qs.filter(state='locked').count()
+    unlocked_count = all_logs_qs.filter(state='unlocked').count()
+    unique_hosts = all_logs_qs.values('host').distinct().count()
 
     # Пагинация
     from django.core.paginator import Paginator
-    paginator = Paginator(logs, 50)
+    paginator = Paginator(logs_qs, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
@@ -1305,8 +1326,12 @@ def screen_lock_log_list(request):
         'logs': page_obj,
         'search': search,
         'host_filter': host_filter,
-        'action': action_filter,
+        'locked': locked_filter,
         'days': days,
+        'total_count': total_count,
+        'locked_count': locked_count,
+        'unlocked_count': unlocked_count,
+        'unique_hosts': unique_hosts,
         'is_paginated': page_obj.has_other_pages(),
         'page_obj': page_obj,
     }

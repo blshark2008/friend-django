@@ -33,7 +33,7 @@
                 <h6 class="text-muted mb-3">Основная информация</h6>
                 <table class="table table-sm">
                     <tr>
-                        <td class="text-muted" style="width: 40%">Тип события:</td>
+                        <td class="text-muted col-half">Тип события:</td>
                         <td><strong>{{ event.get_event_type_display }}</strong></td>
                     </tr>
                     <tr>
@@ -65,7 +65,7 @@
                 <h6 class="text-muted mb-3">Хост</h6>
                 <table class="table table-sm">
                     <tr>
-                        <td class="text-muted" style="width: 40%">Имя хоста:</td>
+                        <td class="text-muted col-half">Имя хоста:</td>
                         <td>
                             <a href="{% url 'siem:host_detail' event.host_id %}" class="text-decoration-none fw-bold">
                                 <i class="bi bi-pc-display me-1"></i>{{ event.host.hostname }}
@@ -134,7 +134,7 @@
                         <tbody>
                             {% for ev in related_events %}
                             <tr class="{% if ev.id == event.id %}table-active{% endif %}">
-                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ ev.occurred_at|date:"H:i:s" }}</td>
+                                <td class="text-nowrap text-muted text-small">{{ ev.occurred_at|date:"H:i:s" }}</td>
                                 <td>
                                     {% if ev.severity == 'critical' %}
                                     <span class="badge bg-danger severity-badge">Крит</span>
@@ -180,7 +180,7 @@
                         <tbody>
                             {% for ev in similar_events %}
                             <tr class="{% if ev.id == event.id %}table-active{% endif %}">
-                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ ev.occurred_at|date:"d.m H:i" }}</td>
+                                <td class="text-nowrap text-muted text-small">{{ ev.occurred_at|date:"d.m H:i" }}</td>
                                 <td>
                                     <a href="{% url 'siem:event_detail' ev.id %}" class="text-decoration-none">
                                         {{ ev.message|truncatewords:8 }}

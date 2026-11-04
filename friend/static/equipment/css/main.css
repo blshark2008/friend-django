@@ -1,0 +1,510 @@
+/* ============================================================================
+   Equipment Management App — Main Stylesheet
+   ============================================================================ */
+
+/* --- Variables --- */
+:root {
+    --sidebar-width: 280px;
+    --sidebar-collapsed-width: 60px;
+}
+
+/* --- Body --- */
+body {
+    background-color: #f8f9fa;
+}
+
+/* --- Sidebar --- */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+    color: #fff;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 1000;
+    transition: width 0.3s ease;
+}
+
+.sidebar.collapsed {
+    width: var(--sidebar-collapsed-width);
+}
+
+.sidebar.collapsed .sidebar-brand h5,
+.sidebar.collapsed .sidebar-brand small,
+.sidebar.collapsed .sidebar-section-title,
+.sidebar.collapsed .nav-link span:not(.badge),
+.sidebar.collapsed .nav-link .float-end {
+    display: none;
+}
+
+.sidebar.collapsed .sidebar-brand {
+    padding: 1rem 0.25rem;
+    text-align: center;
+}
+
+.sidebar.collapsed .sidebar-brand i {
+    font-size: 1.5rem;
+}
+
+.sidebar.collapsed .nav-link {
+    padding: 0.75rem 0.25rem;
+    justify-content: center;
+    border-left: none;
+    border-bottom: 3px solid transparent;
+}
+
+.sidebar.collapsed .nav-link:hover,
+.sidebar.collapsed .nav-link.active {
+    border-bottom-color: #3498db;
+    border-left: none;
+}
+
+.sidebar.collapsed .nav-link i {
+    margin-right: 0;
+    font-size: 1.25rem;
+}
+
+.sidebar .nav-link {
+    color: rgba(255,255,255,0.8);
+    padding: 0.5rem 1.25rem;
+    border-radius: 0;
+    border-left: 3px solid transparent;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.sidebar .nav-link:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+    border-left-color: #3498db;
+}
+
+.sidebar .nav-link.active {
+    color: #fff;
+    background: rgba(52, 152, 219, 0.2);
+    border-left-color: #3498db;
+}
+
+.sidebar .nav-link i {
+    width: 24px;
+    text-align: center;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+
+.sidebar .nav-link .badge {
+    margin-left: auto;
+}
+
+.sidebar .badge {
+    font-size: 0.7rem;
+}
+
+/* --- Sidebar Brand --- */
+.sidebar-brand {
+    padding: 1.5rem 1.25rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-brand h5 {
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.sidebar-brand small {
+    opacity: 0.6;
+    font-size: 0.8rem;
+}
+
+/* --- Sidebar Section --- */
+.sidebar-section {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.sidebar-section-title {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.4);
+    font-weight: 600;
+}
+
+/* --- Sidebar Toggle --- */
+.sidebar-toggle {
+    position: fixed;
+    top: 1rem;
+    left: calc(var(--sidebar-width) - 0.5rem);
+    z-index: 1001;
+    transition: left 0.3s ease;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 6px 6px 0;
+    background: #34495e;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #fff;
+    cursor: pointer;
+}
+
+.sidebar.collapsed ~ .main-content .sidebar-toggle,
+.sidebar-toggle.collapsed {
+    left: calc(var(--sidebar-collapsed-width) - 0.5rem);
+}
+
+.sidebar-toggle:hover {
+    background: #3498db;
+}
+
+.sidebar.collapsed + .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+/* --- Main Content --- */
+.main-content {
+    margin-left: var(--sidebar-width);
+    padding: 2rem;
+    min-height: 100vh;
+    transition: margin-left 0.3s ease;
+}
+
+/* --- Stat Cards --- */
+.stat-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.stat-card .card-body {
+    padding: 1.5rem;
+}
+
+.stat-card .icon-box {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+/* --- Table Cards --- */
+.table-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.table-card .card-header {
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    padding: 1.25rem 1.5rem;
+}
+
+/* --- Tables --- */
+.table thead th {
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+}
+
+.table tbody tr {
+    transition: background 0.15s;
+}
+
+.table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+/* --- Severity / Status Badges --- */
+.severity-badge,
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+}
+
+.count-badge {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* --- Tooltip for collapsed sidebar --- */
+.sidebar.collapsed .nav-link {
+    position: relative;
+}
+
+.sidebar.collapsed .nav-link::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #2c3e50;
+    color: #fff;
+    padding: 0.35rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    margin-left: 8px;
+    z-index: 1002;
+}
+
+.sidebar.collapsed .nav-link:hover::after {
+    opacity: 1;
+}
+
+/* ============================================================================
+   Equipment List Page
+   ============================================================================ */
+
+.filter-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.filter-card .card-header {
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    padding: 1rem 1.25rem;
+}
+
+.filter-group {
+    margin-bottom: 0.75rem;
+}
+
+.filter-group:last-child {
+    margin-bottom: 0;
+}
+
+.filter-group label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+}
+
+.filter-group .form-control,
+.filter-group .form-select {
+    font-size: 0.9rem;
+}
+
+.equipment-row {
+    transition: background 0.15s;
+}
+
+.equipment-row:hover {
+    background: #f8f9fa;
+}
+
+/* ============================================================================
+   Category List Page
+   ============================================================================ */
+
+.category-card {
+    border-left: 4px solid #3498db;
+    margin-bottom: 1rem;
+}
+
+.category-card.archived {
+    border-left-color: #95a5a6;
+    opacity: 0.7;
+}
+
+.subcategory-badge {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.subcategory-badge:hover {
+    transform: scale(1.05);
+}
+
+.filter-btn.active {
+    background: #3498db;
+    color: #fff;
+    border-color: #3498db;
+}
+
+/* ============================================================================
+   Location List Page
+   ============================================================================ */
+
+.location-tree .city-card {
+    border-left: 5px solid #e74c3c;
+    margin-bottom: 1.5rem;
+}
+
+.location-tree .building-card {
+    border-left: 4px solid #3498db;
+    margin-bottom: 1rem;
+}
+
+.location-tree .room-badge {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.location-tree .room-badge:hover {
+    transform: scale(1.05);
+}
+
+.location-tree .floor-rooms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 0 0 0.5rem 0.5rem;
+}
+
+.location-tree .room-count-badge {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+}
+
+/* ============================================================================
+   Category Equipment List Page
+   ============================================================================ */
+
+.sub-filter-btn.active {
+    background: #3498db;
+    color: #fff;
+    border-color: #3498db;
+}
+
+/* ============================================================================
+   Accordion Overrides (shared)
+   ============================================================================ */
+
+.accordion-button:not(.collapsed) {
+    background: rgba(52, 152, 219, 0.1);
+    color: #2c3e50;
+}
+
+.accordion-button {
+    font-weight: 600;
+}
+
+/* ============================================================================
+   Equipment Edit Simple — Mobile Optimization
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    .main-content {
+        padding: 1rem !important;
+        margin-left: 0 !important;
+    }
+
+    .card {
+        margin-bottom: 1rem !important;
+    }
+
+    .assign-info-item {
+        margin-bottom: 1.25rem !important;
+    }
+
+    .assign-info-item .form-label {
+        margin-bottom: 0.25rem !important;
+    }
+
+    .assign-info-item .btn {
+        width: 100%;
+        text-align: left;
+    }
+
+    .assign-info-item .btn i {
+        margin-right: 0.5rem;
+    }
+
+    .assign-info-item .remove-btn {
+        width: auto !important;
+        flex-shrink: 0;
+    }
+
+    .assign-info-item .remove-btn i {
+        margin-right: 0;
+    }
+
+    .form-control, .form-select {
+        font-size: 16px; /* Prevents iOS zoom */
+    }
+
+    .btn-group-mobile {
+        flex-direction: column;
+    }
+
+    .btn-group-mobile .btn {
+        width: 100%;
+    }
+
+    /* Modal mobile */
+    .modal-body {
+        padding: 1rem !important;
+    }
+
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+
+    #assignSearchFio, #assignSearchTab, #assignSearchDept, #assignSearchBtn {
+        width: 100%;
+    }
+
+    #assignSearchFio, #assignSearchTab, #assignSearchDept {
+        margin-bottom: 0.75rem;
+    }
+
+    #assignSearchBtn {
+        margin-bottom: 0.75rem;
+    }
+}
+
+/* ============================================================================
+   Responsive — Sidebar
+   ============================================================================ */
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    .sidebar-toggle {
+        left: 0.5rem !important;
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+}

@@ -11,6 +11,8 @@ urlpatterns = [
     path('events/<int:pk>/', views.event_detail, name='event_detail'),
     path('report/security/', views.report_security, name='report_security'),
     path('report/inventory/', views.report_inventory, name='report_inventory'),
+    path('report/inventory/<int:pk>/', views.inventory_host_history, name='inventory_host_history'),
+    path('report/inventory/<int:pk>/packages/', views.inventory_packages, name='inventory_packages'),
     path('report/hosts/', views.report_hosts, name='report_hosts'),
     # Управление отсутствиями
     path('leaves/', views.leaves_list, name='leaves_list'),

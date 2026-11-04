@@ -282,13 +282,21 @@ collect_screen_locks
 # БЛОК 3. Целостность критичных файлов
 # ===============================================================
 HASH_FILE="$STATE/hashes.new"
+HASH_EXISTS=0
+if [ -f "$STATE/hashes" ] && [ -s "$STATE/hashes" ]; then
+    HASH_EXISTS=1
+fi
+
 for F in /etc/passwd /etc/group /etc/shadow /etc/sudoers /etc/hosts; do
     [ -f "$F" ] || continue
     H=$(sha256sum "$F" 2>/dev/null | cut -d' ' -f1)
-    PREV=$(grep " ${F//\//\\/}$" "$STATE/hashes" 2>/dev/null | cut -d' ' -f1)
-    if [ -n "$PREV" ] && [ "$PREV" != "$H" ]; then
-        printf '{"file": "%s"}' "$F" | event file_changed critical "Изменён критичный файл: $F"
-        log "file_changed $F"
+    
+    if [ "$HASH_EXISTS" -eq 1 ]; then
+        PREV=$(grep " ${F//\//\\/}$" "$STATE/hashes" 2>/dev/null | cut -d' ' -f1)
+        if [ -n "$PREV" ] && [ "$PREV" != "$H" ]; then
+            printf '{"file": "%s"}' "$F" | event file_changed critical "Изменён критичный файл: $F"
+            log "file_changed $F"
+        fi
     fi
     echo "$H $F" >> "$HASH_FILE"
 done
@@ -427,6 +435,31 @@ if [ "$MODE" = "inventory" ]; then
         SENS=$(sensors 2>/dev/null | awk '/Package id 0|Core 0|Tctl/{gsub("[+°C]","",$NF); print $NF; exit}')
         [ -n "$SENS" ] && TEMP_C="$SENS"
     fi
+
+    # Пакеты, требующие обновления (JSON-массив)
+    UPD_JSON="["
+    FIRST=true
+    while IFS= read -r pkg; do
+        [ -z "$pkg" ] && continue
+        [ "$FIRST" = true ] && FIRST=false || UPD_JSON="$UPD_JSON, "
+        UPD_JSON="$UPD_JSON\"$pkg\""
+    done < <(apt list --upgradable 2>/dev/null | tail -n +2 | grep -v '^$' | awk -F/ '{print $1}')
+    UPD_JSON="$UPD_JSON]"
+    [ -z "$UPD_JSON" ] || [ "$UPD_JSON" = "[]" ] && UPD_JSON="[]"
+
+    # Антивирус: запущен ли процесс
+    AV_RUNNING=false
+    if [ -n "$AV" ]; then
+        AV_RUNNING=true
+    fi
+
+    # Текущий залогиненный пользователь (console)
+    CURRENT_USER=""
+    if command -v last >/dev/null 2>&1; then
+        CURRENT_USER=$(last -n 5 2>/dev/null | grep -E '(still logged|still login)' | awk '{print $1}' | head -1)
+    fi
+    [ -z "$CURRENT_USER" ] && CURRENT_USER=$(who 2>/dev/null | awk '{print $1}' | sort -u | head -1)
+    [ -z "$CURRENT_USER" ] && CURRENT_USER=$(logname 2>/dev/null || echo "")
 
     # Таймаут блокировки экрана (best effort, см. примечание ниже)
     CONSOLE_USER=$(who | awk '/:[0-9]/{print $1; exit}')
@@ -637,8 +670,12 @@ print(json.dumps(data, ensure_ascii=False))
     INVENTORY_PAYLOAD=$(printf '{
         "hostname": "%s",
         "cpu_model": "%s",
+        "cpu_temperature": %s,
         "ram_mb": %s,
         "packages_count": %s,
+        "pending_updates": %s,
+        "antivirus_running": %s,
+        "current_logged_user": "%s",
         "open_ports": [],
         "disk_info": %s,
         "raw": {
@@ -652,7 +689,7 @@ print(json.dumps(data, ensure_ascii=False))
             "uptime_hours": %s, "uptime_display": "%s",
             "agent_version": "1.1"
         }
-    }' "$HOSTNAME" "$CPU" "$RAM" "$PKGS" "$DISK_JSON" "$SERIAL" "$MODEL" "$OS" "$OS_NAME" "$KERNEL" \
+    }' "$HOSTNAME" "$CPU" "$TEMP_C" "$RAM" "$PKGS" "$UPD_JSON" "$AV_RUNNING" "$CURRENT_USER" "$DISK_JSON" "$SERIAL" "$MODEL" "$OS" "$OS_NAME" "$KERNEL" \
        "$INSTALL_DATE" "$IP_ALL" "$AV" "$AV_VERSION" "$AV_UPDATE" "$TEMP_C" "$LOCK_INFO" "$LOCK_TIMEOUT" "$USERS_ONLINE" "$USERS_JSON" "$PERMIT_ROOT" "$PASS_MIN_LEN" "$SUID_COUNT" "$LOAD_AVG" "$UPTIME_HOURS_INT" "$UPTIME_DISPLAY")
 
     curl -s --max-time "${CURL_TIMEOUT:-10}" -X POST "$SERVER/api/siem/ingest/inventory/" \

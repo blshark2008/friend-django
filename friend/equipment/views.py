@@ -1,5 +1,8 @@
+import csv
+import io
 import json
 import logging
+import re
 from django.utils import timezone
 from django.shortcuts import render, get_object_or_404, redirect, Http404
 from django.contrib import messages
@@ -8,21 +11,136 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView
 from django.db.models import Q, Count, Prefetch
 from django.urls import reverse
-from django.http import JsonResponse
+from django.core.paginator import Paginator
+from django.http import JsonResponse, HttpResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from .models import (
     Equipment, EquipmentAssignment, EquipmentMOLAssignment, EquipmentFieldSetting,
-    EQUIPMENT_CATEGORIES, EQUIPMENT_SUBTYPES, get_subtypes_for_category,
-    EQUIPMENT_CATEGORY_COMPUTER, EQUIPMENT_CATEGORY_PRINTER, EQUIPMENT_CATEGORY_PERIPHERY,
-    COMPUTER_SUBTYPE_DESKTOP, COMPUTER_SUBTYPE_LAPTOP, COMPUTER_SUBTYPE_TABLET,
-    COMPUTER_SUBTYPE_MONITOR, COMPUTER_SUBTYPE_SERVER,
-    OTHER_SUBTYPE_VKS, EQUIPMENT_STATUS_CHOICES,
-    EQUIPMENT_FIELD_DEFINITIONS,
+    EquipmentCategory, EQUIPMENT_STATUS_CHOICES,
+    City, Building, Floor, Room,
 )
 from .forms import (
     EquipmentForm, SimpleEquipmentForm, AssignUserForm,
+    CityForm, BuildingForm, FloorForm, RoomForm,
 )
+from accounts.models import Department
+
+
+# ============================================================================
+# Фильтр по наименованию — определяет, относится ли позиция к интересующей
+# технике (компьютерное, периферия, сеть, связь, принтеры, видео, мед.)
+# Исключает: мебель, ПО, расходники, книги, мед. инструменты и т.д.
+# ============================================================================
+
+NAME_FILTER_KEYWORDS = {
+    # Компьютерное оборудование
+    'компьютер': [
+        'компьютер', 'системн[ыи]й блок', 'моноблок', 'ноутбук',
+        'нетбук', 'планшет', 'тонкий клиент', 'смарт-часы', 'смаРТЧАС',
+        'тв-приставка', 'all-in-one', 'aio',
+    ],
+    # Мониторы
+    'монитор': [
+        'монитор', 'дисплей', 'display',
+    ],
+    # Принтеры и МФУ
+    'принтер': [
+        'принтер', 'мфу', 'мфУ', 'копир', 'лазерн', 'струйн',
+        'этикеток', 'плоттер',
+    ],
+    # Периферия
+    'периферия': [
+        'веб-камер', 'камер[аы]', 'гарнитур', 'наушник', 'динамик', 'колонк',
+        'диктофон', 'клавиатур', 'сканер', 'шредер', 'дисков[аые]', 'жестк',
+        'сумк[ае] под ноутбук', 'сумк[ае] для ноутбук', 'рутокен',
+    ],
+    # Сетевое оборудование
+    'сеть': [
+        'маршрутизатор', 'коммутатор', 'свитч', 'роутер', 'wifi', 'wi-fi',
+        'точк[аы] доступ', 'контроллер', 'ip-камер', 'sfp', 'медиа-конвертер',
+        'hdm[и]-сплиттер', 'концентратор', 'хаб', 'hub', 'ethernet',
+    ],
+    # Связь
+    'связь': [
+        'телефон', 'voip', 'gsm', 'модем', 'сотов', 'беспроводн',
+        'радиотелефон', 'терминал сбор', 'факс',
+    ],
+    # Видеооборудование
+    'видео': [
+        'проектор', 'телевизор', 'тв', 'видеокамер', 'вкс', 'videocam',
+    ],
+    # Медицинское оборудование
+    'медицинское': [
+        'кардиограф',
+    ],
+}
+
+# ============================================================================
+# Второй уровень фильтрации — исключения по ключевым словам
+# Позиции, содержащие эти слова, исключаются из выгрузки
+# ============================================================================
+
+EXCLUDE_KEYWORDS = [
+    # Мебель
+    'шкаф', 'стол', 'стул', 'кресл', 'тумб', 'стеллаж', 'комод',
+    'полк', 'стойк', 'подставк', 'кронштейн', 'крючок', 'зажим',
+    'витраж', 'дистрактор',
+    # Бытовые устройства
+    'холодильник', 'морозильн', 'утеплител', 'обогрев', 'увлажнител',
+    'термостат', 'терморегул', 'сушильн', 'плит', 'чайник', 'утюг',
+    'микроволн', 'пылесос', 'вентилятор', 'конвектор', 'электроплит',
+    # Расходники и инструменты
+    'пинцет', 'отвертк', 'ножниц', 'иглодерж', 'микроиглодерж',
+    'инструмент', 'резин', 'перемешивател', 'дозатор', 'диспенсер',
+    'инжектор', 'кабель', 'антенн', 'полка', 'крепление',
+    # Документация и ПО
+    'свидетельств', 'патент', 'программн', 'лицензи', 'дисков[аые]',
+    # Мед. расходники
+    'маск', 'шапочк', 'юбк', 'халат', 'перчатк', 'салфетк', 'бинт',
+    'марл', 'шприц', 'катетер', 'трубок', 'матрац', 'кушетк',
+    'ирригатор', 'отсос', 'штор', 'ведр', 'ковр', 'доск', 'щетк',
+    'тряп', 'свист', 'огнетушител', 'радиатор',
+    # Специфичные исключения
+    'суточн', 'прикроватн', 'телеметри', 'мониторинг', 'монитор',
+    'искуственн', 'сердечно', 'реаним', 'дефибрилл', 'спектрофотометр',
+    'режущ', 'водоподготовк', 'стационарн', 'анестезиолог',
+    'ламинар', 'стерилизатор', 'сушильн', 'вытяжн', 'шкаф',
+    'выдвижн', 'пенал', 'гардероб', 'архивн', 'металлич', 'деревянн',
+    'двер', 'секци', 'замк', 'стекл', 'полк',
+    'систем', 'устройств', 'прибор', 'установк', 'модуль',
+    'комплект', 'набор', 'диск', 'вставка', 'ручка', 'рукоятк',
+    'колес', 'опор', 'зеркал', 'панел', 'рамк',
+    'электрокардиограф', 'кардиограф',
+    '3d',
+]
+
+
+def classify_by_name(name):
+    """
+    Определяет категорию техники по наименованию.
+    Возвращает список категорий или пустой список, если не попадает.
+    Применяет второй уровень фильтрации — исключения.
+    """
+    if not name:
+        return []
+    
+    # Второй уровень: проверяем исключения
+    name_lower = name.lower()
+    for kw in EXCLUDE_KEYWORDS:
+        if re.search(kw, name_lower):
+            return []  # Позиция исключена
+    
+    # Первый уровень: ищем по ключевым словам категорий
+    matched = []
+    
+    for category, keywords in NAME_FILTER_KEYWORDS.items():
+        for kw in keywords:
+            if re.search(kw, name_lower):
+                matched.append(category)
+                break
+    
+    return matched
 
 logger = logging.getLogger(__name__)
 
@@ -40,25 +158,42 @@ class EquipmentListView(ListView):
 
     def get_queryset(self):
         qs = Equipment.objects.filter(archived=False).select_related(
-            'assigned_user', 'responsible_user'
+            'assigned_user', 'responsible_user', 'category', 'subcategory'
         )
         if self.equipment_type:
-            qs = qs.filter(category=self.equipment_type)
-        return qs.order_by('-is_active', 'category', 'subtype', 'inventory_number')
+            # equipment_type может быть slug категории
+            cat = EquipmentCategory.objects.filter(slug=self.equipment_type, is_active=True).first()
+            if cat:
+                if cat.is_top_level:
+                    qs = qs.filter(category=cat)
+                else:
+                    qs = qs.filter(subcategory=cat)
+        return qs.order_by('-is_active', 'category', 'subcategory', 'inventory_number')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['equipment_type'] = self.equipment_type
-        context['computers_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_DESKTOP, archived=False).count()
-        context['laptops_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_LAPTOP, archived=False).count()
-        context['tablets_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_TABLET, archived=False).count()
-        context['monitors_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_MONITOR, archived=False).count()
-        context['servers_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_SERVER, archived=False).count()
-        context['printers_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_PRINTER, archived=False).count()
-        context['medical_count'] = Equipment.objects.filter(subtype=OTHER_SUBTYPE_VKS, archived=False).count()
-        context['peripherals_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_PERIPHERY, archived=False).count()
-        context['phones_count'] = Equipment.objects.filter(subtype='inkjet', archived=False).count()
-        context['vks_count'] = Equipment.objects.filter(subtype=OTHER_SUBTYPE_VKS, archived=False).count()
+        context['computers_count'] = Equipment.objects.filter(
+            subcategory__slug='desktop', archived=False).count()
+        context['laptops_count'] = Equipment.objects.filter(
+            subcategory__slug='laptop', archived=False).count()
+        context['tablets_count'] = Equipment.objects.filter(
+            subcategory__slug='tablet', archived=False).count()
+        context['monitors_count'] = Equipment.objects.filter(
+            subcategory__slug='monitor', archived=False).count()
+        context['servers_count'] = Equipment.objects.filter(
+            subcategory__slug='server', archived=False).count()
+        context['printers_count'] = Equipment.objects.filter(
+            category__slug='printers_top', archived=False).count()
+        context['medical_count'] = Equipment.objects.filter(
+            category__slug='medical_top', archived=False).count()
+        context['peripherals_count'] = Equipment.objects.filter(
+            category__slug='periphery_top', archived=False).count()
+        context['phones_count'] = Equipment.objects.filter(
+            subcategory__slug__in=['voip_phone', 'system_phone', 'cordless_phone', 'cellular_phone'],
+            archived=False).count()
+        context['vks_count'] = Equipment.objects.filter(
+            subcategory__slug='vks', archived=False).count()
         return context
 
 
@@ -69,24 +204,36 @@ class ComputerListView(ListView):
     context_object_name = 'equipment_list'
 
     def get_queryset(self):
+        cat = EquipmentCategory.objects.filter(slug='computer_top', is_active=True).first()
         qs = Equipment.objects.filter(
             archived=False,
-            category=EQUIPMENT_CATEGORY_COMPUTER
-        ).select_related('assigned_user', 'responsible_user')
-        return qs.order_by('-is_active', 'subtype', 'inventory_number')
+            category=cat
+        ).select_related('assigned_user', 'responsible_user', 'category', 'subcategory')
+        return qs.order_by('-is_active', 'subcategory', 'inventory_number')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['computers_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_DESKTOP, archived=False).count()
-        context['laptops_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_LAPTOP, archived=False).count()
-        context['tablets_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_TABLET, archived=False).count()
-        context['monitors_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_MONITOR, archived=False).count()
-        context['servers_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_SERVER, archived=False).count()
-        context['printers_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_PRINTER, archived=False).count()
-        context['medical_count'] = Equipment.objects.filter(subtype=OTHER_SUBTYPE_VKS, archived=False).count()
-        context['peripherals_count'] = Equipment.objects.filter(category=EQUIPMENT_CATEGORY_PERIPHERY, archived=False).count()
-        context['phones_count'] = Equipment.objects.filter(subtype='inkjet', archived=False).count()
-        context['vks_count'] = Equipment.objects.filter(subtype=OTHER_SUBTYPE_VKS, archived=False).count()
+        context['computers_count'] = Equipment.objects.filter(
+            subcategory__slug='desktop', archived=False).count()
+        context['laptops_count'] = Equipment.objects.filter(
+            subcategory__slug='laptop', archived=False).count()
+        context['tablets_count'] = Equipment.objects.filter(
+            subcategory__slug='tablet', archived=False).count()
+        context['monitors_count'] = Equipment.objects.filter(
+            subcategory__slug='monitor', archived=False).count()
+        context['servers_count'] = Equipment.objects.filter(
+            subcategory__slug='server', archived=False).count()
+        context['printers_count'] = Equipment.objects.filter(
+            category__slug='printers_top', archived=False).count()
+        context['medical_count'] = Equipment.objects.filter(
+            category__slug='medical_top', archived=False).count()
+        context['peripherals_count'] = Equipment.objects.filter(
+            category__slug='periphery_top', archived=False).count()
+        context['phones_count'] = Equipment.objects.filter(
+            subcategory__slug__in=['voip_phone', 'system_phone', 'cordless_phone', 'cellular_phone'],
+            archived=False).count()
+        context['vks_count'] = Equipment.objects.filter(
+            subcategory__slug='vks', archived=False).count()
         return context
 
 
@@ -98,20 +245,28 @@ class ComputerListView(ListView):
 def equipment_list(request):
     """Общий список всего оборудования."""
     equipment_qs = Equipment.objects.filter(archived=False).select_related(
-        'assigned_user', 'responsible_user'
+        'assigned_user', 'responsible_user', 'category', 'subcategory'
     )
 
     # Фильтры
-    category = request.GET.get('category')
-    subtype = request.GET.get('subtype')
+    category_slug = request.GET.get('category')
+    subcategory_slug = request.GET.get('subcategory')
     search = request.GET.get('search', '').strip()
     status = request.GET.get('status')
     location = request.GET.get('location', '').strip()
+    assigned_dept = request.GET.get('assigned_dept', '').strip()
+    responsible_dept = request.GET.get('responsible_dept', '').strip()
+    assigned_user = request.GET.get('assigned_user', '').strip()
+    responsible_user = request.GET.get('responsible_user', '').strip()
 
-    if category:
-        equipment_qs = equipment_qs.filter(category=category)
-    if subtype:
-        equipment_qs = equipment_qs.filter(subtype=subtype)
+    if category_slug:
+        cat = EquipmentCategory.objects.filter(slug=category_slug, is_active=True).first()
+        if cat and cat.is_top_level:
+            equipment_qs = equipment_qs.filter(category=cat)
+    if subcategory_slug:
+        subcat = EquipmentCategory.objects.filter(slug=subcategory_slug, is_active=True).first()
+        if subcat and not subcat.is_top_level:
+            equipment_qs = equipment_qs.filter(subcategory=subcat)
     if search:
         equipment_qs = equipment_qs.filter(
             Q(inventory_number__icontains=search)
@@ -128,52 +283,175 @@ def equipment_list(request):
     if location:
         equipment_qs = equipment_qs.filter(location__icontains=location)
 
-    equipment_qs = equipment_qs.order_by('-is_active', 'category', 'subtype', 'inventory_number')
+    # Фильтр по подразделению закрепленного сотрудника
+    if assigned_dept:
+        from accounts.models import Department as AccountDepartment
+        dept = AccountDepartment.objects.filter(name=assigned_dept).first()
+        if dept:
+            equipment_qs = equipment_qs.filter(assigned_user__department=dept)
+        else:
+            equipment_qs = equipment_qs.none()
+
+    # Фильтр по подразделению МОЛ
+    if responsible_dept:
+        from accounts.models import Department as AccountDepartment
+        dept = AccountDepartment.objects.filter(name=responsible_dept).first()
+        if dept:
+            equipment_qs = equipment_qs.filter(responsible_user__department=dept)
+        else:
+            equipment_qs = equipment_qs.none()
+
+    # Фильтр по ФИО закрепленного сотрудника
+    if assigned_user:
+        parts = assigned_user.split()
+        if len(parts) >= 2:
+            last_name = parts[0]
+            first_name = parts[1]
+            equipment_qs = equipment_qs.filter(
+                Q(assigned_user__last_name__icontains=last_name)
+                & Q(assigned_user__first_name__icontains=first_name)
+            )
+        elif len(parts) == 1:
+            equipment_qs = equipment_qs.filter(
+                Q(assigned_user__last_name__icontains=parts[0])
+                | Q(assigned_user__first_name__icontains=parts[0])
+                | Q(assigned_user__patronymic__icontains=parts[0])
+            )
+
+    # Фильтр по ФИО МОЛ
+    if responsible_user:
+        parts = responsible_user.split()
+        if len(parts) >= 2:
+            last_name = parts[0]
+            first_name = parts[1]
+            equipment_qs = equipment_qs.filter(
+                Q(responsible_user__last_name__icontains=last_name)
+                & Q(responsible_user__first_name__icontains=first_name)
+            )
+        elif len(parts) == 1:
+            equipment_qs = equipment_qs.filter(
+                Q(responsible_user__last_name__icontains=parts[0])
+                | Q(responsible_user__first_name__icontains=parts[0])
+                | Q(responsible_user__patronymic__icontains=parts[0])
+            )
+
+    equipment_qs = equipment_qs.order_by('-is_active', 'category', 'subcategory', 'inventory_number')
 
     total_count = equipment_qs.count()
 
+    # Pagination
+    page_number = request.GET.get('page', 1)
+    items_per_page = request.GET.get('per_page', 50)
+
+    # Validate items_per_page
+    valid_page_sizes = [20, 50, 100, 200]
+    if str(items_per_page) not in [str(s) for s in valid_page_sizes]:
+        items_per_page = 50
+    else:
+        items_per_page = int(items_per_page)
+
+    paginator = Paginator(equipment_qs, items_per_page)
+    page_obj = paginator.get_page(page_number)
+
+    # Top-level categories for filter
+    top_categories = EquipmentCategory.objects.filter(
+        parent__isnull=True, is_active=True
+    ).order_by('name')
+
+    # Top-level categories for filter dropdown
+    categories = list(
+        EquipmentCategory.objects.filter(parent__isnull=True, is_active=True)
+        .order_by('name')
+        .values_list('slug', 'name')
+    )
+
+    # All subcategories for filter dropdown
+    subtypes = list(
+        EquipmentCategory.objects.filter(is_active=True)
+        .order_by('parent__name', 'name')
+        .values_list('slug', 'name')
+    )
+
+    # Departments for filter dropdowns
+    from accounts.models import Department as AccountDepartment, User as AccountUser
+    departments = list(
+        AccountDepartment.objects.filter(is_active=True)
+        .order_by('name')
+        .values_list('name', flat=True)
+    )
+
+    # Users for filter dropdowns (only those with equipment assigned)
+    assigned_users = list(
+        AccountUser.objects.filter(equipment_assigned__archived=False).distinct()
+        .order_by('last_name', 'first_name')
+        .values_list('id', 'last_name')
+    )
+    responsible_users = list(
+        AccountUser.objects.filter(equipment_responsible__archived=False).distinct()
+        .order_by('last_name', 'first_name')
+        .values_list('id', 'last_name')
+    )
+    # Combine and deduplicate users
+    all_users_map = {}
+    for uid, uname in assigned_users + responsible_users:
+        if uid not in all_users_map:
+            all_users_map[uid] = uname
+    all_users = [(uid, uname) for uid, uname in all_users_map.items()]
+
     # Counts for sidebar badges
     computers_count = Equipment.objects.filter(
-        category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_DESKTOP, archived=False
+        subcategory__slug='desktop', archived=False
     ).count()
     laptops_count = Equipment.objects.filter(
-        category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_LAPTOP, archived=False
+        subcategory__slug='laptop', archived=False
     ).count()
     tablets_count = Equipment.objects.filter(
-        category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_TABLET, archived=False
+        subcategory__slug='tablet', archived=False
     ).count()
     monitors_count = Equipment.objects.filter(
-        category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_MONITOR, archived=False
+        subcategory__slug='monitor', archived=False
     ).count()
     servers_count = Equipment.objects.filter(
-        category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_SERVER, archived=False
+        subcategory__slug='server', archived=False
     ).count()
     printers_count = Equipment.objects.filter(
-        category=EQUIPMENT_CATEGORY_PRINTER, archived=False
+        category__slug='printers_top', archived=False
     ).count()
     medical_count = Equipment.objects.filter(
-        subtype=OTHER_SUBTYPE_VKS, archived=False
+        category__slug='medical_top', archived=False
     ).count()
     peripherals_count = Equipment.objects.filter(
-        category=EQUIPMENT_CATEGORY_PERIPHERY, archived=False
+        category__slug='periphery_top', archived=False
     ).count()
     phones_count = Equipment.objects.filter(
-        subtype='inkjet', archived=False
+        subcategory__slug__in=['voip_phone', 'system_phone', 'cordless_phone', 'cellular_phone'],
+        archived=False
     ).count()
     vks_count = Equipment.objects.filter(
-        subtype=OTHER_SUBTYPE_VKS, archived=False
+        subcategory__slug='vks', archived=False
     ).count()
 
     context = {
-        'equipment_list': equipment_qs,
+        'equipment_list': page_obj,
         'total_count': total_count,
-        'categories': EQUIPMENT_CATEGORIES,
-        'subtypes': EQUIPMENT_SUBTYPES,
-        'current_category': category,
-        'current_subtype': subtype,
+        'page_obj': page_obj,
+        'current_per_page': items_per_page,
+        'valid_page_sizes': valid_page_sizes,
+        'status_choices': EQUIPMENT_STATUS_CHOICES,
+        'categories': categories,
+        'subtypes': subtypes,
+        'top_categories': top_categories,
+        'departments': departments,
+        'all_users': all_users,
+        'current_category': category_slug,
+        'current_subcategory': subcategory_slug,
         'current_search': search,
         'current_status': status,
         'current_location': location,
+        'current_assigned_dept': assigned_dept,
+        'current_responsible_dept': responsible_dept,
+        'current_assigned_user': assigned_user,
+        'current_responsible_user': responsible_user,
         'computers_count': computers_count,
         'laptops_count': laptops_count,
         'tablets_count': tablets_count,
@@ -194,27 +472,32 @@ def equipment_list(request):
 
 @login_required
 def categories_reference(request):
-    """Справочник категорий и подтипов оборудования."""
-    # Статистика по категориям
+    """Справочник категорий и подкатегорий оборудования (иерархический)."""
+    # Статистика по категориям (иерархия)
+    top_categories = EquipmentCategory.objects.filter(
+        parent__isnull=True, is_active=True
+    ).prefetch_related('children').order_by('name')
+
     category_stats = {}
-    for cat_value, cat_label in EQUIPMENT_CATEGORIES:
-        count = Equipment.objects.filter(category=cat_value, archived=False).count()
-        subtypes = get_subtypes_for_category(cat_value)
-        subtype_counts = {}
-        for sub_value, sub_label in subtypes:
+    for top_cat in top_categories:
+        count = Equipment.objects.filter(category=top_cat, archived=False).count()
+        subcategories = top_cat.children.filter(is_active=True)
+        subcategory_counts = {}
+        for subcat in subcategories:
             subtype_count = Equipment.objects.filter(
-                category=cat_value, subtype=sub_value, archived=False
+                subcategory=subcat, archived=False
             ).count()
-            subtype_counts[sub_label] = subtype_count
-        category_stats[cat_label] = {
-            'value': cat_value,
+            subcategory_counts[subcat.name] = subtype_count
+        category_stats[top_cat.name] = {
+            'pk': top_cat.pk,
+            'slug': top_cat.slug,
             'count': count,
-            'subtypes': subtype_counts,
+            'subcategories': subcategory_counts,
         }
 
     # Статистика по статусам
     status_stats = {}
-    for status_value, status_label in EQUIPMENT_STATUS_CHOICES:
+    for status_value, status_label in [('active', 'Активно'), ('maintenance', 'На обслуживании'), ('decommissioned', 'Списано')]:
         count = Equipment.objects.filter(status=status_value, archived=False).count()
         status_stats[status_label] = count
 
@@ -241,16 +524,16 @@ def categories_reference(request):
         'unassigned_count': unassigned_count,
         'secured_count': secured_count,
         'unsecured_count': unsecured_count,
-        'computers_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_DESKTOP, archived=False).count(),
-        'laptops_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_LAPTOP, archived=False).count(),
-        'tablets_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_TABLET, archived=False).count(),
-        'monitors_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_MONITOR, archived=False).count(),
-        'servers_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_SERVER, archived=False).count(),
-        'printers_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_PRINTER, archived=False).count(),
-        'medical_count': Equipment.objects.filter(subtype=OTHER_SUBTYPE_VKS, archived=False).count(),
-        'peripherals_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_PERIPHERY, archived=False).count(),
-        'phones_count': Equipment.objects.filter(subtype='inkjet', archived=False).count(),
-        'vks_count': Equipment.objects.filter(subtype=OTHER_SUBTYPE_VKS, archived=False).count(),
+        'computers_count': Equipment.objects.filter(subcategory__slug='desktop', archived=False).count(),
+        'laptops_count': Equipment.objects.filter(subcategory__slug='laptop', archived=False).count(),
+        'tablets_count': Equipment.objects.filter(subcategory__slug='tablet', archived=False).count(),
+        'monitors_count': Equipment.objects.filter(subcategory__slug='monitor', archived=False).count(),
+        'servers_count': Equipment.objects.filter(subcategory__slug='server', archived=False).count(),
+        'printers_count': Equipment.objects.filter(category__slug='printers_top', archived=False).count(),
+        'medical_count': Equipment.objects.filter(category__slug='medical_top', archived=False).count(),
+        'peripherals_count': Equipment.objects.filter(category__slug='periphery_top', archived=False).count(),
+        'phones_count': Equipment.objects.filter(subcategory__slug__in=['voip_phone', 'system_phone', 'cordless_phone', 'cellular_phone'], archived=False).count(),
+        'vks_count': Equipment.objects.filter(subcategory__slug='vks', archived=False).count(),
     }
     return render(request, 'equipment/categories_reference.html', context)
 
@@ -262,33 +545,657 @@ def categories_reference(request):
 def _sidebar_counts():
     """Возвращает словарь счётчиков для бейджей в сайдбаре."""
     return {
-        'computers_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_DESKTOP, archived=False).count(),
-        'laptops_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_LAPTOP, archived=False).count(),
-        'tablets_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_TABLET, archived=False).count(),
-        'monitors_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_MONITOR, archived=False).count(),
-        'servers_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_COMPUTER, subtype=COMPUTER_SUBTYPE_SERVER, archived=False).count(),
-        'printers_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_PRINTER, archived=False).count(),
-        'medical_count': Equipment.objects.filter(subtype=OTHER_SUBTYPE_VKS, archived=False).count(),
-        'peripherals_count': Equipment.objects.filter(category=EQUIPMENT_CATEGORY_PERIPHERY, archived=False).count(),
-        'phones_count': Equipment.objects.filter(subtype='inkjet', archived=False).count(),
-        'vks_count': Equipment.objects.filter(subtype=OTHER_SUBTYPE_VKS, archived=False).count(),
+        'computers_count': Equipment.objects.filter(
+            subcategory__slug='desktop', archived=False).count(),
+        'laptops_count': Equipment.objects.filter(
+            subcategory__slug='laptop', archived=False).count(),
+        'tablets_count': Equipment.objects.filter(
+            subcategory__slug='tablet', archived=False).count(),
+        'monitors_count': Equipment.objects.filter(
+            subcategory__slug='monitor', archived=False).count(),
+        'servers_count': Equipment.objects.filter(
+            subcategory__slug='server', archived=False).count(),
+        'printers_count': Equipment.objects.filter(
+            category__slug='printers_top', archived=False).count(),
+        'medical_count': Equipment.objects.filter(
+            category__slug='medical_top', archived=False).count(),
+        'peripherals_count': Equipment.objects.filter(
+            category__slug='periphery_top', archived=False).count(),
+        'phones_count': Equipment.objects.filter(
+            subcategory__slug__in=['voip_phone', 'system_phone', 'cordless_phone', 'cellular_phone'],
+            archived=False).count(),
+        'vks_count': Equipment.objects.filter(
+            subcategory__slug='vks', archived=False).count(),
+        # Категории первого уровня с количеством оборудования
+        'top_categories': EquipmentCategory.objects.filter(
+            parent__isnull=True, is_active=True
+        ).prefetch_related().annotate(
+            eq_count=Count(
+                'equipment_items',
+                filter=Q(equipment_items__archived=False),
+                distinct=True,
+            )
+        ).order_by('name'),
     }
 
 def export_equipment_to_excel(request):
     """Стуб: экспорт оборудования в Excel."""
     return render(request, 'equipment/equipment_list.html', {**_sidebar_counts(), 'equipment_list': Equipment.objects.none()})
 
+@login_required
 def dashboard(request):
-    """Стуб: дашборд."""
-    return render(request, 'equipment/dashboard.html', _sidebar_counts())
+    """Дашборд: сводная информация по категориям, статусам и подразделениям."""
+    equipment_qs = Equipment.objects.filter(archived=False).select_related(
+        'assigned_user', 'assigned_user__department', 'responsible_user', 'responsible_user__department',
+        'category', 'subcategory',
+    )
+
+    # === Сводка по категориям ===
+    category_stats = []
+    top_categories = EquipmentCategory.objects.filter(parent__isnull=True, is_active=True).order_by('name')
+    for cat in top_categories:
+        count = equipment_qs.filter(category=cat).count()
+        subcats = cat.children.filter(is_active=True)
+        subcat_data = []
+        for sc in subcats:
+            sub_count = equipment_qs.filter(subcategory=sc).count()
+            if sub_count > 0:
+                subcat_data.append({'name': sc.name, 'count': sub_count})
+        category_stats.append({
+            'name': cat.name,
+            'slug': cat.slug,
+            'count': count,
+            'subcategories': subcat_data,
+        })
+
+    # === Сводка по статусам ===
+    status_stats = []
+    for status_value, status_label in EQUIPMENT_STATUS_CHOICES:
+        count = equipment_qs.filter(status=status_value).count()
+        if count > 0:
+            status_stats.append({'value': status_value, 'label': status_label, 'count': count})
+
+    # === Таблица 1: По подразделению закрепленного за техникой сотрудника (assigned_user) ===
+    assigned_dept_data = {}
+    assigned_qs = equipment_qs.exclude(assigned_user__isnull=True)
+    for item in assigned_qs:
+        dept = item.assigned_user.department
+        if not dept:
+            continue
+        dept_name = dept.name
+        cat_name = item.category.name if item.category else 'Без категории'
+        if dept_name not in assigned_dept_data:
+            assigned_dept_data[dept_name] = {'total': 0, 'categories': {}}
+        assigned_dept_data[dept_name]['total'] += 1
+        if cat_name not in assigned_dept_data[dept_name]['categories']:
+            assigned_dept_data[dept_name]['categories'][cat_name] = 0
+        assigned_dept_data[dept_name]['categories'][cat_name] += 1
+
+    # Sort by total descending
+    assigned_depts = sorted(assigned_dept_data.items(), key=lambda x: x[1]['total'], reverse=True)
+
+    # === Таблица 2: По подразделению МОЛ (responsible_user) ===
+    mol_dept_data = {}
+    mol_qs = equipment_qs.exclude(responsible_user__isnull=True)
+    for item in mol_qs:
+        dept = item.responsible_user.department
+        if not dept:
+            continue
+        dept_name = dept.name
+        cat_name = item.category.name if item.category else 'Без категории'
+        if dept_name not in mol_dept_data:
+            mol_dept_data[dept_name] = {'total': 0, 'categories': {}}
+        mol_dept_data[dept_name]['total'] += 1
+        if cat_name not in mol_dept_data[dept_name]['categories']:
+            mol_dept_data[dept_name]['categories'][cat_name] = 0
+        mol_dept_data[dept_name]['categories'][cat_name] += 1
+
+    mol_depts = sorted(mol_dept_data.items(), key=lambda x: x[1]['total'], reverse=True)
+
+    # === Подкатегории "Компьютерное оборудование" ===
+    computer_cat = EquipmentCategory.objects.filter(slug='computer_top', is_active=True).first()
+    computer_subcats = []
+    computer_subcat_names = []
+    if computer_cat:
+        computer_subcats = list(computer_cat.children.filter(is_active=True).order_by('name'))
+        computer_subcat_names = [sc.name for sc in computer_subcats]
+
+    # === Таблица 3: По подразделению assigned_user — подкатегории компьютерного оборудования ===
+    assigned_comp_data = {}
+    for item in equipment_qs.filter(subcategory__in=computer_subcats).exclude(assigned_user__isnull=True):
+        dept = item.assigned_user.department
+        if not dept:
+            continue
+        dept_name = dept.name
+        subcat_name = item.subcategory.name if item.subcategory else 'Без подкатегории'
+        if dept_name not in assigned_comp_data:
+            assigned_comp_data[dept_name] = {'total': 0, 'subcategories': {}}
+        assigned_comp_data[dept_name]['total'] += 1
+        if subcat_name not in assigned_comp_data[dept_name]['subcategories']:
+            assigned_comp_data[dept_name]['subcategories'][subcat_name] = 0
+        assigned_comp_data[dept_name]['subcategories'][subcat_name] += 1
+
+    assigned_comp_depts = sorted(assigned_comp_data.items(), key=lambda x: x[1]['total'], reverse=True)
+
+    # === Таблица 4: По подразделению МОЛ — подкатегории компьютерного оборудования ===
+    mol_comp_data = {}
+    for item in equipment_qs.filter(subcategory__in=computer_subcats).exclude(responsible_user__isnull=True):
+        dept = item.responsible_user.department
+        if not dept:
+            continue
+        dept_name = dept.name
+        subcat_name = item.subcategory.name if item.subcategory else 'Без подкатегории'
+        if dept_name not in mol_comp_data:
+            mol_comp_data[dept_name] = {'total': 0, 'subcategories': {}}
+        mol_comp_data[dept_name]['total'] += 1
+        if subcat_name not in mol_comp_data[dept_name]['subcategories']:
+            mol_comp_data[dept_name]['subcategories'][subcat_name] = 0
+        mol_comp_data[dept_name]['subcategories'][subcat_name] += 1
+
+    mol_comp_depts = sorted(mol_comp_data.items(), key=lambda x: x[1]['total'], reverse=True)
+
+    # === Количество сотрудников по подразделениям (из accounts) ===
+    from accounts.models import User as AccountUser
+    dept_user_counts = {}
+    for dept in Department.objects.filter(is_active=True):
+        count = AccountUser.objects.filter(department=dept).count()
+        if count > 0:
+            dept_user_counts[dept.name] = count
+
+    context = {
+        **_sidebar_counts(),
+        'category_stats': category_stats,
+        'status_stats': status_stats,
+        'assigned_depts': assigned_depts,
+        'mol_depts': mol_depts,
+        'all_categories': [item['name'] for item in category_stats],
+        # Computer subcategories
+        'computer_subcat_names': computer_subcat_names,
+        'assigned_comp_depts': assigned_comp_depts,
+        'mol_comp_depts': mol_comp_depts,
+        'dept_user_counts': dept_user_counts,
+    }
+    return render(request, 'equipment/dashboard.html', context)
 
 def department_equipment(request, department_id):
     """Стуб: оборудование подразделения."""
     return render(request, 'equipment/department_equipment.html', _sidebar_counts())
 
+@login_required
+def download_new_items(request):
+    """Скачивание CSV файла с новыми позициями."""
+    # Get new items from session (set during upload)
+    new_items = request.session.get('upload_new_items', [])
+    if not new_items:
+        messages.error(request, 'Нет новых позиций для скачивания')
+        return redirect('equipment:upload_os')
+
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="new_os_items.csv"'
+
+    writer = csv.writer(response, delimiter=';')
+    writer.writerow(['Наименование', 'МОЛ/Место хранения', 'Инвентарный номер',
+                     'Заводской номер', 'Тип НФА'])
+
+    for item in new_items:
+        writer.writerow([
+            item.get('name', ''),
+            item.get('mol', ''),
+            item.get('inventory', ''),
+            item.get('serial', ''),
+            item.get('nfa_type', ''),
+        ])
+
+    return response
+
+
 def upload_os_csv(request):
-    """Стуб: загрузка CSV."""
-    return render(request, 'equipment/upload_os_csv.html', _sidebar_counts())
+    """Загрузка и обработка CSV файла основных средств."""
+
+    stats = {
+        'total_rows': 0,
+        'valid_inventory_rows': 0,
+        'found_by_inventory': 0,
+        'confirmed': 0,
+        'not_found_by_inventory': 0,
+        'found_by_serial': 0,
+        'confirmed_by_serial': 0,
+        'not_found_by_serial': 0,
+        'group_accounting': 0,
+        'no_inventory': 0,
+        'new_items': [],
+        'new_items_filtered': [],  # Только позиции, попадающие под фильтр
+        'new_items_excluded': [],  # Позиции, исключённые фильтром
+        'category_stats': {},  # Статистика по категориям новых позиций
+        'filter_keywords': NAME_FILTER_KEYWORDS,  # Для отображения пользователю
+        'exclude_keywords': EXCLUDE_KEYWORDS,  # Исключения для отображения
+        'mio_failures': [],  # Ошибки поиска МОЛ
+        'mio_stats': {
+            'total_mol': 0,
+            'found': 0,
+            'not_found': 0,
+            'too_many': 0,
+            'no_name': 0,
+        },
+        'errors': [],
+    }
+
+    if request.method == 'POST':
+        csv_file = request.FILES.get('csv_file')
+        if not csv_file:
+            messages.error(request, 'Выберите файл для загрузки')
+            return render(request, 'equipment/upload_os_csv.html', {
+                **_sidebar_counts(),
+                'stats': None,
+                'error': 'Файл не выбран',
+            })
+
+        try:
+            # Decode file content
+            file_content = csv_file.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(file_content))
+
+            # Step 1: Set all equipment to 'pending' status
+            Equipment.objects.filter(archived=False).update(status='pending')
+
+            # Track inventory numbers we've seen (for dedup)
+            processed_inventory_numbers = set()
+
+            for row_num, row in enumerate(reader, start=2):  # start=2 because row 1 is header
+                stats['total_rows'] += 1
+
+                # Extract fields
+                inventory_number = (row.get('Инвентарный номер', '') or '').strip()
+                mol_field = (row.get('МОЛ/Место хранения', '') or '').strip()
+                name = (row.get('Наименование', '') or '').strip()
+                serial_number = (row.get('Заводской номер', '') or '').strip()
+                nfa_type = (row.get('Тип НФА', '') or '').strip()
+
+                # Skip rows with group accounting or no inventory
+                if inventory_number in ('<групповой учет>', '<не задан>', ''):
+                    if inventory_number in ('<групповой учет>', '<не задан>'):
+                        stats['group_accounting'] += 1
+                    else:
+                        stats['no_inventory'] += 1
+
+                    # Filter by name
+                    categories = classify_by_name(name)
+                    item_data = {
+                        'name': name,
+                        'mol': mol_field,
+                        'inventory': inventory_number,
+                        'serial': serial_number,
+                        'nfa_type': nfa_type,
+                        'row_num': row_num,
+                        'categories': categories,
+                    }
+                    
+                    if categories:
+                        stats['new_items_filtered'].append(item_data)
+                        for cat in categories:
+                            stats['category_stats'][cat] = stats['category_stats'].get(cat, 0) + 1
+                    else:
+                        stats['new_items_excluded'].append(item_data)
+                    continue
+
+                stats['valid_inventory_rows'] += 1
+
+                # Check for duplicates in this file
+                if inventory_number in processed_inventory_numbers:
+                    continue
+                processed_inventory_numbers.add(inventory_number)
+
+                # Try to find equipment by inventory number
+                equipment = Equipment.objects.filter(
+                    inventory_number=inventory_number, archived=False
+                ).first()
+
+                if equipment:
+                    stats['found_by_inventory'] += 1
+                    equipment.status = 'confirmed'
+
+                    # Parse MIO and assign responsible_user
+                    if mol_field and mol_field not in ('<групповой учет>', '<не задан>'):
+                        mio_result = _parse_and_find_mol(mol_field)
+                        if mio_result['found']:
+                            equipment.responsible_user = mio_result['user']
+                            stats['mio_stats']['found'] += 1
+                        else:
+                            stats['mio_stats']['not_found'] += 1
+                            stats['mio_failures'].append({
+                                'row_num': row_num,
+                                'inventory': inventory_number,
+                                'name': name,
+                                'mol': mol_field,
+                                'reason': mio_result['reason'],
+                                'match_info': mio_result['match_info'],
+                            })
+
+                    # Update serial number if provided and empty
+                    if serial_number and not equipment.serial_number:
+                        equipment.serial_number = serial_number
+
+                    equipment.save(update_fields=['status', 'responsible_user', 'serial_number'])
+                    stats['confirmed'] += 1
+                else:
+                    stats['not_found_by_inventory'] += 1
+
+                    # Try to find by serial number
+                    if serial_number:
+                        eq_by_serial = Equipment.objects.filter(
+                            serial_number=serial_number, archived=False
+                        ).first()
+                        if eq_by_serial:
+                            equipment = eq_by_serial
+                            stats['found_by_serial'] += 1
+                            equipment.status = 'confirmed'
+
+                            if mol_field and mol_field not in ('<групповой учет>', '<не задан>'):
+                                mio_result = _parse_and_find_mol(mol_field)
+                                if mio_result['found']:
+                                    equipment.responsible_user = mio_result['user']
+                                    stats['mio_stats']['found'] += 1
+                                else:
+                                    stats['mio_stats']['not_found'] += 1
+                                    stats['mio_failures'].append({
+                                        'row_num': row_num,
+                                        'inventory': inventory_number,
+                                        'name': name,
+                                        'mol': mol_field,
+                                        'reason': mio_result['reason'],
+                                        'match_info': mio_result['match_info'],
+                                    })
+
+                            equipment.save(update_fields=['status', 'responsible_user'])
+                            stats['confirmed_by_serial'] += 1
+                        else:
+                            stats['not_found_by_serial'] += 1
+                            categories = classify_by_name(name)
+                            item_data = {
+                                'name': name,
+                                'mol': mol_field,
+                                'inventory': inventory_number,
+                                'serial': serial_number,
+                                'nfa_type': nfa_type,
+                                'row_num': row_num,
+                                'categories': categories,
+                            }
+                            
+                            if categories:
+                                stats['new_items_filtered'].append(item_data)
+                                for cat in categories:
+                                    stats['category_stats'][cat] = stats['category_stats'].get(cat, 0) + 1
+                            else:
+                                stats['new_items_excluded'].append(item_data)
+                    else:
+                        stats['not_found_by_serial'] += 1
+                        categories = classify_by_name(name)
+                        item_data = {
+                            'name': name,
+                            'mol': mol_field,
+                            'inventory': inventory_number,
+                            'serial': serial_number,
+                            'nfa_type': nfa_type,
+                            'row_num': row_num,
+                            'categories': categories,
+                        }
+                        
+                        if categories:
+                            stats['new_items_filtered'].append(item_data)
+                            for cat in categories:
+                                stats['category_stats'][cat] = stats['category_stats'].get(cat, 0) + 1
+                        else:
+                            stats['new_items_excluded'].append(item_data)
+
+            messages.success(request, 'Файл основных средств успешно обработан')
+
+            # Save filtered new items to session for download
+            request.session['upload_new_items'] = stats['new_items_filtered']
+
+        except Exception as e:
+            logger.exception('Ошибка обработки CSV файла')
+            stats['errors'].append(str(e))
+            messages.error(request, f'Ошибка обработки файла: {e}')
+
+        return render(request, 'equipment/upload_os_csv.html', {
+            **_sidebar_counts(),
+            'stats': stats,
+        })
+
+    return render(request, 'equipment/upload_os_csv.html', {
+        **_sidebar_counts(),
+        'stats': None,
+    })
+
+
+def _parse_and_find_mol(mol_field):
+    """
+    Парсит поле МОЛ и ищет пользователя в базе.
+    Формат: 'Фамилия И. О. - Подразделение' или 'Фамилия Имя Отчество - Подразделение'
+    
+    Примеры:
+      'Краснобаева Ю. С. - Отдел экспериментальной и клинической кардиологии'
+      'Лузанов А. К. - Отдел информационных технологий'
+      'Иванов Иван Иванович - Отдел'
+    
+    Возвращает словарь:
+    {
+        'found': True/False,
+        'user': User/None,
+        'reason': str - причина неудачи или 'success',
+        'match_info': dict - информация о поиске,
+    }
+    """
+    from accounts.models import User, Department
+    
+    result = {
+        'found': False,
+        'user': None,
+        'reason': '',
+        'match_info': {},
+    }
+    
+    if not mol_field or mol_field in ('<групповой учет>', '<не задан>'):
+        result['reason'] = 'group_accounting'
+        result['match_info'] = {'mol': mol_field}
+        return result
+
+    # Split by ' - ' to get name and department
+    parts = mol_field.split(' - ')
+    if len(parts) < 1:
+        result['reason'] = 'no_separator'
+        result['match_info'] = {'mol': mol_field}
+        return result
+
+    name_part = parts[0].strip()
+    dept_name = parts[1].strip() if len(parts) > 1 else ''
+
+    # Parse name: "Фамилия И. О." or "Фамилия Имя Отчество"
+    name_parts = name_part.split()
+    if len(name_parts) < 2:
+        result['reason'] = 'incomplete_name'
+        result['match_info'] = {'mol': mol_field, 'name_part': name_part}
+        return result
+
+    last_name = name_parts[0]
+    first_name_raw = name_parts[1] if len(name_parts) > 1 else ''
+    patronymic_raw = name_parts[2] if len(name_parts) > 2 else ''
+
+    # Detect format: initials (single letter with/without dots) or full names
+    is_initials = (
+        len(first_name_raw.replace('.', '')) == 1 and
+        len(patronymic_raw.replace('.', '')) == 1
+    )
+
+    # Clean up: remove dots, strip whitespace, lowercase for comparison
+    first_name_clean = first_name_raw.replace('.', '').strip().lower()
+    patronymic_clean = patronymic_raw.replace('.', '').strip().lower()
+
+    result['match_info'] = {
+        'last_name': last_name,
+        'first_name_raw': first_name_raw,
+        'patronymic_raw': patronymic_raw,
+        'is_initials': is_initials,
+        'department': dept_name,
+    }
+
+    # Helper: try to find user with given filters
+    def try_find_user(filters, query_desc):
+        """Try to find user, return (found, user, match_info)."""
+        try:
+            users = User.objects.filter(**filters)
+            count = users.count()
+            match_info = dict(result['match_info'])
+            match_info['query'] = query_desc
+            match_info['matches'] = count
+
+            if count == 1:
+                return True, users.first(), match_info
+            elif count > 1:
+                match_info['users'] = [
+                    {'id': u.id, 'name': u.get_full_name(), 'department': u.department.name if u.department else None}
+                    for u in users[:5]
+                ]
+                match_info['total_matches'] = count
+                return False, None, match_info
+        except Exception:
+            pass
+        return False, None, match_info
+
+    # Strategy 1: ФИО + подразделение (если инициалы — используем startswith)
+    if dept_name:
+        try:
+            dept = Department.objects.filter(
+                name__icontains=dept_name
+            ).first()
+            if dept:
+                result['match_info']['department_found'] = dept.name
+                
+                if is_initials:
+                    # Инициалы: Фамилия + первая буква имени + первая буква отчества
+                    q = {
+                        'last_name__iexact': last_name,
+                        'first_name__istartswith': first_name_clean,
+                        'patronymic__istartswith': patronymic_clean,
+                        'department': dept,
+                    }
+                    found, user, mi = try_find_user(q, f"Ф={last_name}, И={first_name_clean}*, О={patronymic_clean}*, Под={dept.name}")
+                    if found:
+                        result['found'] = True
+                        result['user'] = user
+                        result['reason'] = 'success'
+                        result['match_info'] = mi
+                        return result
+                else:
+                    # Полные ФИО
+                    q = {
+                        'last_name__iexact': last_name,
+                        'first_name__iexact': first_name_clean,
+                        'patronymic__iexact': patronymic_clean,
+                        'department': dept,
+                    }
+                    found, user, mi = try_find_user(q, f"ФИО={last_name} {first_name_clean} {patronymic_clean}, Под={dept.name}")
+                    if found:
+                        result['found'] = True
+                        result['user'] = user
+                        result['reason'] = 'success'
+                        result['match_info'] = mi
+                        return result
+        except Exception:
+            pass
+
+    # Strategy 2: ФИО без подразделения
+    if is_initials:
+        q = {
+            'last_name__iexact': last_name,
+            'first_name__istartswith': first_name_clean,
+            'patronymic__istartswith': patronymic_clean,
+        }
+        found, user, mi = try_find_user(q, f"Ф={last_name}, И={first_name_clean}*, О={patronymic_clean}*")
+        if found:
+            result['found'] = True
+            result['user'] = user
+            result['reason'] = 'success'
+            result['match_info'] = mi
+            return result
+    else:
+        q = {
+            'last_name__iexact': last_name,
+            'first_name__iexact': first_name_clean,
+            'patronymic__iexact': patronymic_clean,
+        }
+        found, user, mi = try_find_user(q, f"ФИО={last_name} {first_name_clean} {patronymic_clean}")
+        if found:
+            result['found'] = True
+            result['user'] = user
+            result['reason'] = 'success'
+            result['match_info'] = mi
+            return result
+
+    # Strategy 3: Фамилия + Имя (без отчества)
+    if is_initials:
+        q = {
+            'last_name__iexact': last_name,
+            'first_name__istartswith': first_name_clean,
+        }
+        found, user, mi = try_find_user(q, f"Ф={last_name}, И={first_name_clean}*")
+        if found:
+            result['found'] = True
+            result['user'] = user
+            result['reason'] = 'success'
+            result['match_info'] = mi
+            return result
+    else:
+        q = {
+            'last_name__iexact': last_name,
+            'first_name__iexact': first_name_clean,
+        }
+        found, user, mi = try_find_user(q, f"ФИ={last_name} {first_name_clean}")
+        if found:
+            result['found'] = True
+            result['user'] = user
+            result['reason'] = 'success'
+            result['match_info'] = mi
+            return result
+
+    # Strategy 4: Фамилия + подразделение
+    if dept_name:
+        try:
+            dept = Department.objects.filter(
+                name__icontains=dept_name
+            ).first()
+            if dept:
+                result['match_info']['department_found'] = dept.name
+                q = {
+                    'last_name__iexact': last_name,
+                    'department': dept,
+                }
+                found, user, mi = try_find_user(q, f"Ф={last_name}, Под={dept.name}")
+                if found:
+                    result['found'] = True
+                    result['user'] = user
+                    result['reason'] = 'success'
+                    result['match_info'] = mi
+                    return result
+        except Exception:
+            pass
+
+    # Strategy 5: Только фамилия
+    q = {'last_name__iexact': last_name}
+    found, user, mi = try_find_user(q, f"Ф={last_name}")
+    if found:
+        result['found'] = True
+        result['user'] = user
+        result['reason'] = 'success'
+        result['match_info'] = mi
+        return result
+
+    # No match found
+    result['reason'] = 'not_found'
+    result['match_info']['query'] = f"Попытки: Фамилия+И*+О*+Под, ФИО, Ф+И*, Фамилия"
+    return result
+
 
 def equipment_add(request, equipment_type):
     """Добавление оборудования с учётом настроек полей."""
@@ -370,6 +1277,20 @@ def equipment_detail(request, equipment_type, pk):
     """Детальная информация об оборудовании с учётом настроек полей."""
     equipment = get_object_or_404(Equipment, pk=pk, archived=False)
     visible_fields = equipment.get_visible_fields(for_edit=False)
+    
+    # Добавляем значения полей с форматированием
+    for field in visible_fields:
+        val = getattr(equipment, field['name'], None)
+        # Форматирование значений
+        if isinstance(val, bool):
+            field['value'] = 'Да' if val else 'Нет'
+        elif hasattr(val, 'name'):
+            field['value'] = val.name
+        elif hasattr(val, '__str__'):
+            field['value'] = str(val)
+        else:
+            field['value'] = val
+    
     return render(request, 'equipment/equipment_detail.html', {
         **_sidebar_counts(),
         'instance': equipment,
@@ -431,56 +1352,84 @@ def equipment_inventory_detail(request, equipment_type, pk):
 
 @login_required
 def field_settings(request):
-    """Управление настройками отображения полей для подтипов оборудования."""
+    """Управление настройками отображения полей для подкатегорий оборудования."""
     if request.method == 'POST':
         # Обновляем настройки
-        for field_def in EQUIPMENT_FIELD_DEFINITIONS:
-            field_name = field_def[0]
-            field_label = field_def[1]
-            field_group = field_def[2]
+        subcategory_id = request.POST.get('subcategory_id')
+        subcat = EquipmentCategory.objects.filter(pk=subcategory_id, is_active=True).first()
+        if not subcat:
+            messages.error(request, 'Выберите подкатегорию')
+            return redirect('equipment:field_settings')
+        
+        for field_name in ['inventory_number', 'serial_number', 'name', 'brand', 'model',
+                          'assigned_user', 'responsible_user', 'hostname', 'mac_address', 'ip_address',
+                          'cpu', 'ram_gb', 'storage_gb', 'screen_size', 'os', 'os_version',
+                          'antivirus_engine', 'antivirus_active', 'resolution', 'printer_status',
+                          'camera_count', 'phone_number', 'extension', 'calibration_date',
+                          'next_calibration', 'status', 'is_active', 'archived', 'last_scan']:
+            is_visible = request.POST.get(f'visible_{subcategory_id}_{field_name}', 'on') == 'on'
+            is_editable = request.POST.get(f'editable_{subcategory_id}_{field_name}', 'on') == 'on'
             
-            for subtype_value, subtype_label in EQUIPMENT_SUBTYPES:
-                is_visible = request.POST.get(f'visible_{subtype_value}_{field_name}', 'on') == 'on'
-                is_editable = request.POST.get(f'editable_{subtype_value}_{field_name}', 'on') == 'on'
-                
-                setting, created = EquipmentFieldSetting.objects.get_or_create(
-                    subtype=subtype_value,
-                    field_name=field_name,
-                    defaults={
-                        'field_label': field_label,
-                        'field_group': field_group,
-                        'is_visible': is_visible,
-                        'is_editable': is_editable,
-                    }
-                )
-                if not created:
-                    setting.field_label = field_label
-                    setting.field_group = field_group
-                    setting.is_visible = is_visible
-                    setting.is_editable = is_editable
-                    setting.save()
+            setting, created = EquipmentFieldSetting.objects.get_or_create(
+                subcategory=subcat,
+                field_name=field_name,
+                defaults={
+                    'is_visible': is_visible,
+                    'is_editable': is_editable,
+                }
+            )
+            if not created:
+                setting.is_visible = is_visible
+                setting.is_editable = is_editable
+                setting.save()
         
         messages.success(request, 'Настройки полей сохранены')
         return redirect('equipment:field_settings')
     
     # Загружаем текущие настройки
+    subcategories = EquipmentCategory.objects.filter(
+        parent__isnull=False, is_active=True
+    ).order_by('parent', 'name')
+    
     settings_data = {}
-    for subtype_value, subtype_label in EQUIPMENT_SUBTYPES:
-        settings = EquipmentFieldSetting.objects.filter(subtype=subtype_value)
+    for subcat in subcategories:
+        settings = EquipmentFieldSetting.objects.filter(subcategory=subcat)
         settings_map = {s.field_name: s for s in settings}
-        settings_data[subtype_value] = {
-            'label': subtype_label,
+        settings_data[subcat.pk] = {
+            'label': subcat.name,
+            'parent': subcat.parent.name if subcat.parent else '',
             'fields': [],
         }
         
-        for field_def in EQUIPMENT_FIELD_DEFINITIONS:
-            field_name = field_def[0]
-            field_label = field_def[1]
-            field_group = field_def[2]
-            
+        field_defs = [
+            ('inventory_number', 'Инвентарный номер', 'Основное'),
+            ('serial_number', 'Серийный номер', 'Основное'),
+            ('name', 'Название', 'Основное'),
+            ('brand', 'Бренд', 'Основное'),
+            ('model', 'Модель', 'Основное'),
+            ('hostname', 'Имя в сети', 'Сеть'),
+            ('mac_address', 'MAC-адрес', 'Сеть'),
+            ('ip_address', 'IP-адрес', 'Сеть'),
+            ('cpu', 'Процессор', 'Характеристики'),
+            ('ram_gb', 'ОЗУ (ГБ)', 'Характеристики'),
+            ('storage_gb', 'Диск (ГБ)', 'Характеристики'),
+            ('screen_size', 'Диагональ экрана', 'Характеристики'),
+            ('os', 'ОС', 'Программное обеспечение'),
+            ('os_version', 'Версия ОС', 'Программное обеспечение'),
+            ('antivirus_engine', 'Антивирус', 'Программное обеспечение'),
+            ('antivirus_active', 'Защита активна', 'Программное обеспечение'),
+            ('resolution', 'Разрешение', 'Характеристики'),
+            ('printer_status', 'Статус принтера', 'Статус'),
+            ('camera_count', 'Количество камер', 'Характеристики'),
+            ('phone_number', 'Внешний номер', 'Телефон'),
+            ('extension', 'Внутренний номер', 'Телефон'),
+            ('status', 'Статус', 'Статус'),
+        ]
+        
+        for field_name, field_label, field_group in field_defs:
             setting = settings_map.get(field_name)
             if setting:
-                settings_data[subtype_value]['fields'].append({
+                settings_data[subcat.pk]['fields'].append({
                     'name': field_name,
                     'label': field_label,
                     'group': field_group,
@@ -488,7 +1437,7 @@ def field_settings(request):
                     'is_editable': setting.is_editable,
                 })
             else:
-                settings_data[subtype_value]['fields'].append({
+                settings_data[subcat.pk]['fields'].append({
                     'name': field_name,
                     'label': field_label,
                     'group': field_group,
@@ -499,6 +1448,570 @@ def field_settings(request):
     context = {
         **_sidebar_counts(),
         'settings_data': settings_data,
-        'field_definitions': EQUIPMENT_FIELD_DEFINITIONS,
+        'default_subcategory': subcategories.first().pk if subcategories.exists() else None,
     }
     return render(request, 'equipment/field_settings.html', context)
+
+
+# ============================================================================
+# Справочник расположения (город → корпус → этаж → кабинет)
+# ============================================================================
+
+@login_required
+def location_list(request):
+    """Иерархический справочник расположения: город → корпус → этаж → кабинет."""
+    cities = City.objects.filter(is_active=True).prefetch_related(
+        'buildings__floors__rooms'
+    ).order_by('name')
+
+    location_data = []
+    for city in cities:
+        city_data = {
+            'pk': city.pk,
+            'name': city.name,
+            'code': city.code,
+            'buildings_count': city.buildings_count,
+            'buildings': [],
+        }
+        for building in city.buildings.filter(is_active=True).order_by('name'):
+            building_data = {
+                'pk': building.pk,
+                'name': building.name,
+                'code': building.code,
+                'address': building.address,
+                'floors_count': building.floors_count,
+                'rooms_count': building.rooms_count,
+                'floors': [],
+            }
+            for floor in building.floors.filter(is_active=True).order_by('floor_number'):
+                floor_data = {
+                    'pk': floor.pk,
+                    'floor_number': floor.floor_number,
+                    'rooms_count': floor.rooms_count,
+                    'rooms': [],
+                }
+                for room in floor.rooms.filter(is_active=True).order_by('room_number'):
+                    floor_data['rooms'].append({
+                        'pk': room.pk,
+                        'room_number': room.room_number,
+                        'capacity': room.capacity,
+                    })
+                building_data['floors'].append(floor_data)
+            city_data['buildings'].append(building_data)
+        location_data.append(city_data)
+
+    context = {
+        **_sidebar_counts(),
+        'location_data': location_data,
+    }
+    return render(request, 'equipment/location_list.html', context)
+
+
+@login_required
+def location_city_add(request):
+    """Добавление города."""
+    if request.method == 'POST':
+        form = CityForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Город успешно добавлен')
+            return redirect('equipment:location_list')
+    else:
+        form = CityForm()
+
+    return render(request, 'equipment/location_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'title': 'Добавить город',
+        'model_type': 'city',
+    })
+
+
+@login_required
+def location_city_edit(request, pk):
+    """Редактирование города."""
+    city = get_object_or_404(City, pk=pk)
+    if request.method == 'POST':
+        form = CityForm(request.POST, instance=city)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Город успешно обновлён')
+            return redirect('equipment:location_list')
+    else:
+        form = CityForm(instance=city)
+
+    return render(request, 'equipment/location_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'instance': city,
+        'title': 'Редактировать город',
+        'model_type': 'city',
+    })
+
+
+@login_required
+def location_city_delete(request, pk):
+    """Удаление города (мягкое)."""
+    city = get_object_or_404(City, pk=pk)
+    city.is_active = False
+    city.save()
+    messages.success(request, 'Город удалён')
+    return redirect('equipment:location_list')
+
+
+@login_required
+def location_building_add(request):
+    """Добавление корпуса."""
+    if request.method == 'POST':
+        form = BuildingForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Корпус успешно добавлен')
+            return redirect('equipment:location_list')
+    else:
+        city_id = request.GET.get('city')
+        form = BuildingForm(initial={'city': city_id} if city_id else {})
+
+    return render(request, 'equipment/location_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'title': 'Добавить корпус',
+        'model_type': 'building',
+    })
+
+
+@login_required
+def location_building_edit(request, pk):
+    """Редактирование корпуса."""
+    building = get_object_or_404(Building, pk=pk)
+    if request.method == 'POST':
+        form = BuildingForm(request.POST, instance=building)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Корпус успешно обновлён')
+            return redirect('equipment:location_list')
+    else:
+        form = BuildingForm(instance=building)
+
+    return render(request, 'equipment/location_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'instance': building,
+        'title': 'Редактировать корпус',
+        'model_type': 'building',
+    })
+
+
+@login_required
+def location_building_delete(request, pk):
+    """Удаление корпуса (мягкое)."""
+    building = get_object_or_404(Building, pk=pk)
+    building.is_active = False
+    building.save()
+    messages.success(request, 'Корпус удалён')
+    return redirect('equipment:location_list')
+
+
+@login_required
+def location_floor_add(request):
+    """Добавление этажа."""
+    if request.method == 'POST':
+        form = FloorForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Этаж успешно добавлен')
+            return redirect('equipment:location_list')
+    else:
+        building_id = request.GET.get('building')
+        form = FloorForm(initial={'building': building_id} if building_id else {})
+
+    return render(request, 'equipment/location_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'title': 'Добавить этаж',
+        'model_type': 'floor',
+    })
+
+
+@login_required
+def location_floor_edit(request, pk):
+    """Редактирование этажа."""
+    floor = get_object_or_404(Floor, pk=pk)
+    if request.method == 'POST':
+        form = FloorForm(request.POST, instance=floor)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Этаж успешно обновлён')
+            return redirect('equipment:location_list')
+    else:
+        form = FloorForm(instance=floor)
+
+    return render(request, 'equipment/location_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'instance': floor,
+        'title': 'Редактировать этаж',
+        'model_type': 'floor',
+    })
+
+
+@login_required
+def location_floor_delete(request, pk):
+    """Удаление этажа (мягкое)."""
+    floor = get_object_or_404(Floor, pk=pk)
+    floor.is_active = False
+    floor.save()
+    messages.success(request, 'Этаж удалён')
+    return redirect('equipment:location_list')
+
+
+@login_required
+def location_room_add(request):
+    """Добавление кабинета."""
+    if request.method == 'POST':
+        form = RoomForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Кабинет успешно добавлен')
+            return redirect('equipment:location_list')
+    else:
+        building_id = request.GET.get('building')
+        floor_id = request.GET.get('floor')
+        initial = {}
+        if building_id:
+            initial['building'] = building_id
+        if floor_id:
+            initial['floor'] = floor_id
+        form = RoomForm(initial=initial)
+
+    # Получаем корпуса для AJAX подгрузки
+    buildings = Building.objects.filter(is_active=True).order_by('city', 'name')
+    floors = Floor.objects.none()
+    if building_id:
+        floors = Floor.objects.filter(building_id=building_id, is_active=True).order_by('floor_number')
+
+    return render(request, 'equipment/location_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'title': 'Добавить кабинет',
+        'model_type': 'room',
+        'buildings': buildings,
+        'floors': floors,
+    })
+
+
+@login_required
+def location_room_edit(request, pk):
+    """Редактирование кабинета."""
+    room = get_object_or_404(Room, pk=pk)
+    if request.method == 'POST':
+        form = RoomForm(request.POST, instance=room)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Кабинет успешно обновлён')
+            return redirect('equipment:location_list')
+    else:
+        form = RoomForm(instance=room)
+
+    buildings = Building.objects.filter(is_active=True).order_by('city', 'name')
+    floors = Floor.objects.filter(building_id=room.building_id, is_active=True).order_by('floor_number')
+
+    return render(request, 'equipment/location_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'instance': room,
+        'title': 'Редактировать кабинет',
+        'model_type': 'room',
+        'buildings': buildings,
+        'floors': floors,
+    })
+
+
+@login_required
+def location_room_delete(request, pk):
+    """Удаление кабинета (мягкое)."""
+    room = get_object_or_404(Room, pk=pk)
+    room.is_active = False
+    room.save()
+    messages.success(request, 'Кабинет удалён')
+    return redirect('equipment:location_list')
+
+
+@login_required
+def get_floors_ajax(request):
+    """AJAX: получить этажи для корпуса."""
+    building_id = request.GET.get('building_id')
+    floors = Floor.objects.filter(
+        building_id=building_id, is_active=True
+    ).order_by('floor_number')
+    data = [
+        {'pk': f.pk, 'floor_number': f.floor_number}
+        for f in floors
+    ]
+    return JsonResponse(data, safe=False)
+
+
+# ============================================================================
+# AJAX endpoints для категорий оборудования
+# ============================================================================
+
+@login_required
+def get_subcategories_ajax(request):
+    """AJAX: получить подкатегории для категории."""
+    category_slug = request.GET.get('category_slug')
+    if not category_slug:
+        return JsonResponse([], safe=False)
+    
+    category = EquipmentCategory.objects.filter(
+        slug=category_slug, is_active=True
+    ).first()
+    
+    if not category:
+        return JsonResponse([], safe=False)
+    
+    subcategories = category.children.filter(is_active=True).order_by('name')
+    data = [
+        {'pk': sc.pk, 'name': sc.name, 'slug': sc.slug}
+        for sc in subcategories
+    ]
+    return JsonResponse(data, safe=False)
+
+
+@login_required
+def get_categories_ajax(request):
+    """AJAX: получить все категории (для фильтров)."""
+    categories = EquipmentCategory.objects.filter(
+        parent__isnull=True, is_active=True
+    ).prefetch_related('children').order_by('name')
+    
+    data = []
+    for cat in categories:
+        subcategories = cat.children.filter(is_active=True).order_by('name')
+        data.append({
+            'pk': cat.pk,
+            'name': cat.name,
+            'slug': cat.slug,
+            'is_top_level': True,
+            'children': [
+                {'pk': sc.pk, 'name': sc.name, 'slug': sc.slug}
+                for sc in subcategories
+            ],
+        })
+    return JsonResponse(data, safe=False)
+
+
+# ============================================================================
+# CRUD справочник категорий оборудования
+# ============================================================================
+
+@login_required
+def category_list(request):
+    """Справочник категорий оборудования с возможностью редактирования."""
+    # Получаем все категории (включая архивные)
+    all_categories = EquipmentCategory.objects.all().prefetch_related('children').order_by('parent', 'name')
+    
+    # Фильтр: показать все / только активные / только архивные
+    show = request.GET.get('show', 'active')  # active, archived, all
+    
+    if show == 'archived':
+        categories = EquipmentCategory.objects.filter(is_active=False).prefetch_related('children').order_by('parent', 'name')
+    elif show == 'all':
+        categories = EquipmentCategory.objects.all().prefetch_related('children').order_by('parent', 'name')
+    else:
+        categories = EquipmentCategory.objects.filter(is_active=True).prefetch_related('children').order_by('parent', 'name')
+    
+    # Группируем по родительским категориям
+    category_tree = []
+    top_categories = categories.filter(parent__isnull=True).order_by('name')
+    
+    for top_cat in top_categories:
+        top_data = {
+            'pk': top_cat.pk,
+            'name': top_cat.name,
+            'slug': top_cat.slug,
+            'is_active': top_cat.is_active,
+            'equipment_count': Equipment.objects.filter(category=top_cat, archived=False).count(),
+            'children': [],
+        }
+        for child in top_cat.children.filter(is_active=True if show != 'all' else None).order_by('name'):
+            child_data = {
+                'pk': child.pk,
+                'name': child.name,
+                'slug': child.slug,
+                'is_active': child.is_active,
+                'equipment_count': Equipment.objects.filter(subcategory=child, archived=False).count(),
+            }
+            top_data['children'].append(child_data)
+        category_tree.append(top_data)
+    
+    # Показываем категории без родителя (на всякий случай)
+    orphan_cats = categories.filter(parent__isnull=True).exclude(
+        pk__in=[c['pk'] for c in category_tree]
+    ).order_by('name')
+    
+    context = {
+        **_sidebar_counts(),
+        'category_tree': category_tree,
+        'orphan_categories': orphan_cats,
+        'current_show': show,
+    }
+    return render(request, 'equipment/category_list.html', context)
+
+
+@login_required
+def category_add(request):
+    """Добавление категории."""
+    parent_id = request.GET.get('parent')
+    
+    if request.method == 'POST':
+        form = EquipmentCategoryForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Категория успешно добавлена')
+            return redirect('equipment:category_list')
+    else:
+        initial = {}
+        if parent_id:
+            initial['parent'] = parent_id
+        form = EquipmentCategoryForm(initial=initial)
+
+    # Получаем родительские категории для формы
+    parents = EquipmentCategory.objects.filter(
+        parent__isnull=True, is_active=True
+    ).order_by('name')
+
+    return render(request, 'equipment/category_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'title': 'Добавить категорию',
+        'parents': parents,
+        'model_type': 'category',
+    })
+
+
+@login_required
+def category_edit(request, pk):
+    """Редактирование категории."""
+    category = get_object_or_404(EquipmentCategory, pk=pk)
+    
+    if request.method == 'POST':
+        form = EquipmentCategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Категория успешно обновлена')
+            return redirect('equipment:category_list')
+    else:
+        form = EquipmentCategoryForm(instance=category)
+
+    parents = EquipmentCategory.objects.filter(
+        parent__isnull=True, is_active=True
+    ).exclude(pk=category.pk).order_by('name')
+
+    return render(request, 'equipment/category_form.html', {
+        **_sidebar_counts(),
+        'form': form,
+        'instance': category,
+        'title': 'Редактировать категорию',
+        'parents': parents,
+        'model_type': 'category',
+    })
+
+
+@login_required
+def category_delete(request, pk):
+    """Удаление категории (мягкое)."""
+    category = get_object_or_404(EquipmentCategory, pk=pk)
+    
+    # Проверяем, привязана ли техника
+    equipment_count = Equipment.objects.filter(
+        Q(category=category) | Q(subcategory=category),
+        archived=False
+    ).count()
+    
+    if equipment_count > 0:
+        messages.error(request, f'Нельзя удалить категорию: за ней закреплено {equipment_count} единиц техники')
+    else:
+        category.is_active = False
+        category.save()
+        messages.success(request, 'Категория перемещена в архив')
+    
+    return redirect('equipment:category_list')
+
+
+@login_required
+def category_restore(request, pk):
+    """Восстановление категории из архива."""
+    category = get_object_or_404(EquipmentCategory, pk=pk, is_active=False)
+    category.is_active = True
+    category.save()
+    messages.success(request, 'Категория восстановлена')
+    return redirect('equipment:category_list')
+
+
+# ============================================================================
+# Список оборудования по категории первого уровня
+# ============================================================================
+
+@login_required
+def category_equipment_list(request, category_slug):
+    """Список оборудования по категории первого уровня."""
+    category = get_object_or_404(
+        EquipmentCategory, slug=category_slug, is_active=True
+    )
+    
+    equipment_qs = Equipment.objects.filter(
+        category=category,
+        archived=False,
+    ).select_related(
+        'assigned_user', 'responsible_user', 'brand', 'category', 'subcategory'
+    ).order_by('-is_active', 'subcategory', 'inventory_number')
+    
+    # Подкатегории для фильтра
+    subcategories = category.children.filter(is_active=True).order_by('name')
+    
+    # Фильтр по подкатегории
+    sub_slug = request.GET.get('subcategory')
+    if sub_slug:
+        subcat = get_object_or_404(
+            EquipmentCategory, slug=sub_slug, is_active=True
+        )
+        equipment_qs = equipment_qs.filter(subcategory=subcat)
+    
+    # Поиск
+    search = request.GET.get('search', '').strip()
+    if search:
+        equipment_qs = equipment_qs.filter(
+            Q(inventory_number__icontains=search)
+            | Q(serial_number__icontains=search)
+            | Q(name__icontains=search)
+            | Q(brand__icontains=search)
+            | Q(model__icontains=search)
+            | Q(hostname__icontains=search)
+            | Q(ip_address__icontains=search)
+            | Q(location__icontains=search)
+        )
+    
+    total_count = equipment_qs.count()
+    
+    # Статистика по подкатегориям
+    sub_stats = []
+    for subcat in subcategories:
+        sub_stats.append({
+            'slug': subcat.slug,
+            'name': subcat.name,
+            'count': Equipment.objects.filter(
+                category=category, subcategory=subcat, archived=False
+            ).count(),
+        })
+    
+    context = {
+        **_sidebar_counts(),
+        'category': category,
+        'equipment_list': equipment_qs,
+        'total_count': total_count,
+        'subcategories': subcategories,
+        'sub_stats': sub_stats,
+        'current_subcategory': sub_slug,
+        'current_search': search,
+    }
+    return render(request, 'equipment/category_equipment_list.html', context)

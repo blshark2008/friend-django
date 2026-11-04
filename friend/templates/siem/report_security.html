@@ -99,9 +99,9 @@
                             </a>
                         </td>
                         <td>
-                            <div class="progress" style="height: 20px;">
-                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ type_percent|default:0 }}%">
-                                    {{ type_percent|default:0 }}%
+                            <div class="progress h-20">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ item.percent }}%">
+                                    {{ item.percent }}%
                                 </div>
                             </div>
                         </td>

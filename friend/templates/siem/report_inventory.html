@@ -48,20 +48,29 @@
                     <tr>
                         <th>Хост</th>
                         <th>ОС</th>
-                        <th>Процессор</th>
                         <th>ОЗУ</th>
-                        <th>Диски</th>
-                        <th>Пакетов</th>
-                        <th>Портов</th>
+                        <th>Дисков</th>
+                        <th>Пакеты, требующие обновлений</th>
+                        <th>Загрузка процессора</th>
+                        <th>Открыто портов</th>
                         <th>Последний снимок</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in inventory_data %}
                     <tr>
-                        <td><strong>{{ item.hostname }}</strong></td>
-                        <td>{{ item.os_info|default:"—" }}</td>
-                        <td>{{ item.cpu_model|default:"—" }}</td>
+                        <td><a href="{% url 'siem:inventory_host_history' item.host_pk %}"><strong>{{ item.hostname }}</strong></a></td>
+                        <td>
+                            {% if item.os_name and item.os_info %}
+                                {{ item.os_name }} {{ item.os_info }}
+                            {% elif item.os_name %}
+                                {{ item.os_name }}
+                            {% elif item.os_info %}
+                                {{ item.os_info }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                         <td>{% if item.ram_mb %}{{ item.ram_mb|floatformat:0 }} МБ{% else %}—{% endif %}</td>
                         <td>
                             {% if item.disk_count > 0 %}
@@ -70,7 +79,16 @@
                             —
                             {% endif %}
                         </td>
-                        <td>{{ item.packages_count|default:"—" }}</td>
+                        <td>
+                            {% if item.pending_updates_count > 0 %}
+                            <a href="{% url 'siem:inventory_packages' item.host_pk %}" class="text-decoration-none">
+                                <span class="badge bg-warning">{{ item.pending_updates_count }}</span>
+                            </a>
+                            {% else %}
+                            <span class="badge bg-success">0</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap">{{ item.load_avg|default:"—" }}</td>
                         <td>{{ item.open_ports_count|default:0 }}</td>
                         <td class="text-nowrap">{{ item.last_snapshot_date|default:"—" }}</td>
                     </tr>

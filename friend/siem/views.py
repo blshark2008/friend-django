@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from django.shortcuts import render, get_object_or_404, redirect
@@ -101,6 +102,8 @@ def hosts_list(request):
             Q(ip_address__icontains=search)
         )
 
+    cutoff = timezone.now() - timezone.timedelta(hours=24)
+
     if status_filter == 'online':
         hosts = hosts.filter(is_active=True)
     elif status_filter == 'offline':
@@ -198,7 +201,8 @@ def report_security(request):
         label = dict(SecurityEvent.EventType.choices).get(et, et)
         count = events.filter(event_type=et).count()
         if count > 0:
-            events_by_type.append({'label': label, 'value': et, 'count': count})
+            pct = round(count * 100 / total_events) if total_events > 0 else 0
+            events_by_type.append({'label': label, 'value': et, 'count': count, 'percent': pct})
 
     # Топ offending hosts
     top_offending_hosts = list(
@@ -242,25 +246,48 @@ def report_inventory(request):
     inventory_data = []
     for host in hosts:
         latest_snapshot = host.snapshots.first()
+        # Берём count и список пакетов из события updates_pending (наиболее актуальные данные)
+        updates_event = host.events.filter(event_type='updates_pending').order_by('-occurred_at').first()
+        pending_count = 0
+        packages_list = []
+        if updates_event and updates_event.details:
+            pending_count = updates_event.details.get('count', 0)
+            pkgs = updates_event.details.get('packages', '')
+            if pkgs:
+                packages_list = [p.strip() for p in pkgs.split(',') if p.strip()]
+        elif latest_snapshot and latest_snapshot.pending_updates:
+            pending_count = len(latest_snapshot.pending_updates)
+            packages_list = latest_snapshot.pending_updates
+
         if latest_snapshot:
             inventory_data.append({
+                'host_pk': host.pk,
                 'hostname': host.hostname,
+                'os_name': host.os_name,
                 'os_info': host.os_info,
                 'cpu_model': latest_snapshot.cpu_model,
                 'ram_mb': latest_snapshot.ram_mb,
                 'disk_count': len(latest_snapshot.disk_info) if latest_snapshot.disk_info else 0,
                 'packages_count': latest_snapshot.packages_count,
+                'pending_updates_count': pending_count,
+                'packages_list': packages_list,
+                'load_avg': latest_snapshot.raw.get('load_avg', ''),
                 'open_ports_count': len(latest_snapshot.open_ports),
                 'last_snapshot_date': latest_snapshot.collected_at,
             })
         else:
             inventory_data.append({
+                'host_pk': host.pk,
                 'hostname': host.hostname,
+                'os_name': host.os_name,
                 'os_info': host.os_info,
                 'cpu_model': '',
                 'ram_mb': None,
                 'disk_count': 0,
                 'packages_count': None,
+                'pending_updates_count': pending_count,
+                'packages_list': packages_list,
+                'load_avg': '',
                 'open_ports_count': 0,
                 'last_snapshot_date': None,
             })
@@ -274,6 +301,95 @@ def report_inventory(request):
         'inventory_data': inventory_data,
     }
     return render(request, 'siem/report_inventory.html', context)
+
+
+def inventory_host_history(request, pk):
+    """История инвентаризаций по хосту."""
+    host = get_object_or_404(Host, pk=pk)
+    snapshots = InventorySnapshot.objects.filter(host=host).order_by('-collected_at')
+    
+    # Все события updates_pending для этого хоста
+    updates_events = host.events.filter(event_type='updates_pending').order_by('-occurred_at')
+    
+    # Подготовка данных для шаблона — извлекаем load_avg из raw JSON
+    snapshot_data = []
+    for snap in snapshots:
+        load_avg = ''
+        if snap.raw and isinstance(snap.raw, dict):
+            load_avg = snap.raw.get('load_avg', '')
+        
+        # Ищем ближайшее событие updates_pending по времени
+        pending_count = 0
+        packages_list = []
+        for ue in updates_events:
+            if ue.occurred_at <= snap.collected_at + timezone.timedelta(hours=1):
+                if ue.details:
+                    pending_count = ue.details.get('count', 0)
+                    pkgs = ue.details.get('packages', '')
+                    if pkgs:
+                        packages_list = [p.strip() for p in pkgs.split(',') if p.strip()]
+                break
+        
+        snapshot_data.append({
+            'pk': snap.pk,
+            'collected_at': snap.collected_at.strftime('%d.%m.%Y %H:%M:%S'),
+            'cpu_model': snap.cpu_model,
+            'ram_mb': snap.ram_mb,
+            'cpu_temperature': snap.cpu_temperature,
+            'disk_info': snap.disk_info,
+            'packages_count': snap.packages_count,
+            'pending_updates_count': pending_count,
+            'packages_list': packages_list,
+            'open_ports': snap.open_ports,
+            'load_avg': load_avg,
+            'raw': snap.raw if snap.raw else {},
+            'pending_updates': snap.pending_updates if snap.pending_updates else [],
+            'antivirus_running': snap.antivirus_running,
+            'current_logged_user': snap.current_logged_user,
+        })
+    
+    context = {
+        'host': host,
+        'snapshot_data': snapshot_data,
+        'total_snapshots': snapshots.count(),
+    }
+    return render(request, 'siem/inventory_host_history.html', context)
+
+
+def inventory_packages(request, pk):
+    """Список пакетов, требующих обновления, для хоста."""
+    host = get_object_or_404(Host, pk=pk)
+    search = request.GET.get('search', '')
+    
+    # Берём последнее событие updates_pending
+    updates_event = host.events.filter(event_type='updates_pending').order_by('-occurred_at').first()
+    packages_list = []
+    total_count = 0
+    
+    if updates_event and updates_event.details:
+        total_count = updates_event.details.get('count', 0)
+        pkgs = updates_event.details.get('packages', '')
+        if pkgs:
+            packages_list = [p.strip() for p in pkgs.split(',') if p.strip()]
+    
+    # Поиск
+    if search:
+        packages_list = [p for p in packages_list if search.lower() in p.lower()]
+    
+    # Пагинация
+    from django.core.paginator import Paginator
+    paginator = Paginator(packages_list, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'host': host,
+        'page_obj': page_obj,
+        'packages_list': page_obj.object_list,
+        'total_count': total_count,
+        'search': search,
+    }
+    return render(request, 'siem/inventory_packages.html', context)
 
 
 def report_hosts(request):
@@ -336,12 +452,64 @@ def host_detail(request, pk):
     """Полная информация о хосте."""
     host = get_object_or_404(Host, pk=pk)
     
-    # Последние события
-    recent_events = host.events.select_related().order_by('-occurred_at')[:50]
+    # Фильтры событий
+    sev = request.GET.get('severity', '')
+    etype = request.GET.get('event_type', '')
+    from_date = request.GET.get('from_date', '')
+    to_date = request.GET.get('to_date', '')
+
+    events = host.events.select_related().all()
+
+    if sev:
+        events = events.filter(severity=sev)
+    if etype:
+        events = events.filter(event_type=etype)
+    if from_date:
+        try:
+            from datetime import datetime
+            events = events.filter(occurred_at__gte=datetime.strptime(from_date, '%Y-%m-%d'))
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            from datetime import datetime
+            events = events.filter(occurred_at__lte=datetime.strptime(to_date, '%Y-%m-%d') + timezone.timedelta(days=1))
+        except ValueError:
+            pass
+
+    recent_events = events.order_by('-occurred_at')[:50]
     
     # Снимки инвентаризации (из API /ingest/inventory/)
     snapshots = host.snapshots.order_by('-collected_at')[:10]
     latest_snapshot = host.snapshots.first()
+    
+    # Снимки для вкладки инвентаризации — с данными об обновлениях из событий
+    updates_events = host.events.filter(event_type='updates_pending').order_by('-occurred_at')
+    snapshot_data = []
+    for snap in snapshots:
+        load_avg = ''
+        if snap.raw and isinstance(snap.raw, dict):
+            load_avg = snap.raw.get('load_avg', '')
+        
+        pending_count = 0
+        for ue in updates_events:
+            if ue.occurred_at <= snap.collected_at + timezone.timedelta(hours=1):
+                if ue.details:
+                    pending_count = ue.details.get('count', 0)
+                break
+        
+        snapshot_data.append({
+            'pk': snap.pk,
+            'collected_at': snap.collected_at.strftime('%d.%m.%Y %H:%M:%S'),
+            'cpu_model': snap.cpu_model,
+            'ram_mb': snap.ram_mb,
+            'cpu_temperature': snap.cpu_temperature,
+            'disk_info': snap.disk_info,
+            'packages_count': snap.packages_count,
+            'pending_updates_count': pending_count,
+            'open_ports': snap.open_ports,
+            'load_avg': load_avg,
+        })
     
     # Инвентаризация из события agent (MODE=inventory) — legacy
     inventory_event = host.events.filter(event_type='inventory').order_by('-occurred_at').first()
@@ -448,6 +616,14 @@ def host_detail(request, pk):
     # Журнал блокировок экрана
     screen_lock_logs = host.screen_lock_logs.order_by('-timestamp')[:100]
 
+    # Последние обновления пакетов
+    latest_updates_event = host.events.filter(event_type='updates_pending').order_by('-occurred_at').first()
+    latest_pending_updates = 0
+    latest_updates_time = None
+    if latest_updates_event and latest_updates_event.details:
+        latest_pending_updates = latest_updates_event.details.get('count', 0)
+        latest_updates_time = latest_updates_event.occurred_at
+
     context = {
         'host': host,
         'recent_events': recent_events,
@@ -466,6 +642,17 @@ def host_detail(request, pk):
         'critical_events': critical_events,
         'warning_events': warning_events,
         'events_by_type': events_by_type,
+        # Фильтры
+        'filter_severity': sev,
+        'filter_event_type': etype,
+        'filter_from_date': from_date,
+        'filter_to_date': to_date,
+        'event_type_choices': SecurityEvent.EventType.choices,
+        # Инвентаризация
+        'snapshot_data': snapshot_data,
+        # Обновления
+        'latest_pending_updates': latest_pending_updates,
+        'latest_updates_time': latest_updates_time,
     }
     return render(request, 'siem/host_detail.html', context)
 
@@ -619,10 +806,18 @@ class IngestViewSet(viewsets.ViewSet):
                 )
 
     def _process_screen_locks(self, details, host, occurred_at):
-        """Извлекает переходы состояния блокировки экрана и сохраняет в ScreenLockLog."""
+        """Извлекает переходы состояния блокировки экрана и сохраняет в ScreenLockLog.
+        
+        Логика для обоих состояний одинаковая:
+        - Запись создается только если последняя запись была противоположного состояния
+          ИЛИ если наступил следующий день
+        """
         locks = details.get('locks', [])
         if not locks:
             return
+
+        # Последняя запись для этого хоста
+        last_log = host.screen_lock_logs.order_by('-timestamp').first()
 
         for lock in locks:
             is_locked = lock.get('is_locked', False)
@@ -640,20 +835,27 @@ class IngestViewSet(viewsets.ViewSet):
             except (ValueError, AttributeError):
                 continue
 
-            # Определяем state
             state = 'locked' if is_locked else 'unlocked'
 
-            # Создаём запись перехода (уникально по host + date + state)
-            ScreenLockLog.objects.get_or_create(
-                host=host,
-                date=timestamp.date(),
-                state=state,
-                defaults={
-                    'timestamp': timestamp,
-                    'username': username,
-                    'session_id': session_id,
-                },
-            )
+            # Проверяем, нужно ли записывать
+            should_record = False
+
+            if last_log is None:
+                should_record = True
+            elif last_log.state != state:
+                should_record = True
+            elif last_log.date != timestamp.date():
+                should_record = True
+
+            if should_record:
+                ScreenLockLog.objects.create(
+                    host=host,
+                    date=timestamp.date(),
+                    state=state,
+                    timestamp=timestamp,
+                    username=username,
+                    session_id=session_id,
+                )
 
     def _check_absence_alert(self, details, host, occurred_at):
         """Проверяет, не вошёл ли сотрудник в период отсутствия."""
@@ -713,6 +915,26 @@ class InventoryIngestViewSet(viewsets.ViewSet):
         created = 0
         for item in serializer.validated_data:
             hostname = item.pop('hostname')
+            
+            # Преобразуем cpu_temperature из строки в float
+            if 'cpu_temperature' in item and item['cpu_temperature']:
+                try:
+                    item['cpu_temperature'] = float(item['cpu_temperature'])
+                except (ValueError, TypeError):
+                    item['cpu_temperature'] = None
+            
+            # Преобразуем antivirus_running в bool
+            if 'antivirus_running' in item and item['antivirus_running']:
+                if isinstance(item['antivirus_running'], str):
+                    item['antivirus_running'] = item['antivirus_running'].lower() == 'true'
+                else:
+                    item['antivirus_running'] = bool(item['antivirus_running'])
+            
+            # Преобразуем pending_updates из строки в список
+            if 'pending_updates' in item and item['pending_updates']:
+                if isinstance(item['pending_updates'], str):
+                    item['pending_updates'] = [p.strip() for p in item['pending_updates'].split(',') if p.strip()]
+            
             host, _ = Host.objects.get_or_create(
                 hostname=hostname,
                 defaults={'is_active': True},

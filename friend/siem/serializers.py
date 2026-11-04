@@ -62,7 +62,7 @@ class InventorySnapshotSerializer(serializers.ModelSerializer):
         fields = [
             'hostname', 'cpu_model', 'cpu_temperature', 'ram_mb',
             'disk_info', 'packages_count', 'pending_updates',
-            'open_ports', 'raw',
+            'open_ports', 'antivirus_running', 'current_logged_user', 'raw',
         ]
 
     def create(self, validated_data):

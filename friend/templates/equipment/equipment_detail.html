@@ -5,7 +5,7 @@
 {% block page_title %}
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <h4 class="mb-0">
-        <i class="bi bi-pc-display me-2"></i>{{ instance.name|default:instance.get_subtype_display }}
+        <i class="bi bi-pc-display me-2"></i>{{ instance.name|default:instance.type_label }}
     </h4>
     <div>
         <a href="{% url 'equipment:edit' instance.category instance.pk %}" class="btn btn-outline-primary btn-sm">
@@ -30,7 +30,7 @@
             {% if field.group == 'Основное' %}
             <div class="col-md-6 mb-3">
                 <div class="fw-semibold text-muted small">{{ field.label }}</div>
-                <div>{{ instance.get_field_value field.name|default:'—' }}</div>
+                <div>{{ field.value|default:'—' }}</div>
             </div>
             {% endif %}
             {% endfor %}
@@ -53,7 +53,7 @@
             {% for field in group.list %}
             <div class="col-md-6 mb-3">
                 <div class="fw-semibold text-muted small">{{ field.label }}</div>
-                <div>{{ instance.get_field_value field.name|default:'—' }}</div>
+                <div>{{ field.value|default:'—' }}</div>
             </div>
             {% endfor %}
         </div>

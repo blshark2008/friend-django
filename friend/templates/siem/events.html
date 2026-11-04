@@ -31,7 +31,7 @@
                 <option value="kernel_error" {% if event_type == 'kernel_error' %}selected{% endif %}>Ядро</option>
                 <option value="agent_alive" {% if event_type == 'agent_alive' %}selected{% endif %}>Агент</option>
             </select>
-            <select name="days" class="form-select" style="width: auto;">
+            <select name="days" class="form-select w-auto">
                 <option value="1" {% if days == 1 %}selected{% endif %}>1 день</option>
                 <option value="14" {% if days == 14 %}selected{% endif %}>14 дней</option>
                 <option value="30" {% if days == 30 %}selected{% endif %}>30 дней</option>
@@ -61,7 +61,7 @@
                     <tr>
                         <td>
                             <a href="{% url 'siem:host_detail' event.host_id %}" class="text-decoration-none fw-bold">
-                                {{ event.host__hostname }}
+                                {{ event.host.hostname }}
                             </a>
                         </td>
                         <td>{{ event.get_event_type_display }}</td>
@@ -81,7 +81,7 @@
                                 {{ event.message|truncatewords:10 }}
                             </a>
                         </td>
-                        <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ event.occurred_at|date:"d.m.Y H:i" }}</td>
+                        <td class="text-nowrap text-muted text-small">{{ event.occurred_at|date:"d.m.Y H:i" }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

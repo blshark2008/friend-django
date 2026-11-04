@@ -49,9 +49,9 @@
                 <tbody>
                     {% for assignment in assigned_equipment %}
                     <tr>
-                        <td>{{ assignment.equipment.get_subtype_display|default:assignment.equipment.subtype|title }}</td>
+                        <td>{{ assignment.equipment.type_label|default:assignment.equipment.subcategory.name|title }}</td>
                         <td>
-                            {{ assignment.equipment.name|default:assignment.equipment.get_category_display }}
+                            {{ assignment.equipment.name|default:assignment.equipment.category_label }}
                             {% if assignment.equipment.model %}— {{ assignment.equipment.model }}{% endif %}
                             {% if assignment.equipment.brand %}({{ assignment.equipment.brand }}){% endif %}
                         </td>

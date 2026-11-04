@@ -1,18 +1,288 @@
 {% extends 'equipment/base.html' %}
+{% load equipment_tags %}
 
 {% block title %}Дашборд{% endblock %}
 
 {% block page_title %}
-<h4 class="mb-0"><i class="bi bi-grid-1x2 me-2"></i>Статистика оборудования</h4>
+<h4 class="mb-0"><i class="bi bi-grid-1x2 me-2"></i>Дашборд</h4>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .stat-card .card-body {
+        padding: 1.25rem;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    .stat-success { background: #d1e7dd; color: #0f5132; }
+    .stat-warning { background: #fff3cd; color: #664d03; }
+    .stat-danger { background: #f8d7da; color: #842029; }
+    .stat-info { background: #cff4fc; color: #055160; }
+    .stat-primary { background: #cfe2ff; color: #084298; }
+    .dept-table th {
+        position: sticky;
+        top: 0;
+        background: #f8f9fa;
+        z-index: 1;
+    }
+    .dept-table th.sortable {
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.15s;
+    }
+    .dept-table th.sortable:hover {
+        background: #e9ecef;
+    }
+    .dept-table th.sortable::after {
+        content: ' ⇅';
+        opacity: 0.3;
+        font-size: 0.8em;
+    }
+    .dept-table th.sortable.asc::after {
+        content: ' ▲';
+        opacity: 1;
+        color: #0d6efd;
+    }
+    .dept-table th.sortable.desc::after {
+        content: ' ▼';
+        opacity: 1;
+        color: #0d6efd;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<!-- Кнопка загрузки основных средств -->
-<div class="mb-4">
-    <a href="{% url 'equipment:upload_os' %}" class="btn btn-outline-primary">
-        <i class="bi bi-upload me-2"></i>Загрузка основных средств (CSV)
-    </a>
+<!-- Сводка по статусам -->
+<h5 class="mb-3"><i class="bi bi-patch-check me-2"></i>Статусы оборудования</h5>
+<div class="row g-3 mb-4">
+    {% for s in status_stats %}
+    <div class="col-6 col-md-4 col-lg-2">
+        <div class="stat-card {% if s.value == 'active' %}stat-success{% elif s.value == 'maintenance' %}stat-warning{% elif s.value == 'decommissioned' %}stat-danger{% elif s.value == 'pending' %}stat-info{% elif s.value == 'confirmed' %}stat-primary{% endif %}">
+            <div class="card-body text-center">
+                <div class="stat-number">{{ s.count }}</div>
+                <div class="stat-label">{{ s.label }}</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
 </div>
 
-<!-- Общее количество -->
+<!-- Сводка по категориям -->
+<h5 class="mb-3"><i class="bi bi-tags me-2"></i>Категории оборудования</h5>
+<div class="row g-3 mb-4">
+    {% for cat in category_stats %}
+    <div class="col-6 col-md-4 col-lg-3">
+        <div class="stat-card stat-primary">
+            <div class="card-body text-center">
+                <div class="stat-number">{{ cat.count }}</div>
+                <div class="stat-label">{{ cat.name }}</div>
+                {% if cat.subcategories %}
+                <div class="mt-2">
+                    {% for sub in cat.subcategories %}
+                    <span class="badge bg-light text-dark border me-1 mb-1">{{ sub.name }}: {{ sub.count }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Таблица 1: По подразделению закрепленного за техникой сотрудника -->
+<h5 class="mb-3"><i class="bi bi-person-badge me-2"></i>Техника по подразделениям (закреплённые сотрудники)</h5>
+<div class="card mb-4">
+    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table class="table table-sm table-hover dept-table mb-0" data-sortable>
+            <thead>
+                <tr>
+                    <th style="width: 200px;" class="sortable">Подразделение</th>
+                    {% for cat_name in all_categories %}
+                    <th style="width: 90px;" class="sortable">{{ cat_name }}</th>
+                    {% endfor %}
+                    <th style="width: 70px;" class="sortable">Итого</th>
+                    <th style="width: 90px;" class="sortable">Сотрудников</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dept_name, data in assigned_depts %}
+                <tr>
+                    <td class="fw-semibold">{{ dept_name }}</td>
+                    {% for cat_name in all_categories %}
+                    <td class="text-center">{{ data.categories|get_default:cat_name }}</td>
+                    {% endfor %}
+                    <td class="text-center fw-bold">{{ data.total }}</td>
+                    <td class="text-center">{{ dept_user_counts|get:dept_name|default:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Таблица 2: По подразделениям МОЛ -->
+<h5 class="mb-3"><i class="bi bi-person-check me-2"></i>Техника по подразделениям (материально ответственные)</h5>
+<div class="card">
+    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table class="table table-sm table-hover dept-table mb-0" data-sortable>
+            <thead>
+                <tr>
+                    <th style="width: 200px;" class="sortable">Подразделение</th>
+                    {% for cat_name in all_categories %}
+                    <th style="width: 90px;" class="sortable">{{ cat_name }}</th>
+                    {% endfor %}
+                    <th style="width: 70px;" class="sortable">Итого</th>
+                    <th style="width: 90px;" class="sortable">Сотрудников</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dept_name, data in mol_depts %}
+                <tr>
+                    <td class="fw-semibold">{{ dept_name }}</td>
+                    {% for cat_name in all_categories %}
+                    <td class="text-center">{{ data.categories|get_default:cat_name }}</td>
+                    {% endfor %}
+                    <td class="text-center fw-bold">{{ data.total }}</td>
+                    <td class="text-center">{{ dept_user_counts|get:dept_name|default:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Таблица 3: Подкатегории компьютерного оборудования — закрепленные сотрудники -->
+<h5 class="mb-3"><i class="bi bi-pc-display me-2"></i>Компьютерное оборудование по подразделениям (закреплённые сотрудники)</h5>
+<div class="card mb-4">
+    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table class="table table-sm table-hover dept-table mb-0" data-sortable>
+            <thead>
+                <tr>
+                    <th style="width: 200px;" class="sortable">Подразделение</th>
+                    {% for sub_name in computer_subcat_names %}
+                    <th style="width: 90px;" class="sortable">{{ sub_name }}</th>
+                    {% endfor %}
+                    <th style="width: 70px;" class="sortable">Итого</th>
+                    <th style="width: 90px;" class="sortable">Сотрудников</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dept_name, data in assigned_comp_depts %}
+                <tr>
+                    <td class="fw-semibold">{{ dept_name }}</td>
+                    {% for sub_name in computer_subcat_names %}
+                    <td class="text-center">{{ data.subcategories|get_default:sub_name }}</td>
+                    {% endfor %}
+                    <td class="text-center fw-bold">{{ data.total }}</td>
+                    <td class="text-center">{{ dept_user_counts|get:dept_name|default:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Таблица 4: Подкатегории компьютерного оборудования — МОЛ -->
+<h5 class="mb-3"><i class="bi bi-pc-display-check me-2"></i>Компьютерное оборудование по подразделениям (материально ответственные)</h5>
+<div class="card">
+    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table class="table table-sm table-hover dept-table mb-0" data-sortable>
+            <thead>
+                <tr>
+                    <th style="width: 200px;" class="sortable">Подразделение</th>
+                    {% for sub_name in computer_subcat_names %}
+                    <th style="width: 90px;" class="sortable">{{ sub_name }}</th>
+                    {% endfor %}
+                    <th style="width: 70px;" class="sortable">Итого</th>
+                    <th style="width: 90px;" class="sortable">Сотрудников</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dept_name, data in mol_comp_depts %}
+                <tr>
+                    <td class="fw-semibold">{{ dept_name }}</td>
+                    {% for sub_name in computer_subcat_names %}
+                    <td class="text-center">{{ data.subcategories|get_default:sub_name }}</td>
+                    {% endfor %}
+                    <td class="text-center fw-bold">{{ data.total }}</td>
+                    <td class="text-center">{{ dept_user_counts|get:dept_name|default:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// Sorting for department tables
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('table[data-sortable]').forEach(function(table) {
+        const headers = table.querySelectorAll('th.sortable');
+        let currentSort = { col: -1, asc: true };
+
+        headers.forEach(function(th, colIndex) {
+            th.addEventListener('click', function() {
+                // Toggle sort direction if same column
+                if (currentSort.col === colIndex) {
+                    currentSort.asc = !currentSort.asc;
+                } else {
+                    currentSort.col = colIndex;
+                    currentSort.asc = true;
+                }
+
+                // Update visual indicators
+                headers.forEach(function(h) {
+                    h.classList.remove('asc', 'desc');
+                });
+                th.classList.add(currentSort.asc ? 'asc' : 'desc');
+
+                // Get tbody rows
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+
+                // Sort rows
+                rows.sort(function(rowA, rowB) {
+                    const cellA = rowA.cells[colIndex];
+                    const cellB = rowB.cells[colIndex];
+                    if (!cellA || !cellB) return 0;
+
+                    const textA = cellA.textContent.trim();
+                    const textB = cellB.textContent.trim();
+
+                    // Try numeric comparison first
+                    const numA = parseFloat(textA);
+                    const numB = parseFloat(textB);
+
+                    let result;
+                    if (!isNaN(numA) && !isNaN(numB) && textA !== '' && textB !== '') {
+                        result = numA - numB;
+                    } else {
+                        result = textA.localeCompare(textB, 'ru');
+                    }
+
+                    return currentSort.asc ? result : -result;
+                });
+
+                // Re-append sorted rows
+                rows.forEach(function(row) {
+                    tbody.appendChild(row);
+                });
+            });
+        });
+    });
+});
+</script>
 {% endblock %}

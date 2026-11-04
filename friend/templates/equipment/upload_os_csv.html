@@ -6,189 +6,480 @@
 <h4 class="mb-0"><i class="bi bi-upload me-2"></i>Загрузка основных средств</h4>
 {% endblock %}
 
-{% block content %}
-<!-- Форма загрузки и очистка в одну строку -->
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="card table-card h-100">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Загрузить CSV файл</h6>
-            </div>
-            <div class="card-body">
-                <form method="post" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="csv_file" class="form-label">Выберите CSV файл (кодировка UTF-8)</label>
-                        <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
-                        <small class="text-muted">
-                            Файл должен содержать колонки: Наименование, МОЛ/Место хранения, Инвентарный номер, Состояние,
-                            Заводской номер, Тип НФА, Дата открытия
-                        </small>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-upload me-2"></i>Загрузить и обработать
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
+{% block extra_css %}
+<style>
+    .upload-zone {
+        border: 2px dashed #dee2e6;
+        border-radius: 12px;
+        padding: 3rem 2rem;
+        text-align: center;
+        background: #f8f9fa;
+        transition: all 0.2s;
+    }
+    .upload-zone:hover {
+        border-color: #0d6efd;
+        background: #e7f1ff;
+    }
+    .upload-zone i {
+        font-size: 3rem;
+        color: #6c757d;
+    }
+    .stat-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .stat-card .card-body {
+        padding: 1.25rem;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 0.25rem;
+    }
+    .stat-success { background: #d1e7dd; color: #0f5132; }
+    .stat-warning { background: #fff3cd; color: #664d03; }
+    .stat-danger { background: #f8d7da; color: #842029; }
+    .stat-info { background: #cff4fc; color: #055160; }
+    .stat-primary { background: #cfe2ff; color: #084298; }
+    .new-items-table {
+        font-size: 0.85rem;
+    }
+    .new-items-table th {
+        background: #f8f9fa;
+        position: sticky;
+        top: 0;
+    }
+</style>
+{% endblock %}
 
-    <div class="col-md-6">
-        <div class="card table-card h-100 border-danger">
-            <div class="card-header bg-danger text-white">
-                <h6 class="mb-0"><i class="bi bi-trash me-2"></i>Очистить оборудование</h6>
+{% block content %}
+<!-- Форма загрузки -->
+<div class="card mb-4" id="uploadFormCard">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-file-earmark-arrow-up me-2"></i>Загрузка CSV файла</h6>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="upload-zone" id="dropZone">
+                <i class="bi bi-cloud-upload d-block mb-3"></i>
+                <h5>Перетащите CSV файл сюда или нажмите для выбора</h5>
+                <p class="text-muted mb-3">Файл должен быть в формате CSV с кодировкой UTF-8</p>
+                <input type="file" name="csv_file" id="csvFile" class="form-control" accept=".csv" style="max-width: 400px; margin: 0 auto;">
             </div>
-            <div class="card-body">
-                <p class="text-muted mb-3">Удалит все записи из моделей оборудования. Это действие нельзя отменить.</p>
-                <form method="post">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="clear">
-                    <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены? Все данные об оборудовании будут удалены!')">
-                        <i class="bi bi-trash me-2"></i>Очистить все модели оборудования
-                    </button>
-                </form>
+            <div class="text-center mt-3">
+                <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>
+                    <i class="bi bi-upload me-1"></i>Загрузить и обработать
+                </button>
             </div>
-        </div>
+        </form>
     </div>
 </div>
 
-<!-- Статистика -->
 {% if stats %}
-<div class="card table-card mb-4">
-    <div class="card-header">
-        <h6 class="mb-0"><i class="bi bi-graph-up me-2"></i>Результаты загрузки</h6>
+<!-- Результаты обработки -->
+<div class="card mb-4">
+    <div class="card-header bg-success text-white">
+        <h6 class="mb-0"><i class="bi bi-check-circle me-2"></i>Результаты обработки</h6>
     </div>
     <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-4">
-                <div class="card bg-light">
+        <!-- Общая статистика -->
+        <h6 class="mb-3"><i class="bi bi-bar-chart me-2"></i>Общая статистика</h6>
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-primary">
                     <div class="card-body text-center">
-                        <h2 class="text-primary">{{ stats.total_rows }}</h2>
-                        <p class="mb-0 text-muted">Всего строк в файле</p>
+                        <div class="stat-number">{{ stats.total_rows }}</div>
+                        <div class="stat-label">Всего строк</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card bg-light">
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-info">
                     <div class="card-body text-center">
-                        <h2 class="text-success">{{ stats.parsed_rows }}</h2>
-                        <p class="mb-0 text-muted">Обработано строк</p>
+                        <div class="stat-number">{{ stats.valid_inventory_rows }}</div>
+                        <div class="stat-label">С инв. номером</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card bg-warning text-dark">
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-warning">
                     <div class="card-body text-center">
-                        <h2>{{ stats.ignored_rows }}</h2>
-                        <p class="mb-0 text-muted">Пропущено (некатегория)</p>
+                        <div class="stat-number">{{ stats.group_accounting }}</div>
+                        <div class="stat-label">Групповой учет</div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card bg-success text-white">
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-warning">
                     <div class="card-body text-center">
-                        <h2>{{ stats.new_equipment }}</h2>
-                        <p class="mb-0">Новое оборудование добавлено</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card bg-info text-white">
-                    <div class="card-body text-center">
-                        <h2>{{ stats.updated_equipment }}</h2>
-                        <p class="mb-0">Оборудование обновлено</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card bg-warning text-dark">
-                    <div class="card-body text-center">
-                        <h2>{{ stats.mol_updated }}</h2>
-                        <p class="mb-0">МОЛ обновлено</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card bg-secondary text-white">
-                    <div class="card-body text-center">
-                        <h2>{{ stats.mol_cleared }}</h2>
-                        <p class="mb-0">МОЛ снято</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card bg-danger text-white">
-                    <div class="card-body text-center">
-                        <h2>{{ stats.archived_candidates }}</h2>
-                        <p class="mb-0">Кандидатов на перевод в архив</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card bg-danger text-white">
-                    <div class="card-body text-center">
-                        <h2>{{ stats.errors }}</h2>
-                        <p class="mb-0">Ошибок при обработке</p>
+                        <div class="stat-number">{{ stats.no_inventory }}</div>
+                        <div class="stat-label">Без инв. номера</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Детали ошибок -->
-        {% if stats.error_details %}
-        <div class="mt-4">
-            <h6 class="text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Детали ошибок</h6>
-            <div class="table-responsive">
-                <table class="table table-sm table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Строка</th>
-                            <th>Ошибка</th>
-                            <th>Данные</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for error in stats.error_details %}
-                        <tr>
-                            <td>{{ error.row }}</td>
-                            <td class="text-danger">{{ error.error }}</td>
-                            <td>
-                                <small>
-                                    {% for key, value in error.data.items %}
-                                    <strong>{{ key }}:</strong> {{ value }}<br>
-                                    {% endfor %}
-                                </small>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <!-- Статистика подтверждения -->
+        <h6 class="mb-3"><i class="bi bi-patch-check me-2"></i>Подтверждение учёта</h6>
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-success">
+                    <div class="card-body text-center">
+                        <div class="stat-number">{{ stats.confirmed }}</div>
+                        <div class="stat-label">Подтверждено (по инв.)</div>
+                    </div>
+                </div>
             </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-success">
+                    <div class="card-body text-center">
+                        <div class="stat-number">{{ stats.confirmed_by_serial }}</div>
+                        <div class="stat-label">Подтверждено (по сер.)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-danger">
+                    <div class="card-body text-center">
+                        <div class="stat-number">{{ stats.not_found_by_inventory }}</div>
+                        <div class="stat-label">Не найдено (по инв.)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-danger">
+                    <div class="card-body text-center">
+                        <div class="stat-number">{{ stats.not_found_by_serial }}</div>
+                        <div class="stat-label">Не найдено (по сер.)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Статистика назначения МОЛ -->
+        <h6 class="mb-3"><i class="bi bi-person-badge me-2"></i>Назначение материально ответственного</h6>
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-success">
+                    <div class="card-body text-center">
+                        <div class="stat-number">{{ stats.mio_stats.found }}</div>
+                        <div class="stat-label">Найден и назначен</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-danger">
+                    <div class="card-body text-center">
+                        <div class="stat-number">{{ stats.mio_stats.not_found }}</div>
+                        <div class="stat-label">Не найден</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-warning">
+                    <div class="card-body text-center">
+                        <div class="stat-number">{{ stats.mio_stats.no_name }}</div>
+                        <div class="stat-label">Некорректное ФИО</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card stat-info">
+                    <div class="card-body text-center">
+                        <div class="stat-number">{{ stats.mio_stats.total_mol }}</div>
+                        <div class="stat-label">Всего обработано</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ошибки поиска МОЛ -->
+        {% if stats.mio_failures %}
+        <h6 class="mb-3">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Ошибки поиска МОЛ: {{ stats.mio_failures|length }}
+        </h6>
+        <p class="text-muted small">
+            Для этих позиций не удалось найти пользователя в базе. Укажите причину и проверьте данные.
+        </p>
+        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+            <table class="table table-sm table-hover new-items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th style="width: 130px;">Инв. номер</th>
+                        <th>Наименование</th>
+                        <th style="width: 200px;">МОЛ из файла</th>
+                        <th style="width: 250px;">Причина</th>
+                        <th style="width: 300px;">Фильтр поиска</th>
+                        <th style="width: 200px;">Результат</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for failure in stats.mio_failures %}
+                    <tr>
+                        <td>{{ failure.row_num }}</td>
+                        <td><code>{{ failure.inventory }}</code></td>
+                        <td>{{ failure.name|truncatechars:40 }}</td>
+                        <td>{{ failure.mol }}</td>
+                        <td>
+                            {% if failure.reason == 'not_found' %}
+                            <span class="badge bg-danger">Не найдено</span>
+                            <br><small class="text-muted">По заданным параметрам не найдено ни одной записи в базе</small>
+                            {% elif failure.reason == 'too_many_matches' %}
+                            <span class="badge bg-warning text-dark">Несколько результатов</span>
+                            <br><small class="text-muted">{{ failure.match_info.total_matches }} записей найдено</small>
+                            {% elif failure.reason == 'incomplete_name' %}
+                            <span class="badge bg-danger">Некорректное ФИО</span>
+                            <br><small class="text-muted">В ФИО меньше 2 слов: "{{ failure.match_info.name_part|default:failure.mol }}"</small>
+                            {% elif failure.reason == 'group_accounting' %}
+                            <span class="badge bg-secondary">Групповой учёт</span>
+                            <br><small class="text-muted">МОЛ: {{ failure.match_info.mol }}</small>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ failure.reason }}</span>
+                            {% endif %}
+                        </td>
+                        <td><code>{{ failure.match_info.query|default:"—" }}</code></td>
+                        <td>
+                            {% if failure.reason == 'too_many_matches' and failure.match_info.users %}
+                            <div class="small">
+                                {% for user in failure.match_info.users %}
+                                <div>
+                                    <i class="bi bi-person me-1"></i>{{ user.name }}
+                                    {% if user.department %}
+                                    <br><small class="text-muted">  → {{ user.department }}</small>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                                {% if failure.match_info.total_matches > 5 %}
+                                <small class="text-muted">...и ещё {{ failure.match_info.total_matches|add:"-5" }}</small>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         {% endif %}
-    </div>
-</div>
 
-<!-- Кандидаты на архив -->
-{% if stats.archived_candidates > 0 %}
-<div class="card table-card mb-4 border-warning">
-    <div class="card-header bg-warning text-dark">
-        <h6 class="mb-0"><i class="bi bi-archive me-2"></i>Кандидаты на перевод в архив ({{ stats.archived_candidates }} ед.)</h6>
-    </div>
-    <div class="card-body">
-        <p class="text-muted">
-            Оборудование, которое есть в базе, но отсутствует в загруженном файле. 
-            Рекомендуется проверить и перевести в архив.
+        <!-- Статистика по категориям новых позиций -->
+        {% if stats.category_stats %}
+        <h6 class="mb-3"><i class="bi bi-tags me-2"></i>Категории новых позиций (по наименованию)</h6>
+        <div class="row g-3 mb-4">
+            {% for cat, count in stats.category_stats.items %}
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="stat-card stat-info">
+                    <div class="card-body text-center">
+                        <div class="stat-number">{{ count }}</div>
+                        <div class="stat-label">{{ cat }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Новые позиции -->
+        {% if stats.new_items_filtered %}
+        <h6 class="mb-3">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Новые позиции (попали под фильтр): {{ stats.new_items_filtered|length }}
+        </h6>
+        <div class="mb-3">
+            <a href="{% url 'equipment:download_new_items' %}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-download me-1"></i>Скачать CSV новых позиций
+            </a>
+        </div>
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm table-hover new-items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Наименование</th>
+                        <th style="width: 140px;">Инв. номер</th>
+                        <th style="width: 120px;">Заводской номер</th>
+                        <th style="width: 150px;">МОЛ</th>
+                        <th style="width: 120px;">Тип НФА</th>
+                        <th style="width: 150px;">Категория</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stats.new_items_filtered %}
+                    <tr>
+                        <td>{{ item.row_num }}</td>
+                        <td>{{ item.name|truncatechars:50 }}</td>
+                        <td><code>{{ item.inventory }}</code></td>
+                        <td>{{ item.serial|default:"—" }}</td>
+                        <td>{{ item.mol }}</td>
+                        <td>{{ item.nfa_type }}</td>
+                        <td>{% for cat in item.categories %}<span class="badge bg-info me-1">{{ cat }}</span>{% endfor %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Исключённые позиции -->
+        {% if stats.new_items_excluded %}
+        <h6 class="mb-3 mt-4">
+            <i class="bi bi-x-circle me-2"></i>
+            Исключённые позиции (не относятся к технике): {{ stats.new_items_excluded|length }}
+        </h6>
+        <p class="text-muted small">
+            Эти позиции не попали под фильтр оборудования (мебель, ПО, расходники и т.д.)
+            и не будут включены в скачиваемый файл.
         </p>
-        <a href="{% url 'equipment:computers' %}?archived=0" class="btn btn-outline-warning btn-sm">
-            <i class="bi bi-search me-2"></i>Просмотрить всё оборудование
-        </a>
+        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+            <table class="table table-sm table-hover new-items-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Наименование</th>
+                        <th style="width: 140px;">Инв. номер</th>
+                        <th style="width: 120px;">МОЛ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stats.new_items_excluded|slice:":30" %}
+                    <tr>
+                        <td>{{ item.row_num }}</td>
+                        <td>{{ item.name|truncatechars:60 }}</td>
+                        <td><code>{{ item.inventory }}</code></td>
+                        <td>{{ item.mol }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if stats.new_items_excluded|length > 30 %}
+            <div class="text-center text-muted py-2">
+                Показано 30 из {{ stats.new_items_excluded|length }} позиций
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if not stats.new_items_filtered and not stats.new_items_excluded %}
+        <div class="alert alert-success mb-0">
+            <i class="bi bi-check-circle me-2"></i>Все позиции с инвентарными номерами найдены в базе!
+        </div>
+        {% endif %}
+
+        <!-- Фильтр по наименованию -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-funnel me-2"></i>Фильтр по наименованию</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Позиции классифицируются по ключевым словам в наименовании.
+                    Только позиции, попавшие хотя бы под одно ключевое слово, включаются в скачиваемый файл.
+                </p>
+                <div class="row g-3">
+                    {% for category, keywords in stats.filter_keywords.items %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="border rounded p-3">
+                            <h6 class="mb-2 text-primary">{{ category }}</h6>
+                            <div class="small">
+                                {% for kw in keywords %}
+                                <span class="badge bg-light text-dark border me-1 mb-1">{{ kw }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Исключения -->
+        <div class="card mt-4">
+            <div class="card-header bg-danger text-white">
+                <h6 class="mb-0"><i class="bi bi-x-circle me-2"></i>Исключения (второй уровень фильтрации)</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Позиции, содержащие эти слова, исключаются из выгрузки автоматически.
+                </p>
+                <div class="small">
+                    {% for kw in stats.exclude_keywords %}
+                    <span class="badge bg-danger me-1 mb-1">{{ kw }}</span>
+                    {% endfor %}
+                </div>
+                <p class="text-muted small mt-3">
+                    Итого исключений: {{ stats.exclude_keywords|length }}
+                </p>
+            </div>
+        </div>
+
+        {% if stats.errors %}
+        <div class="alert alert-danger mt-3 mb-0">
+            <h6><i class="bi bi-exclamation-triangle me-2"></i>Ошибки:</h6>
+            <ul class="mb-0">
+                {% for error in stats.errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <div class="text-center mt-4">
+            <a href="{% url 'equipment:equipment_list' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Вернуться к списку
+            </a>
+            <a href="{% url 'equipment:upload_os' %}" class="btn btn-outline-primary ms-2">
+                <i class="bi bi-upload me-1"></i>Загрузить ещё файл
+            </a>
+        </div>
     </div>
 </div>
 {% endif %}
+{% endblock %}
 
-<a href="{% url 'equipment:dashboard' %}" class="btn btn-secondary">
-    <i class="bi bi-arrow-left me-2"></i>Вернуться на дашборд
-</a>
-{% endif %}
+{% block extra_js %}
+<script>
+// File input handling
+const fileInput = document.getElementById('csvFile');
+const uploadBtn = document.getElementById('uploadBtn');
+const dropZone = document.getElementById('dropZone');
+
+fileInput.addEventListener('change', function() {
+    uploadBtn.disabled = !this.files.length;
+    if (this.files.length) {
+        dropZone.querySelector('h5').textContent = this.files[0].name;
+    }
+});
+
+// Drag and drop
+dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#0d6efd';
+    this.style.background = '#e7f1ff';
+});
+
+dropZone.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#dee2e6';
+    this.style.background = '#f8f9fa';
+});
+
+dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    this.style.borderColor = '#dee2e6';
+    this.style.background = '#f8f9fa';
+    if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        fileInput.dispatchEvent(new Event('change'));
+    }
+});
+</script>
 {% endblock %}

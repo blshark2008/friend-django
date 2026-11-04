@@ -35,6 +35,7 @@
         </div>
     </div>
     <div class="col-md-3">
+        <a href="{% url 'siem:host_detail' host.pk %}#events" class="text-decoration-none text-reset">
         <div class="card stat-card text-center">
             <div class="card-body">
                 <i class="bi bi-list-ul fs-1 text-warning"></i>
@@ -42,8 +43,10 @@
                 <h3 class="mb-0">{{ total_events }}</h3>
             </div>
         </div>
+        </a>
     </div>
     <div class="col-md-3">
+        <a href="{% url 'siem:host_detail' host.pk %}?severity=critical#events" class="text-decoration-none text-reset">
         <div class="card stat-card text-center">
             <div class="card-body">
                 <i class="bi bi-exclamation-triangle fs-1 text-danger"></i>
@@ -51,6 +54,7 @@
                 <h3 class="mb-0 text-danger">{{ critical_events }}</h3>
             </div>
         </div>
+        </a>
     </div>
     <div class="col-md-3">
         <div class="card stat-card text-center">
@@ -99,6 +103,12 @@
             {% if screen_lock_logs|length > 0 %}<span class="badge bg-danger ms-1">{{ screen_lock_logs|length }}</span>{% endif %}
         </button>
     </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="updates-tab" data-bs-toggle="tab" data-bs-target="#updates" type="button" role="tab">
+            <i class="bi bi-boxes me-1"></i> Пакеты к обновлению
+            {% if latest_pending_updates > 0 %}<span class="badge bg-warning ms-1">{{ latest_pending_updates }}</span>{% endif %}
+        </button>
+    </li>
 </ul>
 
 <div class="tab-content" id="hostTabsContent">
@@ -110,7 +120,7 @@
                     <div class="col-md-6">
                         <h6 class="text-muted mb-3">Сетевая информация</h6>
                         <table class="table table-sm">
-                            <tr><td class="text-muted" style="width:40%">Имя хоста:</td><td><strong>{{ host.hostname }}</strong></td></tr>
+                            <tr><td class="text-muted col-half">Имя хоста:</td><td><strong>{{ host.hostname }}</strong></td></tr>
                             <tr><td class="text-muted">IP-адрес:</td><td><code>{{ host.ip_address|default:"—" }}</code></td></tr>
                             <tr><td class="text-muted">MAC-адрес:</td><td>{{ host.mac_address|default:"—" }}</td></tr>
                             <tr><td class="text-muted">Версия агента:</td><td>{{ host.agent_version|default:"—" }}</td></tr>
@@ -119,7 +129,7 @@
                     <div class="col-md-6">
                         <h6 class="text-muted mb-3">Системная информация</h6>
                         <table class="table table-sm">
-                            <tr><td class="text-muted" style="width:40%">Наименование ОС:</td><td>{{ host.os_name|default:host.os_info|default:"—" }}</td></tr>
+                            <tr><td class="text-muted col-half">Наименование ОС:</td><td>{{ host.os_name|default:host.os_info|default:"—" }}</td></tr>
                             {% if host.os_info and host.os_name %}
                             <tr><td class="text-muted">Версия ОС:</td><td>{{ host.os_info }}</td></tr>
                             {% endif %}
@@ -137,7 +147,7 @@
                         <h6 class="text-muted mb-3"><i class="bi bi-clock-history me-1"></i>Последний вход</h6>
                         <table class="table table-sm">
                             {% if latest_login %}
-                            <tr><td class="text-muted" style="width:40%">Время:</td><td>{{ latest_login.login_time|date:"d.m.Y H:i:s" }}</td></tr>
+                            <tr><td class="text-muted col-half">Время:</td><td>{{ latest_login.login_time|date:"d.m.Y H:i:s" }}</td></tr>
                             <tr><td class="text-muted">Логин:</td><td>
                                 <strong>{{ latest_login.username }}</strong>
                                 {% if last_login_fullname %}
@@ -166,7 +176,7 @@
                         <table class="table table-sm">
                             {% for cu in current_users %}
                             <tr>
-                                <td class="text-muted" style="width:40%">Логин:</td>
+                                <td class="text-muted col-half">Логин:</td>
                                 <td>
                                     <strong>{{ cu.username }}</strong>
                                     {% if cu.fullname %}
@@ -197,7 +207,7 @@
                     <div class="col-md-6">
                         <h6 class="text-muted mb-3">Процессор и память</h6>
                         <table class="table table-sm">
-                            <tr><td class="text-muted" style="width:40%">Модель:</td><td>{{ raw_data.cpu_model|default:"—" }}</td></tr>
+                            <tr><td class="text-muted col-half">Модель:</td><td>{{ raw_data.cpu_model|default:"—" }}</td></tr>
                             <tr><td class="text-muted">ОЗУ:</td><td>{% if latest_snapshot.ram_mb %}{{ latest_snapshot.ram_mb }} МБ{% else %}—{% endif %}</td></tr>
                             <tr><td class="text-muted">Температура CPU:</td><td>{% if raw_data.temp_c %}{{ raw_data.temp_c }}°C{% else %}—{% endif %}</td></tr>
                             <tr><td class="text-muted">Пакетов:</td><td>{{ latest_snapshot.packages_count|default:"—" }}</td></tr>
@@ -208,13 +218,16 @@
                     <div class="col-md-6">
                         <h6 class="text-muted mb-3">Система и безопасность</h6>
                         <table class="table table-sm">
-                            <tr><td class="text-muted" style="width:40%">Модель ПК:</td><td>{{ raw_data.model|default:"—" }}</td></tr>
+                            <tr><td class="text-muted col-half">Модель ПК:</td><td>{{ raw_data.model|default:"—" }}</td></tr>
                             <tr><td class="text-muted">Ядро:</td><td>{{ raw_data.kernel|default:"—" }}</td></tr>
                             <tr><td class="text-muted">Дисков:</td><td>{{ raw_data.disk_count|default:0 }}</td></tr>
                             <tr><td class="text-muted">Пользователей онлайн:</td><td>{{ raw_data.users_online|default:"—" }}</td></tr>
+                            <tr><td class="text-muted">Текущий пользователь:</td><td>{{ latest_snapshot.current_logged_user|default:"—" }}</td></tr>
                             <tr><td class="text-muted">Антивирус:</td><td>
-                                {% if host.antivirus_installed %}
-                                    <span class="badge bg-success">{{ host.antivirus_name|default:"установлен" }}</span>
+                                {% if latest_snapshot.antivirus_running %}
+                                    <span class="badge bg-success">{{ host.antivirus_name|default:"запущен" }}</span>
+                                {% elif host.antivirus_installed %}
+                                    <span class="badge bg-warning">Установлен, но не запущен</span>
                                 {% else %}
                                     <span class="badge bg-danger">Не установлен</span>
                                 {% endif %}
@@ -310,6 +323,32 @@
     
     <!-- Events tab -->
     <div class="tab-pane fade" id="events" role="tabpanel">
+        <!-- Filters -->
+        <div class="card table-card mb-3">
+            <div class="card-body py-3">
+                <form method="get" class="d-flex gap-2 flex-wrap align-items-center" id="events-filter-form">
+                    <select name="severity" class="form-select form-select-sm" style="width:160px">
+                        <option value="">Все уровни</option>
+                        <option value="critical" {% if filter_severity == 'critical' %}selected{% endif %}>Критично</option>
+                        <option value="warning" {% if filter_severity == 'warning' %}selected{% endif %}>Предупреждение</option>
+                        <option value="error" {% if filter_severity == 'error' %}selected{% endif %}>Ошибка</option>
+                        <option value="info" {% if filter_severity == 'info' %}selected{% endif %}>Инфо</option>
+                    </select>
+                    <select name="event_type" class="form-select form-select-sm" style="width:200px">
+                        <option value="">Все типы</option>
+                        {% for et_val, et_label in event_type_choices %}
+                        <option value="{{ et_val }}" {% if filter_event_type == et_val %}selected{% endif %}>{{ et_label }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ filter_from_date }}" placeholder="С" style="width:160px">
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ filter_to_date }}" placeholder="По" style="width:160px">
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
+                    {% if filter_severity or filter_event_type or filter_from_date or filter_to_date %}
+                    <a href="{% url 'siem:host_detail' host.pk %}" class="btn btn-sm btn-outline-secondary">Сбросить</a>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
         <div class="card table-card">
             <div class="card-body p-0">
                 {% if recent_events %}
@@ -326,7 +365,7 @@
                         <tbody>
                             {% for event in recent_events %}
                             <tr>
-                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ event.occurred_at|date:"d.m.Y H:i" }}</td>
+                                <td class="text-nowrap text-muted text-small">{{ event.occurred_at|date:"d.m.Y H:i" }}</td>
                                 <td>{{ event.get_event_type_display }}</td>
                                 <td>
                                     {% if event.severity == 'critical' %}
@@ -432,7 +471,7 @@
     
     <!-- Inventory tab -->
     <div class="tab-pane fade" id="inventory" role="tabpanel">
-        {% if snapshots %}
+        {% if snapshot_data %}
         <div class="card table-card">
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -440,24 +479,50 @@
                         <thead>
                             <tr>
                                 <th>Дата сбора</th>
-                                <th>Процессор</th>
-                                <th>ОЗУ</th>
+                                <th>ОС</th>
+                                <th>ОЗУ (МБ)</th>
+                                <th>Загрузка CPU</th>
+                                <th>Темп. CPU (°C)</th>
                                 <th>Дисков</th>
                                 <th>Пакетов</th>
-                                <th>Портов</th>
-                                <th>Температура</th>
+                                <th>Пакетов к обновлению</th>
+                                <th>Открыто портов</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for snap in snapshots %}
+                            {% for s in snapshot_data %}
                             <tr>
-                                <td class="text-nowrap">{{ snap.collected_at|date:"d.m.Y H:i" }}</td>
-                                <td>{{ snap.cpu_model|default:"—" }}</td>
-                                <td>{% if snap.ram_mb %}{{ snap.ram_mb|floatformat:0 }} МБ{% else %}—{% endif %}</td>
-                                <td>{{ snap.disk_info|length }}</td>
-                                <td>{{ snap.packages_count|default:"—" }}</td>
-                                <td>{{ snap.open_ports|length }}</td>
-                                <td>{% if snap.cpu_temperature %}{{ snap.cpu_temperature }}°C{% else %}—{% endif %}</td>
+                                <td class="text-nowrap">{{ s.collected_at }}</td>
+                                <td>
+                                    {% if host.os_name and host.os_info %}
+                                        {{ host.os_name }} {{ host.os_info }}
+                                    {% elif host.os_name %}
+                                        {{ host.os_name }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>{% if s.ram_mb %}{{ s.ram_mb|floatformat:0 }}{% else %}—{% endif %}</td>
+                                <td>{{ s.load_avg|default:"—" }}</td>
+                                <td>{% if s.cpu_temperature %}{{ s.cpu_temperature|floatformat:1 }}{% else %}—{% endif %}</td>
+                                <td>
+                                    {% if s.disk_info %}
+                                    {{ s.disk_info|length }}
+                                    {% else %}
+                                    —
+                                    {% endif %}
+                                </td>
+                                <td>{% if s.packages_count %}{{ s.packages_count }}{% else %}—{% endif %}</td>
+                                <td>
+                                    {% if s.pending_updates_count > 0 %}
+                                    <a href="{% url 'siem:inventory_packages' host.pk %}" class="text-decoration-none">
+                                        <span class="badge bg-warning">{{ s.pending_updates_count }}</span>
+                                    </a>
+                                    {% else %}
+                                    <span class="badge bg-success">0</span>
+                                    {% endif %}
+                                </td>
+                                <td>{% if s.open_ports %}{{ s.open_ports|length }}{% else %}0{% endif %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -484,7 +549,7 @@
                     <table class="table table-hover mb-0">
                         <thead>
                             <tr>
-                                <th style="width:180px">Время</th>
+                                <th class="w-180">Время</th>
                                 <th>Заголовок</th>
                                 <th>URL</th>
                             </tr>
@@ -492,7 +557,7 @@
                         <tbody>
                             {% for bh in browser_history %}
                             <tr>
-                                <td class="text-nowrap text-muted" style="font-size:0.85rem;">{{ bh.visited|default:"—" }}</td>
+                                <td class="text-nowrap text-muted text-small">{{ bh.visited|default:"—" }}</td>
                                 <td>{{ bh.title|default:"—" }}</td>
                                 <td>
                                     <a href="{{ bh.url }}" target="_blank" class="text-decoration-none text-break" title="{{ bh.url }}">
@@ -537,7 +602,7 @@
                             <tr>
                                 <td class="text-nowrap">{{ lock.timestamp|date:"d.m.Y H:i:s" }}</td>
                                 <td>
-                                    {% if lock.action == 'lock' %}
+                                    {% if lock.state == 'locked' %}
                                         <span class="badge bg-danger">
                                             <i class="bi bi-lock-fill me-1"></i>Блокировка
                                         </span>
@@ -578,5 +643,54 @@
         </div>
         {% endif %}
     </div>
+    
+    <!-- Updates tab -->
+    <div class="tab-pane fade" id="updates" role="tabpanel">
+        <div class="card table-card">
+            <div class="card-body p-0">
+                {% if latest_pending_updates > 0 %}
+                <div class="p-4 text-center">
+                    <i class="bi bi-boxes fs-1 text-warning d-block mb-3"></i>
+                    <h5>Требуют обновления: {{ latest_pending_updates }} пакетов</h5>
+                    <p class="text-muted mb-4">Последнее обновление обнаружено {{ latest_updates_time|default:"—" }}</p>
+                    <a href="{% url 'siem:inventory_packages' host.pk %}" class="btn btn-warning">
+                        <i class="bi bi-list-ul me-2"></i>Посмотреть список пакетов
+                    </a>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-muted">
+                    <i class="bi bi-check-circle fs-1 text-success d-block mb-3"></i>
+                    <h5>Обновлений нет</h5>
+                    <p class="text-muted">Все пакеты актуальны</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    // При загрузке страницы: если есть параметры фильтра или hash #events — открыть вкладку «События»
+    document.addEventListener('DOMContentLoaded', function() {
+        var url = new URL(window.location);
+        var filterParams = ['severity', 'event_type', 'from_date', 'to_date'];
+        var hasFilter = false;
+        for (var i = 0; i < filterParams.length; i++) {
+            if (url.searchParams.has(filterParams[i])) { hasFilter = true; break; }
+        }
+        var hasHash = url.hash === '#events';
+        if (hasFilter || hasHash) {
+            // Снять active/show с текущей вкладки
+            var activeTab = document.querySelector('.tab-pane.active');
+            if (activeTab) { activeTab.classList.remove('active', 'show'); }
+            var activeLink = document.querySelector('.nav-link.active');
+            if (activeLink) { activeLink.classList.remove('active'); }
+            // Показать вкладку «События»
+            var eventsTab = document.getElementById('events');
+            if (eventsTab) { eventsTab.classList.add('active', 'show'); }
+            var eventsLink = document.querySelector('[data-bs-target="#events"]');
+            if (eventsLink) { eventsLink.classList.add('active'); }
+        }
+    });
+</script>
 {% endblock %}

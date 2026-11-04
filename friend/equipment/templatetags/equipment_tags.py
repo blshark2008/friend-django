@@ -15,3 +15,11 @@ def get(d, key):
     if d is None or not isinstance(d, dict):
         return None
     return d.get(key)
+
+
+@register.filter
+def get_default(d, key):
+    """Получение элемента из словаря по ключу с значением по умолчанию 0."""
+    if d is None or not isinstance(d, dict):
+        return 0
+    return d.get(key, 0)

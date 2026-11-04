@@ -2,65 +2,7 @@
 
 {% block title %}{{ type_label }} — Редактирование{% endblock %}
 
-{% block extra_css %}
-<style>
-    /* Mobile optimization */
-    @media (max-width: 768px) {
-        .main-content {
-            padding: 1rem !important;
-            margin-left: 0 !important;
-        }
-        .card {
-            margin-bottom: 1rem !important;
-        }
-        .assign-info-item {
-            margin-bottom: 1.25rem !important;
-        }
-        .assign-info-item .form-label {
-            margin-bottom: 0.25rem !important;
-        }
-        .assign-info-item .btn {
-            width: 100%;
-            text-align: left;
-        }
-        .assign-info-item .btn i {
-            margin-right: 0.5rem;
-        }
-        .assign-info-item .remove-btn {
-            width: auto !important;
-            flex-shrink: 0;
-        }
-        .assign-info-item .remove-btn i {
-            margin-right: 0;
-        }
-        .form-control, .form-select {
-            font-size: 16px; /* Prevents iOS zoom */
-        }
-        .btn-group-mobile {
-            flex-direction: column;
-        }
-        .btn-group-mobile .btn {
-            width: 100%;
-        }
-        /* Modal mobile */
-        .modal-body {
-            padding: 1rem !important;
-        }
-        .modal-dialog {
-            margin: 0.5rem;
-        }
-        #assignSearchFio, #assignSearchTab, #assignSearchDept, #assignSearchBtn {
-            width: 100%;
-        }
-        #assignSearchFio, #assignSearchTab, #assignSearchDept {
-            margin-bottom: 0.75rem;
-        }
-        #assignSearchBtn {
-            margin-bottom: 0.75rem;
-        }
-    }
-</style>
-{% endblock %}
+{% block extra_css %}{% endblock %}
 
 {% block page_title %}
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">

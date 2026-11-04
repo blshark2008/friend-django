@@ -23,6 +23,7 @@ urlpatterns = [
 
     # Загрузка основных средств
     path('upload-os/', views.upload_os_csv, name='upload_os'),
+    path('upload-os/download-new/', views.download_new_items, name='download_new_items'),
 
     # CRUD
     path('add/<str:equipment_type>/', views.equipment_add, name='add'),
@@ -61,6 +62,37 @@ urlpatterns = [
     path('inventory/', views.equipment_inventory, name='inventory'),
     path('inventory/<str:equipment_type>/<int:pk>/', views.equipment_inventory_detail, name='inventory_detail'),
 
+    # Справочник расположения
+    path('locations/', views.location_list, name='location_list'),
+    # Город
+    path('locations/city/add/', views.location_city_add, name='location_city_add'),
+    path('locations/city/<int:pk>/edit/', views.location_city_edit, name='location_city_edit'),
+    path('locations/city/<int:pk>/delete/', views.location_city_delete, name='location_city_delete'),
+    # Корпус
+    path('locations/building/add/', views.location_building_add, name='location_building_add'),
+    path('locations/building/<int:pk>/edit/', views.location_building_edit, name='location_building_edit'),
+    path('locations/building/<int:pk>/delete/', views.location_building_delete, name='location_building_delete'),
+    # Этаж
+    path('locations/floor/add/', views.location_floor_add, name='location_floor_add'),
+    path('locations/floor/<int:pk>/edit/', views.location_floor_edit, name='location_floor_edit'),
+    path('locations/floor/<int:pk>/delete/', views.location_floor_delete, name='location_floor_delete'),
+    # Кабинет
+    path('locations/room/add/', views.location_room_add, name='location_room_add'),
+    path('locations/room/<int:pk>/edit/', views.location_room_edit, name='location_room_edit'),
+    path('locations/room/<int:pk>/delete/', views.location_room_delete, name='location_room_delete'),
+    # API
+    path('locations/api/floors/', views.get_floors_ajax, name='get_floors_ajax'),
+    # Категории оборудования (AJAX)
+    path('api/categories/', views.get_categories_ajax, name='get_categories_ajax'),
+    path('api/subcategories/', views.get_subcategories_ajax, name='get_subcategories_ajax'),
+
+    # CRUD справочник категорий
+    path('categories/manage/', views.category_list, name='category_list'),
+    path('categories/manage/add/', views.category_add, name='category_add'),
+    path('categories/manage/<int:pk>/edit/', views.category_edit, name='category_edit'),
+    path('categories/manage/<int:pk>/delete/', views.category_delete, name='category_delete'),
+    path('categories/manage/<int:pk>/restore/', views.category_restore, name='category_restore'),
+
     # Старые URL для совместимости
     path('computers/', views.ComputerListView.as_view(), name='computers'),
     path('computers/type/<str:equipment_type>/', views.ComputerListView.as_view(), name='computers_type'),
@@ -71,4 +103,7 @@ urlpatterns = [
     path('peripherals/', views.EquipmentListView.as_view(equipment_type='peripheral'), name='peripherals'),
     path('phones/', views.EquipmentListView.as_view(equipment_type='phone'), name='phones'),
     path('vks/', views.EquipmentListView.as_view(equipment_type='vks'), name='vks'),
+
+    # Оборудование по категории (динамическое)
+    path('category/<slug:category_slug>/', views.category_equipment_list, name='category_equipment'),
 ]

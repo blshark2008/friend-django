@@ -42,31 +42,15 @@
     .equipment-row:hover {
         background: #f8f9fa;
     }
-    .status-badge {
-        font-size: 0.75rem;
-        padding: 0.35em 0.65em;
-    }
-    .count-badge {
-        font-size: 0.85rem;
-        font-weight: 600;
-    }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- Заголовок Фильтры -->
+<h5 class="mb-3"><i class="bi bi-funnel me-2"></i>Фильтры</h5>
+
 <!-- Строка фильтров -->
 <div class="card filter-card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h6 class="mb-0"><i class="bi bi-funnel me-2"></i>Фильтры</h6>
-        <div>
-            <a href="{% url 'equipment:equipment_list' %}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-counterclockwise me-1"></i>Сбросить
-            </a>
-            <a href="{% url 'equipment:export_excel' %}" class="btn btn-sm btn-outline-primary">
-                <i class="bi bi-download me-1"></i>Экспорт
-            </a>
-        </div>
-    </div>
     <div class="card-body">
         <form method="get" action="{% url 'equipment:equipment_list' %}">
             <div class="row g-3">
@@ -94,7 +78,7 @@
                 <div class="col-md-2">
                     <div class="filter-group">
                         <label for="id_subtype">Подтип</label>
-                        <select name="subtype" id="id_subtype" class="form-select">
+                        <select name="subcategory" id="id_subtype" class="form-select">
                             <option value="">Все подтипы</option>
                             {% for sub_value, sub_label in subtypes %}
                             <option value="{{ sub_value }}" {% if current_subtype == sub_value %}selected{% endif %}>
@@ -109,7 +93,7 @@
                         <label for="id_status">Статус</label>
                         <select name="status" id="id_status" class="form-select">
                             <option value="">Все статусы</option>
-                            {% for status_value, status_label in equipment_list.model.STATUS_CHOICES %}
+                            {% for status_value, status_label in status_choices %}
                             <option value="{{ status_value }}" {% if current_status == status_value %}selected{% endif %}>
                                 {{ status_label }}
                             </option>
@@ -123,6 +107,48 @@
                         <input type="text" name="location" id="id_location" class="form-control"
                                value="{{ current_location }}"
                                placeholder="Номер кабинета">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="filter-group">
+                        <label for="id_assigned_dept">Подразделение (закрепл.)</label>
+                        <select name="assigned_dept" id="id_assigned_dept" class="form-select">
+                            <option value="">Все подразделения</option>
+                            {% for dept_name in departments %}
+                            <option value="{{ dept_name }}" {% if current_assigned_dept == dept_name %}selected{% endif %}>
+                                {{ dept_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="filter-group">
+                        <label for="id_responsible_dept">Подразделение (МОЛ)</label>
+                        <select name="responsible_dept" id="id_responsible_dept" class="form-select">
+                            <option value="">Все подразделения</option>
+                            {% for dept_name in departments %}
+                            <option value="{{ dept_name }}" {% if current_responsible_dept == dept_name %}selected{% endif %}>
+                                {{ dept_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="filter-group">
+                        <label for="id_assigned_user">ФИО (закрепл.)</label>
+                        <input type="text" name="assigned_user" id="id_assigned_user" class="form-control"
+                               value="{{ current_assigned_user }}"
+                               placeholder="Фамилия И.О.">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="filter-group">
+                        <label for="id_responsible_user">ФИО (МОЛ)</label>
+                        <input type="text" name="responsible_user" id="id_responsible_user" class="form-control"
+                               value="{{ current_responsible_user }}"
+                               placeholder="Фамилия И.О.">
                     </div>
                 </div>
                 <div class="col-md-1 d-flex align-items-end">
@@ -141,10 +167,19 @@
         <span class="count-badge text-muted">
             Найдено: <span class="text-primary">{{ total_count }}</span> единиц
         </span>
+        <a href="{% url 'equipment:equipment_list' %}" class="btn btn-sm btn-link text-muted ps-2">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>Сбросить
+        </a>
     </div>
     <div>
         <a href="{% url 'equipment:add' equipment_type='computer' %}" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg me-1"></i>Добавить оборудование
+        </a>
+        <a href="{% url 'equipment:export_excel' %}" class="btn btn-outline-primary btn-sm ms-1">
+            <i class="bi bi-download me-1"></i>Экспорт
+        </a>
+        <a href="{% url 'equipment:upload_os' %}" class="btn btn-outline-success btn-sm ms-1">
+            <i class="bi bi-file-earmark-arrow-up me-1"></i>Загрузка ОС
         </a>
     </div>
 </div>
@@ -155,12 +190,12 @@
         <table class="table table-hover mb-0">
             <thead>
                 <tr>
+                    <th style="width: 50px;">Статус</th>
                     <th style="width: 120px;">Инв. номер</th>
                     <th>Название</th>
                     <th style="width: 140px;">Категория</th>
                     <th style="width: 160px;">Закреплён за</th>
-                    <th style="width: 100px;">Статус</th>
-                    <th style="width: 120px;">Кабинет</th>
+                    <th style="width: 160px;">Материально ответственный</th>
                     <th style="width: 100px;">Действия</th>
                 </tr>
             </thead>
@@ -168,13 +203,28 @@
                 {% for item in equipment_list %}
                 <tr class="equipment-row">
                     <td>
+                        {% if item.archived %}
+                        <span class="text-muted" title="Архив"><i class="bi bi-archive"></i></span>
+                        {% elif item.status == 'active' %}
+                        <span class="text-success" title="Активно"><i class="bi bi-check-circle"></i></span>
+                        {% elif item.status == 'maintenance' %}
+                        <span class="text-warning" title="Обслуживание"><i class="bi bi-tools"></i></span>
+                        {% elif item.status == 'pending' %}
+                        <span class="text-info" title="Не подтверждён учёт"><i class="bi bi-question-circle"></i></span>
+                        {% elif item.status == 'confirmed' %}
+                        <span class="text-primary" title="Подтверждён учёт"><i class="bi bi-patch-check"></i></span>
+                        {% else %}
+                        <span class="text-danger" title="Списано"><i class="bi bi-x-circle"></i></span>
+                        {% endif %}
+                    </td>
+                    <td>
                         <span class="fw-semibold">{{ item.inventory_number }}</span>
                         {% if item.serial_number %}
                         <br><small class="text-muted">{{ item.serial_number }}</small>
                         {% endif %}
                     </td>
                     <td>
-                        <div class="fw-medium">{{ item.name|default:item.get_subtype_display }}</div>
+                        <div class="fw-medium">{{ item.name|default:item.type_label }}</div>
                         {% if item.brand or item.model %}
                         <small class="text-muted">
                             {{ item.brand }}{% if item.brand and item.model %} {% endif %}{{ item.model }}
@@ -186,10 +236,10 @@
                     </td>
                     <td>
                         <span class="badge bg-light text-dark border">
-                            {{ item.get_category_display }}
+                            {{ item.category_label }}
                         </span>
                         <br>
-                        <small class="text-muted">{{ item.get_subtype_display }}</small>
+                        <small class="text-muted">{{ item.type_label }}</small>
                     </td>
                     <td>
                         {% if item.assigned_user %}
@@ -202,24 +252,13 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if item.archived %}
-                        <span class="badge bg-secondary status-badge">Архив</span>
-                        {% elif item.status == 'active' %}
-                        <span class="badge bg-success status-badge">Активно</span>
-                        {% elif item.status == 'maintenance' %}
-                        <span class="badge bg-warning text-dark status-badge">Обслуживание</span>
+                        {% if item.responsible_user %}
+                        <div>
+                            <i class="bi bi-person-badge text-success me-1"></i>
+                            {{ item.responsible_user.get_full_name|default:item.responsible_user.username }}
+                        </div>
                         {% else %}
-                        <span class="badge bg-danger status-badge">Списано</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        {% if item.location %}
-                        <i class="bi bi-geo-alt me-1"></i>{{ item.location }}
-                        {% if item.place %}
-                        <br><small class="text-muted">{{ item.place }}</small>
-                        {% endif %}
-                        {% else %}
-                        <span class="text-muted">—</span>
+                        <span class="text-muted"><i class="bi bi-dash-circle me-1"></i>Не назначен</span>
                         {% endif %}
                     </td>
                     <td>
@@ -249,51 +288,78 @@
     </div>
 </div>
 
-<script>
-// Mapping categories → subtypes
-const categorySubtypes = {
-    'computer': [
-        ['desktop', 'Компьютер'],
-        ['monoblock', 'Моноблок'],
-        ['laptop', 'Ноутбук'],
-        ['tablet', 'Планшет'],
-        ['system_unit', 'Системный блок'],
-        ['monitor', 'Монитор'],
-        ['server', 'Сервер'],
-        ['thin_client', 'Тонкий клиент'],
-    ],
-    'printer': [
-        ['laser_color', 'Принтер лазерный цветной'],
-        ['laser_bw', 'Принтер лазерный чёрно-белый'],
-        ['mfp_laser', 'МФУ лазерное'],
-        ['mfp_inkjet', 'МФУ струйное'],
-    ],
-    'periphery': [
-        ['headset', 'Гарнитура'],
-        ['speakers', 'Колонки'],
-        ['inkjet', 'Принтер струйный'],
-    ],
-    'other': [
-        ['disk_array', 'Дисковая стойка'],
-        ['vks', 'ВКС (видеоконференцсвязь)'],
-    ],
-};
+<!-- Пагинация -->
+{% if page_obj.has_other_pages %}
+<div class="card mt-3">
+    <div class="card-body py-3">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="text-muted small">
+                    Показано {{ page_obj.start_index }}–{{ page_obj.end_index }} из {{ total_count }}
+                </span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 small text-muted">Строк на странице:</label>
+                <select id="perPageSelect" class="form-select form-select-sm" style="width: 80px;">
+                    {% for size in valid_page_sizes %}
+                    <option value="{{ size }}" {% if size == current_per_page %}selected{% endif %}>
+                        {{ size }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_location %}&location={{ current_location }}{% endif %}#">&laquo;</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_location %}&location={{ current_location }}{% endif %}#">&lsaquo;</a>
+                        </li>
+                        {% endif %}
+                        <li class="page-item disabled">
+                            <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                        </li>
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_location %}&location={{ current_location }}{% endif %}#">&rsaquo;</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_location %}&location={{ current_location }}{% endif %}#">&raquo;</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
+<script>
+// Динамическая подгрузка подкатегорий через AJAX
 function updateSubtypes(category) {
     const subtypeSelect = document.getElementById('id_subtype');
-    const currentValue = subtypeSelect.value;
     // Clear existing options, keep the first "all"
     subtypeSelect.innerHTML = '<option value="">Все подтипы</option>';
 
-    if (category && categorySubtypes[category]) {
-        categorySubtypes[category].forEach(function(sub) {
-            const opt = document.createElement('option');
-            opt.value = sub[0];
-            opt.textContent = sub[1];
-            if (sub[0] === currentValue) opt.selected = true;
-            subtypeSelect.appendChild(opt);
-        });
-    }
+    if (!category) return;
+
+    // AJAX request to get subcategories
+    const url = "{% url 'equipment:get_subcategories_ajax' %}?category_slug=" + encodeURIComponent(category);
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(function(sub) {
+                const opt = document.createElement('option');
+                opt.value = sub.slug;
+                opt.textContent = sub.name;
+                subtypeSelect.appendChild(opt);
+            });
+        })
+        .catch(err => console.error('Ошибка подгрузки подкатегорий:', err));
 }
 
 document.getElementById('id_category').addEventListener('change', function() {

@@ -1,0 +1,229 @@
+{% extends 'siem/base.html' %}
+
+{% block title %}История инвентаризации — {{ host.hostname }}{% endblock %}
+
+{% block page_title %}
+<div class="d-flex align-items-center">
+    <a href="{% url 'siem:report_inventory' %}" class="btn btn-sm btn-outline-secondary me-2">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <h4 class="mb-0"><i class="bi bi-hdd-stack me-2"></i>История инвентаризации — {{ host.hostname }}</h4>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-primary">{{ total_snapshots }}</h2>
+                <p class="mb-0 text-muted">Всего снимков</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-info">
+                    {% if host.os_name and host.os_info %}
+                        {{ host.os_name }} {{ host.os_info }}
+                    {% elif host.os_name %}
+                        {{ host.os_name }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </h2>
+                <p class="mb-0 text-muted">Операционная система</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card text-center">
+            <div class="card-body">
+                <h2 class="text-success">{{ host.last_seen|date:"d.m.Y H:i" }}</h2>
+                <p class="mb-0 text-muted">Последний контакт</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Snapshots table -->
+<div class="card table-card">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Снимки инвентаризации</h6>
+    </div>
+    <div class="card-body p-0">
+        {% if snapshot_data %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Дата сбора</th>
+                        <th>ОС</th>
+                        <th>ОЗУ (МБ)</th>
+                        <th>Загрузка CPU</th>
+                        <th>Темп. CPU (°C)</th>
+                        <th>Дисков</th>
+                        <th>Пакетов</th>
+                        <th>Пакетов к обновлению</th>
+                        <th>Открыто портов</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in snapshot_data %}
+                    <tr style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#snapshotModal"
+                        data-index="{{ forloop.counter0 }}">
+                        <td class="text-nowrap">{{ s.collected_at }}</td>
+                        <td>
+                            {% if host.os_name and host.os_info %}
+                                {{ host.os_name }} {{ host.os_info }}
+                            {% elif host.os_name %}
+                                {{ host.os_name }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>{% if s.ram_mb %}{{ s.ram_mb|floatformat:0 }}{% else %}—{% endif %}</td>
+                        <td>{{ s.load_avg|default:"—" }}</td>
+                        <td>{% if s.cpu_temperature %}{{ s.cpu_temperature|floatformat:1 }}{% else %}—{% endif %}</td>
+                        <td>
+                            {% if s.disk_info %}
+                            {{ s.disk_info|length }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>{% if s.packages_count %}{{ s.packages_count }}{% else %}—{% endif %}</td>
+                        <td>
+                            {% if s.pending_updates_count > 0 %}
+                            <a href="{% url 'siem:inventory_packages' host.pk %}" class="text-decoration-none" onclick="event.stopPropagation();">
+                                <span class="badge bg-warning">{{ s.pending_updates_count }}</span>
+                            </a>
+                            {% else %}
+                            <span class="badge bg-success">0</span>
+                            {% endif %}
+                        </td>
+                        <td>{% if s.open_ports %}{{ s.open_ports|length }}{% else %}0{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-hdd fs-1 d-block mb-3"></i>
+            <p class="mb-0">Снимки инвентаризации отсутствуют</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="snapshotModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Детали инвентаризации</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <strong>Дата сбора:</strong> <span id="modalDate"></span>
+                </div>
+                
+                <h6 class="text-muted mb-2"><i class="bi bi-cpu me-1"></i>Процессор</h6>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted">Модель:</td><td id="modalCpuModel">—</td></tr>
+                            <tr><td class="text-muted">Температура:</td><td id="modalCpuTemp">—</td></tr>
+                            <tr><td class="text-muted">Загрузка:</td><td id="modalLoadAvg">—</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <h6 class="text-muted mb-2"><i class="bi bi-memory me-1"></i>Память и диски</h6>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted">ОЗУ:</td><td id="modalRam">—</td></tr>
+                            <tr><td class="text-muted">Дисков:</td><td id="modalDisks">—</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <h6 class="text-muted mb-2"><i class="bi bi-boxes me-1"></i>Пакеты</h6>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted">Установлено:</td><td id="modalPackagesCount">—</td></tr>
+                            <tr><td class="text-muted">Обновлений:</td><td id="modalPendingUpdates">—</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <h6 class="text-muted mb-2"><i class="bi bi-plug me-1"></i>Сеть</h6>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted">Открытых портов:</td><td id="modalPorts">—</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <h6 class="text-muted mb-2"><i class="bi bi-shield-check me-1"></i>Безопасность</h6>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tr><td class="text-muted">Антивирус запущен:</td><td id="modalAntivirus">—</td></tr>
+                            <tr><td class="text-muted">Текущий пользователь:</td><td id="modalLoggedUser">—</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Raw data -->
+                <h6 class="text-muted mb-2"><i class="bi bi-code-square me-1"></i>Полные данные</h6>
+                <div class="card">
+                    <div class="card-body">
+                        <pre class="mb-0 small" id="modalRaw"></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ snapshot_data|json_script:"snapshot-json" }}
+<script>
+    var snapshotData = JSON.parse(document.getElementById('snapshot-json').textContent);
+    
+    var modal = document.getElementById('snapshotModal');
+    modal.addEventListener('show.bs.modal', function(event) {
+        var row = event.relatedTarget;
+        if (!row || row.tagName !== 'TR') return;
+        
+        var idx = parseInt(row.dataset.index);
+        var d = snapshotData[idx];
+        if (!d) return;
+        
+        document.getElementById('modalDate').textContent = d.collected_at;
+        document.getElementById('modalCpuModel').textContent = d.cpu_model || '—';
+        document.getElementById('modalCpuTemp').textContent = d.cpu_temperature !== null ? d.cpu_temperature + ' °C' : '—';
+        document.getElementById('modalLoadAvg').textContent = d.load_avg || '—';
+        document.getElementById('modalRam').textContent = d.ram_mb ? d.ram_mb + ' МБ' : '—';
+        document.getElementById('modalDisks').textContent = d.disk_info ? d.disk_info.length : '—';
+        document.getElementById('modalPackagesCount').textContent = d.packages_count || '—';
+        document.getElementById('modalPendingUpdates').textContent = d.pending_updates_count || '0';
+        document.getElementById('modalPorts').textContent = d.open_ports ? d.open_ports.length : '0';
+        document.getElementById('modalAntivirus').textContent = d.antivirus_running === true ? 'Да' : (d.antivirus_running === false ? 'Нет' : '—');
+        document.getElementById('modalLoggedUser').textContent = d.current_logged_user || '—';
+        document.getElementById('modalRaw').textContent = JSON.stringify(d.raw, null, 2);
+    });
+</script>
+{% endblock %}

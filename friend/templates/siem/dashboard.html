@@ -159,7 +159,7 @@
                         <tbody>
                             {% for event in recent_events %}
                             <tr>
-                                <td style="width: 80px;">
+                                <td class="w-80">
                                     {% if event.severity == 'critical' %}
                                     <span class="badge bg-danger severity-badge">Крит</span>
                                     {% elif event.severity == 'warning' %}
@@ -169,7 +169,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{% url 'siem:event_detail' event.id %}" class="text-decoration-none small d-block text-truncate" style="max-width: 150px;">
+                                    <a href="{% url 'siem:event_detail' event.id %}" class="text-decoration-none small d-block text-truncate max-w-150">
                                         {{ event.message }}
                                     </a>
                                     <small class="text-muted">{{ event.host__hostname }}</small>

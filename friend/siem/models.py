@@ -70,6 +70,8 @@ class InventorySnapshot(models.Model):
     disk_info = models.JSONField('Диски', default=dict)
     packages_count = models.PositiveIntegerField('Кол-во пакетов', null=True, blank=True)
     pending_updates = models.JSONField('Ожидают обновления', default=list)
+    antivirus_running = models.BooleanField('Антивирус запущен', null=True, blank=True)
+    current_logged_user = models.CharField('Текущий пользователь', max_length=100, blank=True)
     open_ports = models.JSONField('Открытые порты', default=list)
     raw = models.JSONField('Полные данные', default=dict)
 
@@ -109,12 +111,7 @@ class ScreenLockLog(models.Model):
         verbose_name = 'Переход блокировки'
         verbose_name_plural = 'Переходы блокировки'
         ordering = ['-timestamp']
-        constraints = [
-            models.UniqueConstraint(
-                fields=['host', 'date', 'state'],
-                name='uq_screenlocklog_host_date_state',
-            ),
-        ]
+        constraints = []
         indexes = [
             models.Index(fields=['host', 'timestamp']),
             models.Index(fields=['state', 'timestamp']),

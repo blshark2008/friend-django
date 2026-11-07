@@ -17,7 +17,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from .models import (
     Equipment, EquipmentAssignment, EquipmentMOLAssignment, EquipmentFieldSetting,
-    EquipmentCategory, EQUIPMENT_STATUS_CHOICES,
+    EquipmentCategory, ExcludeKeyword, FilterKeyword, EQUIPMENT_STATUS_CHOICES,
     City, Building, Floor, Room,
 )
 from .forms import (
@@ -33,87 +33,24 @@ from accounts.models import Department
 # Исключает: мебель, ПО, расходники, книги, мед. инструменты и т.д.
 # ============================================================================
 
-NAME_FILTER_KEYWORDS = {
-    # Компьютерное оборудование
-    'компьютер': [
-        'компьютер', 'системн[ыи]й блок', 'моноблок', 'ноутбук',
-        'нетбук', 'планшет', 'тонкий клиент', 'смарт-часы', 'смаРТЧАС',
-        'тв-приставка', 'all-in-one', 'aio',
-    ],
-    # Мониторы
-    'монитор': [
-        'монитор', 'дисплей', 'display',
-    ],
-    # Принтеры и МФУ
-    'принтер': [
-        'принтер', 'мфу', 'мфУ', 'копир', 'лазерн', 'струйн',
-        'этикеток', 'плоттер',
-    ],
-    # Периферия
-    'периферия': [
-        'веб-камер', 'камер[аы]', 'гарнитур', 'наушник', 'динамик', 'колонк',
-        'диктофон', 'клавиатур', 'сканер', 'шредер', 'дисков[аые]', 'жестк',
-        'сумк[ае] под ноутбук', 'сумк[ае] для ноутбук', 'рутокен',
-    ],
-    # Сетевое оборудование
-    'сеть': [
-        'маршрутизатор', 'коммутатор', 'свитч', 'роутер', 'wifi', 'wi-fi',
-        'точк[аы] доступ', 'контроллер', 'ip-камер', 'sfp', 'медиа-конвертер',
-        'hdm[и]-сплиттер', 'концентратор', 'хаб', 'hub', 'ethernet',
-    ],
-    # Связь
-    'связь': [
-        'телефон', 'voip', 'gsm', 'модем', 'сотов', 'беспроводн',
-        'радиотелефон', 'терминал сбор', 'факс',
-    ],
-    # Видеооборудование
-    'видео': [
-        'проектор', 'телевизор', 'тв', 'видеокамер', 'вкс', 'videocam',
-    ],
-    # Медицинское оборудование
-    'медицинское': [
-        'кардиограф',
-    ],
-}
+def _get_exclude_keywords():
+    """Получает ключевые слова исключений из базы данных."""
+    return list(
+        ExcludeKeyword.objects.filter(is_active=True)
+        .values_list('keyword', flat=True)
+        .order_by('keyword')
+    )
 
-# ============================================================================
-# Второй уровень фильтрации — исключения по ключевым словам
-# Позиции, содержащие эти слова, исключаются из выгрузки
-# ============================================================================
 
-EXCLUDE_KEYWORDS = [
-    # Мебель
-    'шкаф', 'стол', 'стул', 'кресл', 'тумб', 'стеллаж', 'комод',
-    'полк', 'стойк', 'подставк', 'кронштейн', 'крючок', 'зажим',
-    'витраж', 'дистрактор',
-    # Бытовые устройства
-    'холодильник', 'морозильн', 'утеплител', 'обогрев', 'увлажнител',
-    'термостат', 'терморегул', 'сушильн', 'плит', 'чайник', 'утюг',
-    'микроволн', 'пылесос', 'вентилятор', 'конвектор', 'электроплит',
-    # Расходники и инструменты
-    'пинцет', 'отвертк', 'ножниц', 'иглодерж', 'микроиглодерж',
-    'инструмент', 'резин', 'перемешивател', 'дозатор', 'диспенсер',
-    'инжектор', 'кабель', 'антенн', 'полка', 'крепление',
-    # Документация и ПО
-    'свидетельств', 'патент', 'программн', 'лицензи', 'дисков[аые]',
-    # Мед. расходники
-    'маск', 'шапочк', 'юбк', 'халат', 'перчатк', 'салфетк', 'бинт',
-    'марл', 'шприц', 'катетер', 'трубок', 'матрац', 'кушетк',
-    'ирригатор', 'отсос', 'штор', 'ведр', 'ковр', 'доск', 'щетк',
-    'тряп', 'свист', 'огнетушител', 'радиатор',
-    # Специфичные исключения
-    'суточн', 'прикроватн', 'телеметри', 'мониторинг', 'монитор',
-    'искуственн', 'сердечно', 'реаним', 'дефибрилл', 'спектрофотометр',
-    'режущ', 'водоподготовк', 'стационарн', 'анестезиолог',
-    'ламинар', 'стерилизатор', 'сушильн', 'вытяжн', 'шкаф',
-    'выдвижн', 'пенал', 'гардероб', 'архивн', 'металлич', 'деревянн',
-    'двер', 'секци', 'замк', 'стекл', 'полк',
-    'систем', 'устройств', 'прибор', 'установк', 'модуль',
-    'комплект', 'набор', 'диск', 'вставка', 'ручка', 'рукоятк',
-    'колес', 'опор', 'зеркал', 'панел', 'рамк',
-    'электрокардиограф', 'кардиограф',
-    '3d',
-]
+def _get_filter_keywords():
+    """Получает ключевые слова фильтрации из базы данных, сгруппированные по категориям."""
+    keywords = FilterKeyword.objects.filter(is_active=True).values_list('category', 'keyword')
+    result = {}
+    for category, keyword in keywords:
+        if category not in result:
+            result[category] = []
+        result[category].append(keyword)
+    return result
 
 
 def classify_by_name(name):
@@ -124,17 +61,19 @@ def classify_by_name(name):
     """
     if not name:
         return []
-    
+
     # Второй уровень: проверяем исключения
     name_lower = name.lower()
-    for kw in EXCLUDE_KEYWORDS:
+    exclude_kws = _get_exclude_keywords()
+    for kw in exclude_kws:
         if re.search(kw, name_lower):
             return []  # Позиция исключена
     
-    # Первый уровень: ищем по ключевым словам категорий
+    # Первый уровень: ищем по ключевым словам категорий из БД
     matched = []
+    filter_kws = _get_filter_keywords()
     
-    for category, keywords in NAME_FILTER_KEYWORDS.items():
+    for category, keywords in filter_kws.items():
         for kw in keywords:
             if re.search(kw, name_lower):
                 matched.append(category)
@@ -143,6 +82,39 @@ def classify_by_name(name):
     return matched
 
 logger = logging.getLogger(__name__)
+
+
+def _find_equipment_by_inventory(inventory_number):
+    """Находит оборудование по инвентарному номеру с несколькими вариантами нормализации."""
+    if not inventory_number:
+        return None
+    
+    # Варианты нормализации инвентарного номера
+    variations = [
+        inventory_number,  # Точное совпадение
+        inventory_number.replace(' ', ''),  # Убираем пробелы
+        inventory_number.replace('-', ''),  # Убираем дефисы
+        inventory_number.replace(' ', '').replace('-', ''),  # Убираем пробелы и дефисы
+        inventory_number.strip(),  # Убираем пробелы по краям
+    ]
+    
+    # Убираем дубликаты, сохраняя порядок
+    seen = set()
+    unique_variations = []
+    for v in variations:
+        if v not in seen and v:
+            seen.add(v)
+            unique_variations.append(v)
+    
+    # Ищем по всем вариантам
+    for inv in unique_variations:
+        equipment = Equipment.objects.filter(
+            inventory_number=inv, archived=False
+        ).first()
+        if equipment:
+            return equipment
+    
+    return None
 
 
 # ============================================================================
@@ -272,7 +244,7 @@ def equipment_list(request):
             Q(inventory_number__icontains=search)
             | Q(serial_number__icontains=search)
             | Q(name__icontains=search)
-            | Q(brand__icontains=search)
+            | Q(brand__name__icontains=search)
             | Q(model__icontains=search)
             | Q(hostname__icontains=search)
             | Q(ip_address__icontains=search)
@@ -569,7 +541,7 @@ def _sidebar_counts():
         # Категории первого уровня с количеством оборудования
         'top_categories': EquipmentCategory.objects.filter(
             parent__isnull=True, is_active=True
-        ).prefetch_related().annotate(
+        ).exclude(slug='').prefetch_related().annotate(
             eq_count=Count(
                 'equipment_items',
                 filter=Q(equipment_items__archived=False),
@@ -750,36 +722,383 @@ def download_new_items(request):
     return response
 
 
+@login_required
+def _import_single_item(item):
+    """
+    Импортирует одну позицию в базу данных Equipment.
+    
+    Возвращает словарь с результатами:
+        {'created': bool, 'skipped_no_inventory': bool, 'skipped_duplicate': bool,
+         'error': str|None}
+    
+    Выбрасывает исключения, которые перехватываются на уровне цикла
+    в import_new_items_to_db — это позволяет продолжить импорт остальных позиций.
+    """
+    name = item.get('name', '').strip()
+    inventory = item.get('inventory', '').strip()
+    serial = item.get('serial', '').strip()
+    mol = item.get('mol', '').strip()
+    categories = item.get('categories', [])
+    
+    result = {
+        'created': False,
+        'skipped_no_inventory': False,
+        'skipped_duplicate': False,
+        'error': None,
+    }
+    
+    # Пропускаем позиции без корректного инвентарного номера
+    if not inventory or inventory in ('<групповой учет>', '<не задан>', ''):
+        result['skipped_no_inventory'] = True
+        return result
+    
+    # Проверяем дубликат
+    if Equipment.objects.filter(inventory_number=inventory).exists():
+        result['skipped_duplicate'] = True
+        return result
+    
+    # Определяем категорию
+    category = None
+    subcategory = None
+    if categories:
+        # Берём первую категорию
+        cat_name = categories[0]
+        # Ищем категорию по name или slug
+        category = EquipmentCategory.objects.filter(
+            Q(name__icontains=cat_name) | Q(slug__icontains=cat_name),
+            is_active=True
+        ).first()
+        
+        # Если не нашли, создаём
+        if not category:
+            category = EquipmentCategory.objects.create(
+                name=cat_name,
+                is_active=True
+            )
+    
+    # Ищем МОЛ (материально ответственное лицо)
+    responsible_user = None
+    if mol and mol not in ('<групповой учет>', '<не задан>', ''):
+        mio_result = _parse_and_find_mol(mol)
+        if mio_result['found']:
+            responsible_user = mio_result['user']
+    
+    # Создаём оборудование
+    Equipment.objects.create(
+        inventory_number=inventory,
+        serial_number=serial if serial else None,
+        name=name,
+        category=category,
+        subcategory=subcategory,
+        responsible_user=responsible_user,
+        status='confirmed',
+        is_active=True,
+        archived=False,
+    )
+    result['created'] = True
+    return result
+
+
+def import_new_items_to_db(request):
+    """Импорт новых позиций из сессии в базу данных Equipment.
+    
+    Загружаются только позиции с корректным инвентарным номером.
+    Позиции без инв. номера (<не задан>, <групповой учет>, пустые) пропускаются.
+    """
+    new_items = request.session.get('upload_new_items', [])
+    
+    if not new_items:
+        messages.warning(request, 'Нет позиций для импорта. Сначала загрузите CSV файл.')
+        return redirect('equipment:upload_os')
+    
+    created_count = 0
+    skipped_no_inventory = 0
+    skipped_duplicate = 0
+    errors = []
+    
+    for item in new_items:
+        try:
+            result = _import_single_item(item)
+            if result['created']:
+                created_count += 1
+            elif result['skipped_no_inventory']:
+                skipped_no_inventory += 1
+            elif result['skipped_duplicate']:
+                skipped_duplicate += 1
+        except Exception as exc:
+            logger.exception(f'Ошибка импорта позиции: {exc}')
+            errors.append(f'Ошибка обработки позиции: {str(exc)}')
+    
+    # Очищаем сессию
+    if 'upload_new_items' in request.session:
+        del request.session['upload_new_items']
+    
+    # Формируем сообщение
+    msg = f'Импорт завершён: создано {created_count}'
+    if skipped_no_inventory:
+        msg += f', пропущено без инв. номера: {skipped_no_inventory}'
+    if skipped_duplicate:
+        msg += f', пропущено (дубликат): {skipped_duplicate}'
+    if errors:
+        msg += f'. Ошибки: {"; ".join(errors[:5])}'
+    
+    if created_count > 0:
+        messages.success(request, msg)
+    else:
+        messages.warning(request, msg)
+    
+    return redirect('equipment:upload_os')
+
+
+def _process_csv_row(row, row_num, clean_field, processed_inventory_numbers,
+                     csv_duplicate_inventory, csv_duplicate_serial, csv_serial_in_db,
+                     stats):
+    """
+    Обрабатывает одну строку CSV-файла основных средств.
+    
+    Все исключения перехватываются на уровне цикла — эта функция может
+    выбрасывать исключения, которые будут записаны в stats['errors']
+    без прерывания загрузки остальных строк.
+    """
+    inventory_number = clean_field(row.get('Инвентарный номер', ''))
+    mol_field = clean_field(row.get('МОЛ/Место хранения', ''))
+    name = clean_field(row.get('Наименование', ''))
+    serial_number = clean_field(row.get('Заводской номер', ''))
+    nfa_type = clean_field(row.get('Тип НФА', ''))
+
+    # Debug: log specific inventory numbers
+    if '2143230100000001' in inventory_number or '2143230100000001' in row.get('Инвентарный номер', ''):
+        logger.warning(f'DEBUG row {row_num}: inv="{inventory_number}" raw="{row.get("Инвентарный номер", "")}" name="{name}" serial="{serial_number}"')
+
+    # Skip rows with group accounting or no inventory
+    if inventory_number in ('<групповой учет>', '<не задан>', ''):
+        if inventory_number in ('<групповой учет>', '<не задан>'):
+            stats['group_accounting'] += 1
+        else:
+            stats['no_inventory'] += 1
+
+        # Filter by name
+        categories = classify_by_name(name)
+        item_data = {
+            'name': name,
+            'mol': mol_field,
+            'inventory': inventory_number,
+            'serial': serial_number,
+            'nfa_type': nfa_type,
+            'row_num': row_num,
+            'categories': categories,
+        }
+        
+        if categories:
+            stats['new_items_filtered'].append(item_data)
+            for cat in categories:
+                stats['category_stats'][cat] = stats['category_stats'].get(cat, 0) + 1
+        else:
+            stats['new_items_excluded'].append(item_data)
+        return
+
+    stats['valid_inventory_rows'] += 1
+
+    # Check for duplicates in this file (inventory number)
+    if inventory_number in processed_inventory_numbers:
+        csv_duplicate_inventory.append({
+            'row_num': row_num,
+            'inventory': inventory_number,
+            'name': name,
+        })
+        return
+    processed_inventory_numbers.add(inventory_number)
+
+    # Check for duplicate serial number in this file
+    if serial_number:
+        if serial_number in csv_serial_in_db:
+            csv_duplicate_serial.append({
+                'row_num': row_num,
+                'serial': serial_number,
+                'name': name,
+            })
+            return
+        csv_serial_in_db.add(serial_number)
+
+    # Try to find equipment by inventory number (with normalization)
+    equipment = _find_equipment_by_inventory(inventory_number)
+    
+    # Debug: log specific inventory numbers
+    if '2143230100000001' == inventory_number:
+        logger.warning(f'DEBUG search: inv="{inventory_number}" found={equipment is not None}')
+        if equipment:
+            logger.warning(f'DEBUG found: {equipment.name}, status={equipment.status}')
+
+    if equipment:
+        stats['found_by_inventory'] += 1
+        equipment.status = 'confirmed'
+        
+        # Debug: log specific inventory numbers
+        if '2143230100000001' == inventory_number:
+            logger.warning(f'DEBUG confirmed: {inventory_number} -> {equipment.name}')
+
+        # Parse MIO and assign responsible_user
+        if mol_field and mol_field not in ('<групповой учет>', '<не задан>'):
+            mio_result = _parse_and_find_mol(mol_field)
+            if mio_result['found']:
+                equipment.responsible_user = mio_result['user']
+                stats['mio_stats']['found'] += 1
+            else:
+                stats['mio_stats']['not_found'] += 1
+                stats['mio_failures'].append({
+                    'row_num': row_num,
+                    'inventory': inventory_number,
+                    'name': name,
+                    'mol': mol_field,
+                    'reason': mio_result['reason'],
+                    'match_info': mio_result['match_info'],
+                })
+
+        # Update serial number if provided and empty
+        if serial_number and not equipment.serial_number:
+            equipment.serial_number = serial_number
+
+        try:
+            equipment.save(update_fields=['status', 'responsible_user', 'serial_number'])
+            stats['confirmed'] += 1
+        except Exception as e:
+            # Если конфликт уникальности — обновляем без serial_number
+            if 'serial_number_unique' in str(e):
+                equipment.serial_number = None  # Отменяем обновление сер. номера
+                equipment.status = 'confirmed'
+                if mol_field and mol_field not in ('<групповой учет>', '<не задан>'):
+                    equipment.responsible_user = mio_result['user'] if mio_result.get('found') else equipment.responsible_user
+                try:
+                    equipment.save(update_fields=['status', 'responsible_user'])
+                    stats['confirmed'] += 1
+                    stats['csv_serial_conflict'].append({
+                        'row_num': row_num,
+                        'inventory': inventory_number,
+                        'serial': serial_number,
+                        'name': name,
+                    })
+                except:
+                    pass
+            else:
+                raise
+    else:
+        stats['not_found_by_inventory'] += 1
+
+        # Try to find by serial number
+        if serial_number:
+            eq_by_serial = Equipment.objects.filter(
+                serial_number=serial_number, archived=False
+            ).first()
+            if eq_by_serial:
+                equipment = eq_by_serial
+                stats['found_by_serial'] += 1
+                equipment.status = 'confirmed'
+
+                if mol_field and mol_field not in ('<групповой учет>', '<не задан>'):
+                    mio_result = _parse_and_find_mol(mol_field)
+                    if mio_result['found']:
+                        equipment.responsible_user = mio_result['user']
+                        stats['mio_stats']['found'] += 1
+                    else:
+                        stats['mio_stats']['not_found'] += 1
+                        stats['mio_failures'].append({
+                            'row_num': row_num,
+                            'inventory': inventory_number,
+                            'name': name,
+                            'mol': mol_field,
+                            'reason': mio_result['reason'],
+                            'match_info': mio_result['match_info'],
+                        })
+
+                equipment.save(update_fields=['status', 'responsible_user'])
+                stats['confirmed_by_serial'] += 1
+            else:
+                stats['not_found_by_serial'] += 1
+                
+                # Check if serial number already exists in DB
+                if serial_number:
+                    existing_by_serial = Equipment.objects.filter(
+                        serial_number=serial_number, archived=False
+                    ).exclude(inventory_number=inventory_number).first()
+                    if existing_by_serial:
+                        stats['csv_serial_conflict'].append({
+                            'row_num': row_num,
+                            'inventory': inventory_number,
+                            'serial': serial_number,
+                            'name': name,
+                            'conflict_with': existing_by_serial.inventory_number,
+                        })
+                categories = classify_by_name(name)
+                item_data = {
+                    'name': name,
+                    'mol': mol_field,
+                    'inventory': inventory_number,
+                    'serial': serial_number,
+                    'nfa_type': nfa_type,
+                    'row_num': row_num,
+                    'categories': categories,
+                }
+                
+                if categories:
+                    stats['new_items_filtered'].append(item_data)
+                    for cat in categories:
+                        stats['category_stats'][cat] = stats['category_stats'].get(cat, 0) + 1
+                else:
+                    stats['new_items_excluded'].append(item_data)
+        else:
+            stats['not_found_by_serial'] += 1
+            categories = classify_by_name(name)
+            item_data = {
+                'name': name,
+                'mol': mol_field,
+                'inventory': inventory_number,
+                'serial': serial_number,
+                'nfa_type': nfa_type,
+                'row_num': row_num,
+                'categories': categories,
+            }
+            
+            if categories:
+                stats['new_items_filtered'].append(item_data)
+                for cat in categories:
+                    stats['category_stats'][cat] = stats['category_stats'].get(cat, 0) + 1
+            else:
+                stats['new_items_excluded'].append(item_data)
+
+
 def upload_os_csv(request):
     """Загрузка и обработка CSV файла основных средств."""
 
     stats = {
-        'total_rows': 0,
-        'valid_inventory_rows': 0,
-        'found_by_inventory': 0,
-        'confirmed': 0,
-        'not_found_by_inventory': 0,
-        'found_by_serial': 0,
-        'confirmed_by_serial': 0,
-        'not_found_by_serial': 0,
-        'group_accounting': 0,
-        'no_inventory': 0,
-        'new_items': [],
-        'new_items_filtered': [],  # Только позиции, попадающие под фильтр
-        'new_items_excluded': [],  # Позиции, исключённые фильтром
-        'category_stats': {},  # Статистика по категориям новых позиций
-        'filter_keywords': NAME_FILTER_KEYWORDS,  # Для отображения пользователю
-        'exclude_keywords': EXCLUDE_KEYWORDS,  # Исключения для отображения
-        'mio_failures': [],  # Ошибки поиска МОЛ
-        'mio_stats': {
-            'total_mol': 0,
-            'found': 0,
-            'not_found': 0,
-            'too_many': 0,
-            'no_name': 0,
-        },
-        'errors': [],
-    }
+                'total_rows': 0,
+                'valid_inventory_rows': 0,
+                'found_by_inventory': 0,
+                'confirmed': 0,
+                'not_found_by_inventory': 0,
+                'found_by_serial': 0,
+                'confirmed_by_serial': 0,
+                'not_found_by_serial': 0,
+                'group_accounting': 0,
+                'no_inventory': 0,
+                'new_items': [],
+                'new_items_filtered': [],  # Только позиции, попадающие под фильтр
+                'new_items_excluded': [],  # Позиции, исключённые фильтром
+                'category_stats': {},  # Статистика по категориям новых позиций
+                'filter_keywords': _get_filter_keywords(),  # Для отображения пользователю
+                'exclude_keywords': _get_exclude_keywords(),  # Исключения для отображения
+                'mio_failures': [],  # Ошибки поиска МОЛ
+                'mio_stats': {
+                    'total_mol': 0,
+                    'found': 0,
+                    'not_found': 0,
+                    'too_many': 0,
+                    'no_name': 0,
+                },
+                'errors': [],
+                'csv_duplicate_inventory': [],  # Дубликаты инв. номеров в CSV
+                'csv_duplicate_serial': [],  # Дубликаты сер. номеров в CSV
+                'csv_serial_conflict': [],  # Конфликт сер. номеров с БД
+            }
 
     if request.method == 'POST':
         csv_file = request.FILES.get('csv_file')
@@ -794,161 +1113,51 @@ def upload_os_csv(request):
         try:
             # Decode file content
             file_content = csv_file.read().decode('utf-8-sig')
-            reader = csv.DictReader(io.StringIO(file_content))
-
-            # Step 1: Set all equipment to 'pending' status
-            Equipment.objects.filter(archived=False).update(status='pending')
+            
+            # Detect delimiter (semicolon or comma)
+            delimiter = ';' if ';' in file_content.split('\n')[0] else ','
+            reader = csv.DictReader(io.StringIO(file_content), delimiter=delimiter)
 
             # Track inventory numbers we've seen (for dedup)
             processed_inventory_numbers = set()
+            csv_duplicate_inventory = []  # Дубликаты инв. номеров в CSV
+            csv_duplicate_serial = []  # Дубликаты сер. номеров в CSV
+            csv_serial_in_db = set()  # Серийные номера из CSV для проверки дубликатов
+
+            # Helper function for cleaning fields
+            def clean_field(value):
+                """Очищаем поле от невидимых Unicode символов."""
+                if not value:
+                    return ''
+                value = value.replace('\u00a0', ' ').replace('\u200b', '').replace('\ufeff', '')
+                value = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', value)
+                return value.strip()
 
             for row_num, row in enumerate(reader, start=2):  # start=2 because row 1 is header
-                stats['total_rows'] += 1
-
-                # Extract fields
-                inventory_number = (row.get('Инвентарный номер', '') or '').strip()
-                mol_field = (row.get('МОЛ/Место хранения', '') or '').strip()
-                name = (row.get('Наименование', '') or '').strip()
-                serial_number = (row.get('Заводской номер', '') or '').strip()
-                nfa_type = (row.get('Тип НФА', '') or '').strip()
-
-                # Skip rows with group accounting or no inventory
-                if inventory_number in ('<групповой учет>', '<не задан>', ''):
-                    if inventory_number in ('<групповой учет>', '<не задан>'):
-                        stats['group_accounting'] += 1
-                    else:
-                        stats['no_inventory'] += 1
-
-                    # Filter by name
-                    categories = classify_by_name(name)
-                    item_data = {
-                        'name': name,
-                        'mol': mol_field,
-                        'inventory': inventory_number,
-                        'serial': serial_number,
-                        'nfa_type': nfa_type,
+                try:
+                    _process_csv_row(
+                        row, row_num, clean_field, processed_inventory_numbers,
+                        csv_duplicate_inventory, csv_duplicate_serial, csv_serial_in_db,
+                        stats,
+                    )
+                except Exception as exc:
+                    # Обработка отдельной строки: ошибка не прерывает загрузку
+                    logger.exception(f'Ошибка обработки строки {row_num}: {exc}')
+                    stats['errors'].append({
                         'row_num': row_num,
-                        'categories': categories,
-                    }
-                    
-                    if categories:
-                        stats['new_items_filtered'].append(item_data)
-                        for cat in categories:
-                            stats['category_stats'][cat] = stats['category_stats'].get(cat, 0) + 1
-                    else:
-                        stats['new_items_excluded'].append(item_data)
-                    continue
-
-                stats['valid_inventory_rows'] += 1
-
-                # Check for duplicates in this file
-                if inventory_number in processed_inventory_numbers:
-                    continue
-                processed_inventory_numbers.add(inventory_number)
-
-                # Try to find equipment by inventory number
-                equipment = Equipment.objects.filter(
-                    inventory_number=inventory_number, archived=False
-                ).first()
-
-                if equipment:
-                    stats['found_by_inventory'] += 1
-                    equipment.status = 'confirmed'
-
-                    # Parse MIO and assign responsible_user
-                    if mol_field and mol_field not in ('<групповой учет>', '<не задан>'):
-                        mio_result = _parse_and_find_mol(mol_field)
-                        if mio_result['found']:
-                            equipment.responsible_user = mio_result['user']
-                            stats['mio_stats']['found'] += 1
-                        else:
-                            stats['mio_stats']['not_found'] += 1
-                            stats['mio_failures'].append({
-                                'row_num': row_num,
-                                'inventory': inventory_number,
-                                'name': name,
-                                'mol': mol_field,
-                                'reason': mio_result['reason'],
-                                'match_info': mio_result['match_info'],
-                            })
-
-                    # Update serial number if provided and empty
-                    if serial_number and not equipment.serial_number:
-                        equipment.serial_number = serial_number
-
-                    equipment.save(update_fields=['status', 'responsible_user', 'serial_number'])
-                    stats['confirmed'] += 1
-                else:
-                    stats['not_found_by_inventory'] += 1
-
-                    # Try to find by serial number
-                    if serial_number:
-                        eq_by_serial = Equipment.objects.filter(
-                            serial_number=serial_number, archived=False
-                        ).first()
-                        if eq_by_serial:
-                            equipment = eq_by_serial
-                            stats['found_by_serial'] += 1
-                            equipment.status = 'confirmed'
-
-                            if mol_field and mol_field not in ('<групповой учет>', '<не задан>'):
-                                mio_result = _parse_and_find_mol(mol_field)
-                                if mio_result['found']:
-                                    equipment.responsible_user = mio_result['user']
-                                    stats['mio_stats']['found'] += 1
-                                else:
-                                    stats['mio_stats']['not_found'] += 1
-                                    stats['mio_failures'].append({
-                                        'row_num': row_num,
-                                        'inventory': inventory_number,
-                                        'name': name,
-                                        'mol': mol_field,
-                                        'reason': mio_result['reason'],
-                                        'match_info': mio_result['match_info'],
-                                    })
-
-                            equipment.save(update_fields=['status', 'responsible_user'])
-                            stats['confirmed_by_serial'] += 1
-                        else:
-                            stats['not_found_by_serial'] += 1
-                            categories = classify_by_name(name)
-                            item_data = {
-                                'name': name,
-                                'mol': mol_field,
-                                'inventory': inventory_number,
-                                'serial': serial_number,
-                                'nfa_type': nfa_type,
-                                'row_num': row_num,
-                                'categories': categories,
-                            }
-                            
-                            if categories:
-                                stats['new_items_filtered'].append(item_data)
-                                for cat in categories:
-                                    stats['category_stats'][cat] = stats['category_stats'].get(cat, 0) + 1
-                            else:
-                                stats['new_items_excluded'].append(item_data)
-                    else:
-                        stats['not_found_by_serial'] += 1
-                        categories = classify_by_name(name)
-                        item_data = {
-                            'name': name,
-                            'mol': mol_field,
-                            'inventory': inventory_number,
-                            'serial': serial_number,
-                            'nfa_type': nfa_type,
-                            'row_num': row_num,
-                            'categories': categories,
-                        }
-                        
-                        if categories:
-                            stats['new_items_filtered'].append(item_data)
-                            for cat in categories:
-                                stats['category_stats'][cat] = stats['category_stats'].get(cat, 0) + 1
-                        else:
-                            stats['new_items_excluded'].append(item_data)
+                        'error': str(exc),
+                        'raw': {k: row.get(k, '') for k in row},
+                    })
 
             messages.success(request, 'Файл основных средств успешно обработан')
+
+            # Add warnings for duplicates
+            if csv_duplicate_inventory:
+                messages.warning(request, f'Пропущено {len(csv_duplicate_inventory)} строк с дублирующимся инвентарным номером в файле')
+            if csv_duplicate_serial:
+                messages.warning(request, f'Пропущено {len(csv_duplicate_serial)} строк с дублирующимся серийным номером в файле')
+            if stats['csv_serial_conflict']:
+                messages.warning(request, f'Пропущено {len(stats["csv_serial_conflict"])} позиций — конфликт серийного номера с существующим оборудованием в базе')
 
             # Save filtered new items to session for download
             request.session['upload_new_items'] = stats['new_items_filtered']
@@ -1344,6 +1553,134 @@ def equipment_inventory(request):
 def equipment_inventory_detail(request, equipment_type, pk):
     """Стуб: детальная инвентаризация."""
     return render(request, 'equipment/inventory.html', _sidebar_counts())
+
+
+# ============================================================================
+# Инвентаризация — Закрепленное оборудование
+# ============================================================================
+
+@login_required
+def assigned_equipment(request):
+    """Закрепленное оборудование — список оборудования с назначенными пользователями."""
+    # Фильтры
+    search = request.GET.get('search', '').strip()
+    user_filter = request.GET.get('user', '').strip()
+    category_filter = request.GET.get('category', '').strip()
+    
+    equipment_qs = Equipment.objects.filter(
+        Q(assigned_user__isnull=False) | Q(responsible_user__isnull=False),
+        archived=False
+    ).select_related(
+        'assigned_user', 'responsible_user', 'category', 'subcategory', 'brand'
+    ).order_by('-is_active', 'category', 'inventory_number')
+    
+    if search:
+        equipment_qs = equipment_qs.filter(
+            Q(name__icontains=search) |
+            Q(inventory_number__icontains=search) |
+            Q(serial_number__icontains=search) |
+            Q(assigned_user__first_name__icontains=search) |
+            Q(assigned_user__last_name__icontains=search) |
+            Q(responsible_user__first_name__icontains=search) |
+            Q(responsible_user__last_name__icontains=search)
+        )
+    
+    if user_filter:
+        equipment_qs = equipment_qs.filter(
+            Q(assigned_user__id=user_filter) | Q(responsible_user__id=user_filter)
+        )
+    
+    if category_filter:
+        equipment_qs = equipment_qs.filter(category__slug=category_filter)
+    
+    # Статистика
+    total_assigned = equipment_qs.count()
+    by_user = equipment_qs.values('assigned_user__first_name', 'assigned_user__last_name').annotate(
+        count=Count('id')
+    ).order_by('-count')[:10]
+    
+    by_category = equipment_qs.values('category__name').annotate(
+        count=Count('id')
+    ).order_by('-count')[:10]
+    
+    context = {
+        **_sidebar_counts(),
+        'equipment_list': equipment_qs[:100],
+        'total_count': total_assigned,
+        'by_user': by_user,
+        'by_category': by_category,
+        'current_search': search,
+        'current_user': user_filter,
+        'current_category': category_filter,
+        'all_users': User.objects.filter(
+            equipment_assigned__isnull=False,
+            equipment_responsible__isnull=False
+        ).distinct().values_list('id', 'first_name', 'last_name'),
+        'all_categories': EquipmentCategory.objects.filter(
+            parent__isnull=True, is_active=True
+        ).values_list('slug', 'name'),
+    }
+    return render(request, 'equipment/assigned_equipment.html', context)
+
+
+# ============================================================================
+# Инвентаризация — Инвентаризационный поиск
+# ============================================================================
+
+@login_required
+def inventory_search(request):
+    """Инвентаризационный поиск — поиск оборудования по любым полям."""
+    search_query = request.GET.get('q', '').strip()
+    search_type = request.GET.get('type', 'all')
+    
+    equipment_qs = Equipment.objects.filter(archived=False).select_related(
+        'assigned_user', 'responsible_user', 'category', 'subcategory', 'brand'
+    ).order_by('-is_active', 'category', 'inventory_number')
+    
+    if search_query:
+        if search_type == 'inventory':
+            equipment_qs = equipment_qs.filter(inventory_number__icontains=search_query)
+        elif search_type == 'serial':
+            equipment_qs = equipment_qs.filter(serial_number__icontains=search_query)
+        elif search_type == 'name':
+            equipment_qs = equipment_qs.filter(name__icontains=search_query)
+        elif search_type == 'hostname':
+            equipment_qs = equipment_qs.filter(hostname__icontains=search_query)
+        elif search_type == 'mac':
+            equipment_qs = equipment_qs.filter(mac_address__icontains=search_query)
+        elif search_type == 'user':
+            equipment_qs = equipment_qs.filter(
+                Q(assigned_user__first_name__icontains=search_query) |
+                Q(assigned_user__last_name__icontains=search_query) |
+                Q(responsible_user__first_name__icontains=search_query) |
+                Q(responsible_user__last_name__icontains=search_query)
+            )
+        else:
+            equipment_qs = equipment_qs.filter(
+                Q(name__icontains=search_query) |
+                Q(inventory_number__icontains=search_query) |
+                Q(serial_number__icontains=search_query) |
+                Q(hostname__icontains=search_query) |
+                Q(mac_address__icontains=search_query)
+            )
+    
+    context = {
+        **_sidebar_counts(),
+        'equipment_list': equipment_qs[:100],
+        'total_count': equipment_qs.count(),
+        'search_query': search_query,
+        'search_type': search_type,
+        'search_types': [
+            ('all', 'Все поля'),
+            ('inventory', 'Инвентарный номер'),
+            ('serial', 'Серийный номер'),
+            ('name', 'Наименование'),
+            ('hostname', 'Имя в сети'),
+            ('mac', 'MAC-адрес'),
+            ('user', 'Пользователь'),
+        ],
+    }
+    return render(request, 'equipment/inventory_search.html', context)
 
 
 # ============================================================================
@@ -1984,7 +2321,7 @@ def category_equipment_list(request, category_slug):
             Q(inventory_number__icontains=search)
             | Q(serial_number__icontains=search)
             | Q(name__icontains=search)
-            | Q(brand__icontains=search)
+            | Q(brand__name__icontains=search)
             | Q(model__icontains=search)
             | Q(hostname__icontains=search)
             | Q(ip_address__icontains=search)
@@ -2015,3 +2352,279 @@ def category_equipment_list(request, category_slug):
         'current_search': search,
     }
     return render(request, 'equipment/category_equipment_list.html', context)
+
+
+# ============================================================================
+# Справочник исключений (второй уровень фильтрации)
+# ============================================================================
+
+@login_required
+def exclude_keywords_reference(request):
+    """Справочник ключевых слов исключений (второй уровень фильтрации)."""
+    # Статистика по категориям
+    categories = ExcludeKeyword.objects.values_list('category', flat=True).distinct().order_by('category')
+    category_stats = {}
+    for cat in categories:
+        count = ExcludeKeyword.objects.filter(category=cat, is_active=True).count()
+        category_stats[cat] = count
+
+    # Получаем все активные исключения, сгруппированные по категориям
+    keywords = ExcludeKeyword.objects.all().order_by('category', 'keyword')
+    grouped_keywords = {}
+    for kw in keywords:
+        if kw.category not in grouped_keywords:
+            grouped_keywords[kw.category] = []
+        grouped_keywords[kw.category].append(kw)
+
+    context = {
+        **_sidebar_counts(),
+        'grouped_keywords_items': list(grouped_keywords.items()),
+        'category_stats': category_stats,
+        'total_active': ExcludeKeyword.objects.filter(is_active=True).count(),
+        'total_all': ExcludeKeyword.objects.count(),
+    }
+    return render(request, 'equipment/exclude_keywords_reference.html', context)
+
+
+@login_required
+def exclude_keyword_add(request):
+    """Добавление ключевого слова исключения."""
+    if request.method == 'POST':
+        keyword = request.POST.get('keyword', '').strip()
+        category = request.POST.get('category', '').strip()
+        is_active = request.POST.get('is_active', 'on') == 'on'
+        
+        if not keyword:
+            messages.error(request, 'Введите ключевое слово')
+            return redirect('equipment:exclude_keywords_reference')
+        
+        # Проверяем дубликат
+        if ExcludeKeyword.objects.filter(keyword__iexact=keyword).exists():
+            messages.error(request, f'Исключение "{keyword}" уже существует')
+            return redirect('equipment:exclude_keywords_reference')
+        
+        ExcludeKeyword.objects.create(
+            keyword=keyword,
+            category=category,
+            is_active=is_active,
+        )
+        messages.success(request, f'Исключение "{keyword}" добавлено')
+        return redirect('equipment:exclude_keywords_reference')
+    
+    return redirect('equipment:exclude_keywords_reference')
+
+
+@login_required
+def exclude_keyword_edit(request, pk):
+    """Редактирование ключевого слова исключения."""
+    kw = get_object_or_404(ExcludeKeyword, pk=pk)
+    
+    if request.method == 'POST':
+        kw.keyword = request.POST.get('keyword', '').strip()
+        kw.category = request.POST.get('category', '').strip()
+        kw.is_active = request.POST.get('is_active', 'on') == 'on'
+        
+        if not kw.keyword:
+            messages.error(request, 'Введите ключевое слово')
+            return redirect('equipment:exclude_keywords_reference')
+        
+        # Проверяем дубликат (исключая текущую запись)
+        if ExcludeKeyword.objects.filter(keyword__iexact=kw.keyword).exclude(pk=pk).exists():
+            messages.error(request, f'Исключение "{kw.keyword}" уже существует')
+            return redirect('equipment:exclude_keywords_reference')
+        
+        kw.save()
+        messages.success(request, f'Исключение "{kw.keyword}" обновлено')
+        return redirect('equipment:exclude_keywords_reference')
+    
+    # GET запрос — показываем справочник с модальным окном редактирования
+    categories = ExcludeKeyword.objects.values_list('category', flat=True).distinct().order_by('category')
+    category_stats = {}
+    for cat in categories:
+        count = ExcludeKeyword.objects.filter(category=cat, is_active=True).count()
+        category_stats[cat] = count
+
+    keywords = ExcludeKeyword.objects.all().order_by('category', 'keyword')
+    grouped_keywords = {}
+    for k in keywords:
+        if k.category not in grouped_keywords:
+            grouped_keywords[k.category] = []
+        grouped_keywords[k.category].append(k)
+
+    context = {
+        **_sidebar_counts(),
+        'grouped_keywords_items': list(grouped_keywords.items()),
+        'category_stats': category_stats,
+        'total_active': ExcludeKeyword.objects.filter(is_active=True).count(),
+        'total_all': ExcludeKeyword.objects.count(),
+        'edit_kw': kw,  # Для модального окна редактирования
+    }
+    return render(request, 'equipment/exclude_keywords_reference.html', context)
+
+
+@login_required
+def exclude_keyword_delete(request, pk):
+    """Удаление ключевого слова исключения."""
+    kw = get_object_or_404(ExcludeKeyword, pk=pk)
+    keyword = kw.keyword
+    kw.delete()
+    messages.success(request, f'Исключение "{keyword}" удалено')
+    return redirect('equipment:exclude_keywords_reference')
+
+
+@login_required
+def exclude_keyword_toggle(request, pk):
+    """Переключение активности ключевого слова."""
+    kw = get_object_or_404(ExcludeKeyword, pk=pk)
+    kw.is_active = not kw.is_active
+    kw.save()
+    status = 'активировано' if kw.is_active else 'деактивировано'
+    messages.success(request, f'Исключение "{kw.keyword}" {status}')
+    return redirect('equipment:exclude_keywords_reference')
+
+
+# ============================================================================
+# Справочник ключевых слов фильтрации наименований (первый уровень)
+# ============================================================================
+
+@login_required
+def filter_keywords_reference(request):
+    """Справочник ключевых слов фильтрации наименований."""
+    categories = FilterKeyword.objects.values_list('category', flat=True).distinct().order_by('category')
+    category_stats = {}
+    for cat in categories:
+        count = FilterKeyword.objects.filter(category=cat, is_active=True).count()
+        category_stats[cat] = count
+
+    keywords = FilterKeyword.objects.all().order_by('category', 'keyword')
+    grouped_keywords = {}
+    for kw in keywords:
+        if kw.category not in grouped_keywords:
+            grouped_keywords[kw.category] = []
+        grouped_keywords[kw.category].append(kw)
+
+    # Добавляем отображаемые названия категорий
+    category_labels = {cat: label for cat, label in FilterKeyword.CATEGORY_CHOICES}
+    
+    # Добавляем display_name к каждой группе
+    grouped_with_labels = []
+    for cat, kws in grouped_keywords.items():
+        grouped_with_labels.append((category_labels.get(cat, cat), kws))
+
+    context = {
+        **_sidebar_counts(),
+        'grouped_keywords_items': grouped_with_labels,
+        'category_stats': category_stats,
+        'total_active': FilterKeyword.objects.filter(is_active=True).count(),
+        'total_all': FilterKeyword.objects.count(),
+        'CATEGORY_CHOICES': dict(FilterKeyword.CATEGORY_CHOICES),
+        'category_labels': category_labels,
+    }
+    return render(request, 'equipment/filter_keywords_reference.html', context)
+
+
+@login_required
+def filter_keyword_add(request):
+    """Добавление ключевого слова фильтрации."""
+    if request.method == 'POST':
+        keyword = request.POST.get('keyword', '').strip()
+        category = request.POST.get('category', '')
+        is_active = request.POST.get('is_active', 'on') == 'on'
+        
+        if not keyword:
+            messages.error(request, 'Введите ключевое слово')
+            return redirect('equipment:filter_keywords_reference')
+        
+        if not category:
+            messages.error(request, 'Выберите категорию')
+            return redirect('equipment:filter_keywords_reference')
+        
+        if FilterKeyword.objects.filter(keyword__iexact=keyword, category=category).exists():
+            messages.error(request, f'Ключевое слово "{keyword}" уже существует в категории')
+            return redirect('equipment:filter_keywords_reference')
+        
+        FilterKeyword.objects.create(
+            keyword=keyword,
+            category=category,
+            is_active=is_active,
+        )
+        messages.success(request, f'Ключевое слово "{keyword}" добавлено')
+        return redirect('equipment:filter_keywords_reference')
+    
+    return redirect('equipment:filter_keywords_reference')
+
+
+@login_required
+def filter_keyword_edit(request, pk):
+    """Редактирование ключевого слова фильтрации."""
+    kw = get_object_or_404(FilterKeyword, pk=pk)
+    
+    if request.method == 'POST':
+        kw.keyword = request.POST.get('keyword', '').strip()
+        kw.category = request.POST.get('category', '')
+        kw.is_active = request.POST.get('is_active', 'on') == 'on'
+        
+        if not kw.keyword or not kw.category:
+            messages.error(request, 'Заполните все поля')
+            return redirect('equipment:filter_keywords_reference')
+        
+        if FilterKeyword.objects.filter(keyword__iexact=kw.keyword, category=kw.category).exclude(pk=pk).exists():
+            messages.error(request, f'Ключевое слово "{kw.keyword}" уже существует')
+            return redirect('equipment:filter_keywords_reference')
+        
+        kw.save()
+        messages.success(request, f'Ключевое слово "{kw.keyword}" обновлено')
+        return redirect('equipment:filter_keywords_reference')
+    
+    # GET — показываем справочник с модальным окном
+    categories = FilterKeyword.objects.values_list('category', flat=True).distinct().order_by('category')
+    category_stats = {}
+    for cat in categories:
+        count = FilterKeyword.objects.filter(category=cat, is_active=True).count()
+        category_stats[cat] = count
+
+    keywords = FilterKeyword.objects.all().order_by('category', 'keyword')
+    grouped_keywords = {}
+    for k in keywords:
+        if k.category not in grouped_keywords:
+            grouped_keywords[k.category] = []
+        grouped_keywords[k.category].append(k)
+
+    category_labels = {cat: label for cat, label in FilterKeyword.CATEGORY_CHOICES}
+    
+    grouped_with_labels = []
+    for cat, kws in grouped_keywords.items():
+        grouped_with_labels.append((category_labels.get(cat, cat), kws))
+
+    context = {
+        **_sidebar_counts(),
+        'grouped_keywords_items': grouped_with_labels,
+        'category_stats': category_stats,
+        'total_active': FilterKeyword.objects.filter(is_active=True).count(),
+        'total_all': FilterKeyword.objects.count(),
+        'CATEGORY_CHOICES': dict(FilterKeyword.CATEGORY_CHOICES),
+        'category_labels': category_labels,
+        'edit_kw': kw,
+    }
+    return render(request, 'equipment/filter_keywords_reference.html', context)
+
+
+@login_required
+def filter_keyword_delete(request, pk):
+    """Удаление ключевого слова фильтрации."""
+    kw = get_object_or_404(FilterKeyword, pk=pk)
+    keyword = kw.keyword
+    kw.delete()
+    messages.success(request, f'Ключевое слово "{keyword}" удалено')
+    return redirect('equipment:filter_keywords_reference')
+
+
+@login_required
+def filter_keyword_toggle(request, pk):
+    """Переключение активности ключевого слова."""
+    kw = get_object_or_404(FilterKeyword, pk=pk)
+    kw.is_active = not kw.is_active
+    kw.save()
+    status = 'активировано' if kw.is_active else 'деактивировано'
+    messages.success(request, f'Ключевое слово "{kw.keyword}" {status}')
+    return redirect('equipment:filter_keywords_reference')

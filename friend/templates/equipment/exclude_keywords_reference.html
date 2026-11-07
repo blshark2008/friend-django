@@ -1,0 +1,246 @@
+{% extends 'equipment/base.html' %}
+
+{% block title %}Справочник исключений{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-shield-exclamation me-2"></i>Справочник исключений</h4>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .keyword-badge {
+        display: inline-block;
+        padding: 0.35rem 0.65rem;
+        margin: 0.2rem;
+        border-radius: 0.375rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    .keyword-badge.active {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        border: 1px solid #badbcc;
+    }
+    .keyword-badge.inactive {
+        background-color: #e2e3e5;
+        color: #41464b;
+        border: 1px solid #c2c4c6;
+        text-decoration: line-through;
+    }
+    .category-card {
+        border: 1px solid #dee2e6;
+        border-radius: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    .category-card .card-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        font-weight: 600;
+    }
+    .stat-pill {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+    .keyword-actions {
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    .keyword-badge:hover .keyword-actions {
+        opacity: 1;
+    }
+    .add-form-card {
+        border: 2px dashed #0d6efd;
+        border-radius: 0.75rem;
+        margin-bottom: 1.5rem;
+        background: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Форма добавления -->
+<div class="card add-form-card shadow-sm mb-4">
+    <div class="card-body">
+        <h6 class="mb-3"><i class="bi bi-plus-circle me-2"></i>Добавить исключение</h6>
+        <form method="post" action="{% url 'equipment:exclude_keyword_add' %}" class="row g-2">
+            {% csrf_token %}
+            <div class="col-md-4">
+                <input type="text" name="keyword" class="form-control form-control-sm" 
+                       placeholder="Ключевое слово" required>
+            </div>
+            <div class="col-md-3">
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">Без категории</option>
+                    <option value="Мебель">Мебель</option>
+                    <option value="Бытовые">Бытовые</option>
+                    <option value="Расходники">Расходники</option>
+                    <option value="Документация">Документация</option>
+                    <option value="Мед. расходники">Мед. расходники</option>
+                    <option value="Специфичные">Специфичные</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <div class="form-check form-switch">
+                    <input type="checkbox" name="is_active" class="form-check-input" id="isActive" checked>
+                    <label class="form-check-label small" for="isActive">Активно</label>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-plus-lg me-1"></i>Добавить
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card stat-card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="stat-number text-success">{{ total_active }}</div>
+                <div class="stat-label">Активных исключений</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="stat-number text-secondary">{{ total_all }}</div>
+                <div class="stat-label">Всего исключений</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="stat-number text-primary">{{ grouped_keywords_items|length }}</div>
+                <div class="stat-label">Категорий</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <a href="/admin/equipment/excludekeyword/" 
+                   class="text-decoration-none text-info fw-bold" target="_blank">
+                    <i class="bi bi-gear me-1"></i>Админ-панель
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Категории исключений -->
+{% for category, keywords in grouped_keywords_items %}
+<div class="card category-card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-tag me-2"></i>{{ category|default:"Без категории" }}</span>
+        <span class="stat-pill bg-danger text-white">{{ keywords|length }} шт.</span>
+    </div>
+    <div class="card-body">
+        <div>
+            {% for kw in keywords %}
+            <span class="keyword-badge {% if kw.is_active %}active{% else %}inactive{% endif %}">
+                {{ kw.keyword }}
+                <span class="keyword-actions ms-2">
+                    <a href="{% url 'equipment:exclude_keyword_edit' kw.pk %}" 
+                       class="text-muted small" title="Редактировать" data-bs-toggle="tooltip">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{% url 'equipment:exclude_keyword_toggle' kw.pk %}" 
+                       class="text-muted small" title="{% if kw.is_active %}Деактивировать{% else %}Активировать{% endif %}" data-bs-toggle="tooltip">
+                        <i class="bi bi-{% if kw.is_active %}toggle-on{% else %}toggle-off{% endif %}"></i>
+                    </a>
+                    <a href="{% url 'equipment:exclude_keyword_delete' kw.pk %}" 
+                       class="text-danger small" title="Удалить" data-bs-toggle="tooltip"
+                       onclick="return confirm('Удалить исключение \'{{ kw.keyword }}\'?')">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                </span>
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i>
+    Исключения пока не добавлены. Используйте форму выше для добавления.
+</div>
+{% endfor %}
+
+<div class="text-center mt-4">
+    <a href="{% url 'equipment:upload_os' %}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Вернуться к загрузке
+    </a>
+</div>
+
+<!-- Модальное окно редактирования -->
+{% if edit_kw %}
+<div class="modal fade show" id="editModal" tabindex="-1" style="display: block; background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Редактировать исключение</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'equipment:exclude_keyword_edit' edit_kw.pk %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ключевое слово</label>
+                        <input type="text" name="keyword" class="form-control" value="{{ edit_kw.keyword }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Категория</label>
+                        <select name="category" class="form-select">
+                            <option value="">Без категории</option>
+                            <option value="Мебель" {% if edit_kw.category == 'Мебель' %}selected{% endif %}>Мебель</option>
+                            <option value="Бытовые" {% if edit_kw.category == 'Бытовые' %}selected{% endif %}>Бытовые</option>
+                            <option value="Расходники" {% if edit_kw.category == 'Расходники' %}selected{% endif %}>Расходники</option>
+                            <option value="Документация" {% if edit_kw.category == 'Документация' %}selected{% endif %}>Документация</option>
+                            <option value="Мед. расходники" {% if edit_kw.category == 'Мед. расходники' %}selected{% endif %}>Мед. расходники</option>
+                            <option value="Специфичные" {% if edit_kw.category == 'Специфичные' %}selected{% endif %}>Специфичные</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" name="is_active" class="form-check-input" id="editIsActive" {% if edit_kw.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="editIsActive">Активно</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var editModal = new bootstrap.Modal(document.getElementById('editModal'));
+    editModal.show();
+    document.getElementById('editModal').addEventListener('hidden.bs.modal', function() {
+        window.location.href = "{% url 'equipment:exclude_keywords_reference' %}";
+    });
+});
+</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Initialize tooltips
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+  return new bootstrap.Tooltip(tooltipTriggerEl)
+})
+</script>
+{% endblock %}

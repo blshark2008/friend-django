@@ -1,0 +1,41 @@
+{% extends "messaging/base.html" %}
+{% load static %}
+
+{% block title %}Удаление сообщения — «Друг»{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Подтверждение удаления</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="mb-3">Вы уверены, что хотите удалить сообщение:</p>
+                <div class="alert alert-light border">
+                    <strong>{{ message.title|default:"Без заголовка" }}</strong>
+                    <div class="small text-muted mt-1">
+                        Отправитель: {{ message.sender.get_full_name|default:message.sender.username }}<br>
+                        Создано: {{ message.created_at|date:"d.m.Y H:i" }}
+                    </div>
+                </div>
+                <p class="text-danger small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Это действие нельзя отменить. Все записи о доставке также будут удалены.
+                </p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash me-1"></i>Удалить
+                        </button>
+                        <a href="{% url 'messaging:message_detail' message.pk %}" class="btn btn-outline-secondary">
+                            Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

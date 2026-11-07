@@ -107,6 +107,14 @@ class User(AbstractUser):
     is_admin = models.BooleanField('Администратор', default=False, help_text='Автоматически не архивируется при импорте')
     is_mol = models.BooleanField('МОЛ', default=False, help_text='Материально-ответственное лицо подразделения')
 
+    # ===== Настройки каналов связи для сообщений =====
+    max_id = models.CharField('ID в MAX', max_length=100, blank=True, default='', help_text='ID пользователя в системе MAX')
+    telegram_id = models.CharField('ID в Telegram', max_length=100, blank=True, default='', help_text='ID пользователя в Telegram')
+    notify_max = models.BooleanField('Уведомления через MAX', default=False, help_text='Разрешить отправку сообщений через MAX')
+    notify_telegram = models.BooleanField('Уведомления через Telegram', default=False, help_text='Разрешить отправку сообщений через Telegram')
+    notify_corporate_email = models.BooleanField('Уведомления на корп. почту', default=False, help_text='Разрешить отправку на корпоративный email')
+    notify_personal_email = models.BooleanField('Уведомления на лич. почту', default=False, help_text='Разрешить отправку на личный email')
+
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'

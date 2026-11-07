@@ -240,7 +240,8 @@ class Equipment(models.Model):
         db_index=True, default='',
     )
     serial_number = models.CharField(
-        'Серийный номер', max_length=100, blank=True, default='',
+        'Серийный номер', max_length=100, blank=True, null=True,
+        unique=True, db_index=True,
     )
     name = models.CharField('Название', max_length=255, blank=True, default='')
     brand = models.ForeignKey(
@@ -843,6 +844,62 @@ class EquipmentDecommissionRecord(models.Model):
 
     def __str__(self):
         return f"{self.equipment} — {self.act_number or 'Списание'}"
+
+
+# ============================================================================
+# Справочник ключевых слов фильтрации наименований (первый уровень фильтрации)
+# ============================================================================
+
+class FilterKeyword(models.Model):
+    """Ключевое слово для классификации оборудования по наименованию."""
+
+    CATEGORY_CHOICES = [
+        ('компьютер', 'Компьютер'),
+        ('монитор', 'Монитор'),
+        ('принтер', 'Принтер'),
+        ('периферия', 'Периферия'),
+        ('сеть', 'Сеть'),
+        ('связь', 'Связь'),
+        ('видео', 'Видео'),
+        ('медицинское', 'Медицинское'),
+    ]
+
+    keyword = models.CharField('Ключевое слово', max_length=100, db_index=True)
+    category = models.CharField('Категория', max_length=20, choices=CATEGORY_CHOICES, db_index=True)
+    is_active = models.BooleanField('Активен', default=True)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Фильтр-ключ'
+        verbose_name_plural = 'Фильтр-ключи'
+        ordering = ['category', 'keyword']
+
+    def __str__(self):
+        return f"{self.keyword} ({self.get_category_display()})"
+
+
+# ============================================================================
+# Справочник исключений (второй уровень фильтрации наименований)
+# ============================================================================
+
+class ExcludeKeyword(models.Model):
+    """Ключевое слово для исключения из выгрузки (второй уровень фильтрации)."""
+
+    keyword = models.CharField('Ключевое слово', max_length=100, db_index=True)
+    category = models.CharField('Категория', max_length=50, blank=True, default='', db_index=True,
+                                 help_text='Мебель, Бытовые, Расходники, Мед. и т.д.')
+    is_active = models.BooleanField('Активен', default=True)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Исключение'
+        verbose_name_plural = 'Исключения'
+        ordering = ['category', 'keyword']
+
+    def __str__(self):
+        return f"{self.keyword} ({self.category})"
 
 
 # ============================================================================

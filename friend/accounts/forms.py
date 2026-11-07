@@ -41,6 +41,10 @@ class UserEditForm(forms.ModelForm):
             'snils', 'domain_account',
             'hire_date', 'fire_date',
             'is_mol', 'is_admin',
+            # Поля каналов связи
+            'max_id', 'telegram_id',
+            'notify_max', 'notify_telegram',
+            'notify_corporate_email', 'notify_personal_email',
         ]
         widgets = {
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -58,4 +62,11 @@ class UserEditForm(forms.ModelForm):
             'fire_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'is_mol': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'is_admin': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            # Поля каналов связи
+            'max_id': forms.TextInput(attrs={'class': 'form-control'}),
+            'telegram_id': forms.TextInput(attrs={'class': 'form-control'}),
+            'notify_max': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_telegram': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_corporate_email': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_personal_email': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }

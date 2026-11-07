@@ -414,6 +414,106 @@ class UserGeneralView(LoginRequiredMixin, DetailView):
         return User.objects.select_related('department', 'position').get(pk=self.kwargs['pk'])
 
 
+class UserEditContactsView(LoginRequiredMixin, DetailView):
+    """Редактирование контактных данных пользователя."""
+    model = User
+    template_name = 'accounts/user_general.html'
+    context_object_name = 'user'
+
+    def get_object(self, queryset=None):
+        return User.objects.select_related('department', 'position').get(pk=self.kwargs['pk'])
+
+    def post(self, request, *args, **kwargs):
+        user = self.get_object()
+        user.corporate_email = request.POST.get('corporate_email', '')
+        user.personal_email = request.POST.get('personal_email', '')
+        user.corporate_phone = request.POST.get('corporate_phone', '')
+        user.personal_phone = request.POST.get('personal_phone', '')
+        user.save(update_fields=[
+            'corporate_email', 'personal_email',
+            'corporate_phone', 'personal_phone',
+        ])
+        messages.success(request, 'Контактные данные обновлены.')
+        return redirect('accounts:user_general', pk=user.pk)
+
+
+class UserEditAdditionalView(LoginRequiredMixin, DetailView):
+    """Редактирование дополнительных данных пользователя."""
+    model = User
+    template_name = 'accounts/user_general.html'
+    context_object_name = 'user'
+
+    def get_object(self, queryset=None):
+        return User.objects.select_related('department', 'position').get(pk=self.kwargs['pk'])
+
+    def post(self, request, *args, **kwargs):
+        user = self.get_object()
+        user.snils = request.POST.get('snils', '')
+        user.domain_account = request.POST.get('domain_account', '')
+        user.save(update_fields=['snils', 'domain_account'])
+        messages.success(request, 'Дополнительные данные обновлены.')
+        return redirect('accounts:user_general', pk=user.pk)
+
+
+class UserClearMaxIdView(LoginRequiredMixin, DetailView):
+    """Очистка MAX ID пользователя."""
+    model = User
+    template_name = 'accounts/user_general.html'
+    context_object_name = 'user'
+
+    def get_object(self, queryset=None):
+        return User.objects.select_related('department', 'position').get(pk=self.kwargs['pk'])
+
+    def post(self, request, *args, **kwargs):
+        user = self.get_object()
+        user.max_id = ''
+        user.notify_max = False
+        user.save(update_fields=['max_id', 'notify_max'])
+        messages.success(request, 'MAX ID очищен.')
+        return redirect('accounts:user_general', pk=user.pk)
+
+
+class UserClearTelegramIdView(LoginRequiredMixin, DetailView):
+    """Очистка Telegram ID пользователя."""
+    model = User
+    template_name = 'accounts/user_general.html'
+    context_object_name = 'user'
+
+    def get_object(self, queryset=None):
+        return User.objects.select_related('department', 'position').get(pk=self.kwargs['pk'])
+
+    def post(self, request, *args, **kwargs):
+        user = self.get_object()
+        user.telegram_id = ''
+        user.notify_telegram = False
+        user.save(update_fields=['telegram_id', 'notify_telegram'])
+        messages.success(request, 'Telegram ID очищен.')
+        return redirect('accounts:user_general', pk=user.pk)
+
+
+class UserNotifySettingsView(LoginRequiredMixin, DetailView):
+    """Настройки каналов связи пользователя."""
+    model = User
+    template_name = 'accounts/user_general.html'
+    context_object_name = 'user'
+
+    def get_object(self, queryset=None):
+        return User.objects.select_related('department', 'position').get(pk=self.kwargs['pk'])
+
+    def post(self, request, *args, **kwargs):
+        user = self.get_object()
+        user.notify_max = 'notify_max' in request.POST and bool(user.max_id)
+        user.notify_telegram = 'notify_telegram' in request.POST and bool(user.telegram_id)
+        user.notify_corporate_email = 'notify_corporate_email' in request.POST and bool(user.corporate_email)
+        user.notify_personal_email = 'notify_personal_email' in request.POST and bool(user.personal_email)
+        user.save(update_fields=[
+            'notify_max', 'notify_telegram',
+            'notify_corporate_email', 'notify_personal_email',
+        ])
+        messages.success(request, 'Настройки каналов связи обновлены.')
+        return redirect('accounts:user_general', pk=user.pk)
+
+
 class UserTrainingsView(LoginRequiredMixin, DetailView):
     """Обучения пользователя."""
     model = User

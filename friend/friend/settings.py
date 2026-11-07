@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'accounts',
     'equipment',
     'siem',
+    'training',
+    'messaging',
 ]
 
 MIDDLEWARE = [
@@ -141,3 +143,23 @@ AUTH_USER_MODEL = 'accounts.User'
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+# Skillspace integration settings
+SKILLSPACE_API_KEY = ''  # Set your API key from Skillspace settings
+SKILLSPACE_BASE_URL = 'https://api.skillspace.ru'
+SKILLSPACE_WEBHOOK_BASE_URL = 'https://skillspace.ru'
+
+# Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST = 'localhost'
+EMAIL_PORT = 25
+DEFAULT_FROM_EMAIL = 'noreply@friend.local'
+
+# MAX Bot settings
+MAX_BOT_TOKEN = 'f9LHodD0cOIYMz2y4innjHTr1GbEaOS0kX_FdLooS7xj1JzkdrVufdvwwwpOmfJ8vaemQcwdhNJOz8b52Sdw'
+MAX_API_BASE_URL = 'https://platform-api2.max.ru'
+MAX_WEBHOOK_PATH = '/max/webhook/'
+MAX_WEBHOOK_SECRET = ''
+
+# Telegram Bot settings (для будущих рассылок через Telegram)
+TELEGRAM_BOT_TOKEN = ''

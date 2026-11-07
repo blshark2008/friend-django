@@ -1,0 +1,208 @@
+{% extends 'equipment/base.html' %}
+
+{% block title %}Инвентаризационный поиск{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-search me-2"></i>Инвентаризационный поиск</h4>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .search-box {
+        border: 2px solid #dee2e6;
+        border-radius: 12px;
+        padding: 2rem;
+        background: #f8f9fa;
+    }
+    .stat-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .stat-card .card-body {
+        padding: 1.5rem;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+    }
+    .search-type-btn {
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: #fff;
+    }
+    .search-type-btn:hover {
+        border-color: #3498db;
+        background: #f0f8ff;
+    }
+    .search-type-btn.active {
+        border-color: #3498db;
+        background: #3498db;
+        color: #fff;
+    }
+    .search-type-btn .bi {
+        font-size: 1.25rem;
+        margin-bottom: 0.25rem;
+    }
+    .search-type-btn .label {
+        display: block;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Статистика -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="card-body text-center">
+                <div class="stat-number text-primary">{{ total_count }}</div>
+                <div class="stat-label">Найдено результатов</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="card-body text-center">
+                <a href="{% url 'equipment:assigned_equipment' %}" class="text-decoration-none text-primary fw-bold">
+                    <i class="bi bi-people me-1"></i>Закрепленное оборудование
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Поиск -->
+<div class="search-box mb-4">
+    <form method="get" action="{% url 'equipment:inventory_search' %}">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label fw-semibold">Поиск</label>
+                <input type="text" name="q" class="form-control form-control-lg" 
+                       placeholder="Введите запрос..." value="{{ search_query }}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Поле поиска</label>
+                <select name="type" class="form-select form-select-lg">
+                    {% for type_value, type_label in search_types %}
+                    <option value="{{ type_value }}" {% if search_type == type_value %}selected{% endif %}>{{ type_label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-lg w-100">
+                    <i class="bi bi-search me-1"></i>Найти
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Быстрый поиск -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Быстрый поиск</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'equipment:inventory_search' %}?q=&type=inventory" class="search-type-btn text-center text-decoration-none d-block">
+                    <i class="bi bi-upc-scan d-block"></i>
+                    <span class="label">Инв. номер</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'equipment:inventory_search' %}?q=&type=serial" class="search-type-btn text-center text-decoration-none d-block">
+                    <i class="bi bi-upc d-block"></i>
+                    <span class="label">Серийный номер</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'equipment:inventory_search' %}?q=&type=name" class="search-type-btn text-center text-decoration-none d-block">
+                    <i class="bi bi-tag d-block"></i>
+                    <span class="label">Наименование</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'equipment:inventory_search' %}?q=&type=hostname" class="search-type-btn text-center text-decoration-none d-block">
+                    <i class="bi bi-hdd-network d-block"></i>
+                    <span class="label">Имя в сети</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'equipment:inventory_search' %}?q=&type=mac" class="search-type-btn text-center text-decoration-none d-block">
+                    <i class="bi bi-ethernet d-block"></i>
+                    <span class="label">MAC-адрес</span>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'equipment:inventory_search' %}?q=&type=user" class="search-type-btn text-center text-decoration-none d-block">
+                    <i class="bi bi-people d-block"></i>
+                    <span class="label">Пользователь</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Результаты поиска -->
+{% if search_query %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Результаты поиска</h6>
+        <span class="badge bg-primary">{{ total_count }} шт.</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Инв. номер</th>
+                    <th>Наименование</th>
+                    <th>Категория</th>
+                    <th>Серийный номер</th>
+                    <th>Имя в сети</th>
+                    <th>MAC-адрес</th>
+                    <th>Закреплён</th>
+                    <th>МОЛ</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for eq in equipment_list %}
+                <tr>
+                    <td><code>{{ eq.inventory_number }}</code></td>
+                    <td>{{ eq.name|default:"—" }}</td>
+                    <td>{{ eq.category|default:"—" }}</td>
+                    <td>{{ eq.serial_number|default:"—" }}</td>
+                    <td>{{ eq.hostname|default:"—" }}</td>
+                    <td>{{ eq.mac_address|default:"—" }}</td>
+                    <td>{{ eq.assigned_user|default:"—" }}</td>
+                    <td>{{ eq.responsible_user|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        <i class="bi bi-search me-2"></i>Ничего не найдено по запросу "{{ search_query }}"
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i>
+    Введите запрос для поиска оборудования. Используйте быстрый поиск или введите значение в поле выше.
+</div>
+{% endif %}
+{% endblock %}

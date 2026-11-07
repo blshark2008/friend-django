@@ -24,51 +24,106 @@
         </div>
 
         <div class="sidebar-section">
-            <div class="sidebar-section-title">Основное</div>
-            <a class="nav-link {% if request.resolver_match.url_name == 'equipment_list' %}active{% endif %}"
-               href="{% url 'equipment:equipment_list' %}" data-tooltip="Список техники">
-                <i class="bi bi-list-ul"></i> <span>Список техники</span>
+            <a class="nav-link sidebar-section-toggle collapsed" href="#section-osnovnoe" data-bs-toggle="collapse" aria-expanded="false">
+                <i class="bi bi-grid-3x3-gap"></i>
+                <span>Основное</span>
+                <i class="bi bi-chevron-right section-arrow ms-auto"></i>
             </a>
-            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
-               href="{% url 'equipment:dashboard' %}" data-tooltip="Дашборд">
-                <i class="bi bi-grid-1x2"></i> <span>Дашборд</span>
-            </a>
+            <div class="collapse sidebar-section-content" id="section-osnovnoe">
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'equipment_list' %}active{% endif %}"
+                   href="{% url 'equipment:equipment_list' %}" data-tooltip="Список техники">
+                    <span class="sub-dot"></span>
+                    <span>Список техники</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+                   href="{% url 'equipment:dashboard' %}" data-tooltip="Дашборд">
+                    <span class="sub-dot"></span>
+                    <span>Дашборд</span>
+                </a>
+            </div>
         </div>
 
         <div class="sidebar-section">
-            <div class="sidebar-section-title">Оборудование</div>
-            {% for cat in top_categories %}
-            <a class="nav-link {% if request.resolver_match.url_name == 'category_equipment' and request.resolver_match.kwargs.category_slug == cat.slug %}active{% endif %}"
-               href="{% url 'equipment:category_equipment' cat.slug %}" data-tooltip="{{ cat.name }}">
-                <i class="bi bi-{% if cat.slug == 'computer_top' %}pc-display{% elif cat.slug == 'printers_top' %}printer{% elif cat.slug == 'periphery_top' %}hdd-stack{% elif cat.slug == 'networking_top' %}ethernet{% elif cat.slug == 'communication_top' %}telephone{% elif cat.slug == 'medical_top' %}heart-pulse{% elif cat.slug == 'video_top' %}camera-video{% else %}box{% endif %}"></i>
-                <span>{{ cat.name }}</span>
-                <span class="badge bg-primary">{{ cat.eq_count|default:0 }}</span>
+            <a class="nav-link sidebar-section-toggle collapsed" href="#section-oborudovanie" data-bs-toggle="collapse" aria-expanded="false">
+                <i class="bi bi-pc-display"></i>
+                <span>Оборудование</span>
+                <i class="bi bi-chevron-right section-arrow ms-auto"></i>
             </a>
-            {% endfor %}
+            <div class="collapse sidebar-section-content" id="section-oborudovanie">
+                {% for cat in top_categories %}
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'category_equipment' and request.resolver_match.kwargs.category_slug == cat.slug %}active{% endif %}"
+                   href="{% url 'equipment:category_equipment' cat.slug %}" data-tooltip="{{ cat.name }}">
+                    <span class="sub-dot"></span>
+                    <span>{{ cat.name }}</span>
+                    <span class="badge bg-secondary sub-badge">{{ cat.eq_count|default:0 }}</span>
+                </a>
+                {% endfor %}
+            </div>
         </div>
 
         <div class="sidebar-section">
-            <div class="sidebar-section-title">Сервис</div>
-            <a class="nav-link {% if request.resolver_match.url_name == 'categories_reference' %}active{% endif %}"
-               href="{% url 'equipment:categories_reference' %}" data-tooltip="Статистика категорий">
-                <i class="bi bi-book"></i> <span>Статистика категорий</span>
+            <a class="nav-link sidebar-section-toggle collapsed" href="#section-servis" data-bs-toggle="collapse" aria-expanded="false">
+                <i class="bi bi-gear"></i>
+                <span>Сервис</span>
+                <i class="bi bi-chevron-right section-arrow ms-auto"></i>
             </a>
-            <a class="nav-link {% if request.resolver_match.url_name == 'category_list' %}active{% endif %}"
-               href="{% url 'equipment:category_list' %}" data-tooltip="Редактировать категории">
-                <i class="bi bi-tags"></i> <span>Редактировать категории</span>
+            <div class="collapse sidebar-section-content" id="section-servis">
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'categories_reference' %}active{% endif %}"
+                   href="{% url 'equipment:categories_reference' %}" data-tooltip="Статистика категорий">
+                    <span class="sub-dot"></span>
+                    <span>Статистика категорий</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'category_list' %}active{% endif %}"
+                   href="{% url 'equipment:category_list' %}" data-tooltip="Редактировать категории">
+                    <span class="sub-dot"></span>
+                    <span>Редактировать категории</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'location_list' %}active{% endif %}"
+                   href="{% url 'equipment:location_list' %}" data-tooltip="Расположение">
+                    <span class="sub-dot"></span>
+                    <span>Расположение</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'field_settings' %}active{% endif %}"
+                   href="{% url 'equipment:field_settings' %}" data-tooltip="Настройки полей">
+                    <span class="sub-dot"></span>
+                    <span>Настройки полей</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'inventory' %}active{% endif %}"
+                   href="{% url 'equipment:inventory' %}" data-tooltip="Инвентаризация">
+                    <span class="sub-dot"></span>
+                    <span>Инвентаризация</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'exclude_keywords_reference' %}active{% endif %}"
+                   href="{% url 'equipment:exclude_keywords_reference' %}" data-tooltip="Справочник исключений">
+                    <span class="sub-dot"></span>
+                    <span>Справочник исключений</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'filter_keywords_reference' %}active{% endif %}"
+                   href="{% url 'equipment:filter_keywords_reference' %}" data-tooltip="Ключевые слова фильтрации">
+                    <span class="sub-dot"></span>
+                    <span>Ключевые слова фильтрации</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <a class="nav-link sidebar-section-toggle collapsed" href="#section-inventarizaciya" data-bs-toggle="collapse" aria-expanded="false">
+                <i class="bi bi-clipboard-data"></i>
+                <span>Инвентаризация</span>
+                <i class="bi bi-chevron-right section-arrow ms-auto"></i>
             </a>
-            <a class="nav-link {% if request.resolver_match.url_name == 'location_list' %}active{% endif %}"
-               href="{% url 'equipment:location_list' %}" data-tooltip="Расположение">
-                <i class="bi bi-geo-alt"></i> <span>Расположение</span>
-            </a>
-            <a class="nav-link {% if request.resolver_match.url_name == 'field_settings' %}active{% endif %}"
-               href="{% url 'equipment:field_settings' %}" data-tooltip="Настройки полей">
-                <i class="bi bi-gear"></i> <span>Настройки полей</span>
-            </a>
-            <a class="nav-link {% if request.resolver_match.url_name == 'inventory' %}active{% endif %}"
-               href="{% url 'equipment:inventory' %}" data-tooltip="Инвентаризация">
-                <i class="bi bi-list-check"></i> <span>Инвентаризация</span>
-            </a>
+            <div class="collapse sidebar-section-content" id="section-inventarizaciya">
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'assigned_equipment' %}active{% endif %}"
+                   href="{% url 'equipment:assigned_equipment' %}" data-tooltip="Закрепленное оборудование">
+                    <span class="sub-dot"></span>
+                    <span>Закрепленное оборудование</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'inventory_search' %}active{% endif %}"
+                   href="{% url 'equipment:inventory_search' %}" data-tooltip="Инвентаризационный поиск">
+                    <span class="sub-dot"></span>
+                    <span>Инвентаризационный поиск</span>
+                </a>
+            </div>
         </div>
 
     </nav>

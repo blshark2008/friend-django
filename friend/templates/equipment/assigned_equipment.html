@@ -1,0 +1,187 @@
+{% extends 'equipment/base.html' %}
+
+{% block title %}Закрепленное оборудование{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-people me-2"></i>Закрепленное оборудование</h4>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .stat-card .card-body {
+        padding: 1.5rem;
+    }
+    .stat-number {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+    }
+    .user-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.85rem;
+        background: #e9ecef;
+        margin: 0.2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Статистика -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="card-body text-center">
+                <div class="stat-number text-primary">{{ total_count }}</div>
+                <div class="stat-label">Всего закреплено</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="card-body text-center">
+                <div class="stat-number text-success">{{ by_user|length }}</div>
+                <div class="stat-label">Ответственных лиц</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="card-body text-center">
+                <div class="stat-number text-info">{{ by_category|length }}</div>
+                <div class="stat-label">Категорий</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="card-body text-center">
+                <a href="{% url 'equipment:inventory_search' %}" class="text-decoration-none text-primary fw-bold">
+                    <i class="bi bi-search me-1"></i>Инвентаризационный поиск
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2">
+            <div class="col-md-4">
+                <input type="text" name="search" class="form-control form-control-sm" 
+                       placeholder="Поиск по имени, инв. номеру..." value="{{ current_search }}">
+            </div>
+            <div class="col-md-3">
+                <select name="user" class="form-select form-select-sm">
+                    <option value="">Все пользователи</option>
+                    {% for user_id, first_name, last_name in all_users %}
+                    <option value="{{ user_id }}" {% if current_user == user_id|stringformat:"s" %}selected{% endif %}>
+                        {{ last_name }} {{ first_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">Все категории</option>
+                    {% for slug, name in all_categories %}
+                    <option value="{{ slug }}" {% if current_category == slug %}selected{% endif %}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">Применить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Топ пользователей -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Топ ответственных лиц</h6>
+            </div>
+            <div class="card-body">
+                {% for item in by_user %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="user-badge">{{ item.assigned_user__last_name }} {{ item.assigned_user__first_name|default:"—" }}</span>
+                    <span class="badge bg-primary">{{ item.count }}</span>
+                </div>
+                {% empty %}
+                <p class="text-muted">Нет данных</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-tags me-2"></i>По категориям</h6>
+            </div>
+            <div class="card-body">
+                {% for item in by_category %}
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="user-badge">{{ item.category__name|default:"Без категории" }}</span>
+                    <span class="badge bg-primary">{{ item.count }}</span>
+                </div>
+                {% empty %}
+                <p class="text-muted">Нет данных</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица оборудования -->
+<div class="card">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Список закрепленного оборудования</h6>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Инв. номер</th>
+                    <th>Наименование</th>
+                    <th>Категория</th>
+                    <th>Закреплён</th>
+                    <th>МОЛ</th>
+                    <th>Серийный номер</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for eq in equipment_list %}
+                <tr>
+                    <td><code>{{ eq.inventory_number }}</code></td>
+                    <td>{{ eq.name|default:"—" }}</td>
+                    <td>{{ eq.category|default:"—" }}</td>
+                    <td>{{ eq.assigned_user|default:"—" }}</td>
+                    <td>{{ eq.responsible_user|default:"—" }}</td>
+                    <td>{{ eq.serial_number|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox me-2"></i>Нет закрепленного оборудования
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

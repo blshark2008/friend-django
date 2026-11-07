@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Equipment, EquipmentAssignment, EquipmentMOLAssignment,
-    EquipmentCategory,
+    EquipmentCategory, ExcludeKeyword, FilterKeyword,
     EquipmentMovement, EquipmentRepair, EquipmentUpgrade,
     EquipmentDecommissionRecord,
 )
@@ -160,3 +160,21 @@ class EquipmentDecommissionRecordAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
     date_hierarchy = 'created_at'
     list_select_related = ('equipment',)
+
+
+@admin.register(ExcludeKeyword)
+class ExcludeKeywordAdmin(admin.ModelAdmin):
+    list_display = ('keyword', 'category', 'is_active', 'updated_at')
+    list_filter = ('is_active', 'category')
+    search_fields = ('keyword', 'category')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ['category', 'keyword']
+
+
+@admin.register(FilterKeyword)
+class FilterKeywordAdmin(admin.ModelAdmin):
+    list_display = ('keyword', 'category', 'is_active', 'updated_at')
+    list_filter = ('is_active', 'category')
+    search_fields = ('keyword', 'category')
+    readonly_fields = ('created_at', 'updated_at')
+    ordering = ['category', 'keyword']

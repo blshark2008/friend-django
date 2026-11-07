@@ -488,8 +488,97 @@ body {
 }
 
 /* ============================================================================
-   Responsive — Sidebar
-   ============================================================================ */
+    Collapsible Sidebar Sections
+    ============================================================================ */
+
+.sidebar-section {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.sidebar-section-title {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.4);
+    font-weight: 600;
+}
+
+.sidebar-section-toggle {
+    cursor: pointer;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.03);
+    margin: 0.25rem 0.5rem;
+    border-radius: 6px;
+}
+
+.sidebar-section-toggle:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.sidebar-section-toggle .section-arrow {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+    opacity: 0.5;
+}
+
+.sidebar-section-toggle[aria-expanded="true"] .section-arrow {
+    transform: rotate(90deg);
+    opacity: 1;
+}
+
+.sidebar-section-content {
+    padding: 0.25rem 0;
+}
+
+.sidebar-sublink {
+    padding-left: 2.5rem;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.6);
+    border-left: 3px solid transparent;
+}
+
+.sidebar-sublink:hover {
+    color: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.05);
+    border-left-color: #3498db;
+}
+
+.sidebar-sublink.active {
+    color: #fff;
+    background: rgba(52, 152, 219, 0.15);
+    border-left-color: #3498db;
+}
+
+.sidebar-sublink .sub-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.sidebar-sublink .sub-badge {
+    font-size: 0.65rem;
+    padding: 0.2em 0.5em;
+    margin-left: auto;
+}
+
+/* Collapsed state — hide section content */
+.sidebar.collapsed .sidebar-section-toggle .section-arrow {
+    display: none;
+}
+
+.sidebar.collapsed .sidebar-section-content {
+    display: none !important;
+}
+
+/* ============================================================================
+    Responsive — Sidebar
+    ============================================================================ */
 
 @media (max-width: 768px) {
     .sidebar {
@@ -507,4 +596,95 @@ body {
     .main-content {
         margin-left: 0;
     }
+}
+
+/* ============================================================================
+    Responsive — Sidebar
+    ============================================================================ */
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .sidebar.show {
+        transform: translateX(0);
+    }
+
+    .sidebar-toggle {
+        left: 0.5rem !important;
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+}
+
+.sidebar-category-toggle {
+    cursor: pointer;
+    position: relative;
+}
+
+.sidebar-category-toggle .category-arrow {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+    opacity: 0.5;
+}
+
+.sidebar-category-toggle[aria-expanded="true"] .category-arrow {
+    transform: rotate(90deg);
+    opacity: 1;
+}
+
+.sidebar-category-toggle:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.sidebar-subcategory {
+    background: rgba(0,0,0,0.15);
+    padding: 0.25rem 0;
+}
+
+.sidebar-sublink {
+    padding-left: 2.5rem;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.6);
+    border-left: 3px solid transparent;
+}
+
+.sidebar-sublink:hover {
+    color: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.05);
+    border-left-color: #3498db;
+}
+
+.sidebar-sublink.active {
+    color: #fff;
+    background: rgba(52, 152, 219, 0.15);
+    border-left-color: #3498db;
+}
+
+.sidebar-sublink .sub-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.sidebar-sublink .sub-badge {
+    font-size: 0.65rem;
+    padding: 0.2em 0.5em;
+}
+
+/* Collapsed state — hide subcategories */
+.sidebar.collapsed .sidebar-category,
+.sidebar.collapsed .sidebar-subcategory {
+    display: none;
+}
+
+.sidebar.collapsed .sidebar-category-toggle .category-arrow {
+    display: none;
 }

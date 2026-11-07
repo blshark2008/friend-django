@@ -15,6 +15,20 @@ urlpatterns = [
     # Справочник категорий
     path('categories/', views.categories_reference, name='categories_reference'),
 
+    # Справочник исключений
+    path('exclude-keywords/', views.exclude_keywords_reference, name='exclude_keywords_reference'),
+    path('exclude-keywords/add/', views.exclude_keyword_add, name='exclude_keyword_add'),
+    path('exclude-keywords/<int:pk>/edit/', views.exclude_keyword_edit, name='exclude_keyword_edit'),
+    path('exclude-keywords/<int:pk>/delete/', views.exclude_keyword_delete, name='exclude_keyword_delete'),
+    path('exclude-keywords/<int:pk>/toggle/', views.exclude_keyword_toggle, name='exclude_keyword_toggle'),
+
+    # Справочник ключевых слов фильтрации
+    path('filter-keywords/', views.filter_keywords_reference, name='filter_keywords_reference'),
+    path('filter-keywords/add/', views.filter_keyword_add, name='filter_keyword_add'),
+    path('filter-keywords/<int:pk>/edit/', views.filter_keyword_edit, name='filter_keyword_edit'),
+    path('filter-keywords/<int:pk>/delete/', views.filter_keyword_delete, name='filter_keyword_delete'),
+    path('filter-keywords/<int:pk>/toggle/', views.filter_keyword_toggle, name='filter_keyword_toggle'),
+
     # Настройки полей
     path('field-settings/', views.field_settings, name='field_settings'),
 
@@ -24,6 +38,7 @@ urlpatterns = [
     # Загрузка основных средств
     path('upload-os/', views.upload_os_csv, name='upload_os'),
     path('upload-os/download-new/', views.download_new_items, name='download_new_items'),
+    path('upload-os/import-new/', views.import_new_items_to_db, name='import_new_items_to_db'),
 
     # CRUD
     path('add/<str:equipment_type>/', views.equipment_add, name='add'),
@@ -61,6 +76,8 @@ urlpatterns = [
     # Инвентаризация
     path('inventory/', views.equipment_inventory, name='inventory'),
     path('inventory/<str:equipment_type>/<int:pk>/', views.equipment_inventory_detail, name='inventory_detail'),
+    path('inventory/assigned/', views.assigned_equipment, name='assigned_equipment'),
+    path('inventory/search/', views.inventory_search, name='inventory_search'),
 
     # Справочник расположения
     path('locations/', views.location_list, name='location_list'),

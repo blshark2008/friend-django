@@ -96,17 +96,27 @@ class Command(BaseCommand):
             else:
                 secret = getattr(settings, 'MAX_WEBHOOK_SECRET', '')
                 try:
-                    result = client.subscribe_webhook(
-                        url=webhook_url,
-                        update_types=['message_created', 'bot_started', 'bot_added'],
-                        secret=secret,
-                    )
-                    if result.get('success'):
-                        print('✓ Webhook зарегистрирован успешно')
+                    # Проверяем, есть ли уже webhook с таким URL
+                    subscriptions = client.get_subscriptions()
+                    if isinstance(subscriptions, list):
+                        existing = [s for s in subscriptions if s.get('url') == webhook_url]
                     else:
-                        print(f'✗ Ошибка регистрации webhook: {result.get("message", "")}')
+                        existing = []
+
+                    if existing:
+                        print(f'✓ Webhook уже зарегистрирован: {webhook_url}')
+                    else:
+                        result = client.subscribe_webhook(
+                            url=webhook_url,
+                            update_types=['message_created', 'bot_started', 'bot_added'],
+                            secret=secret,
+                        )
+                        if result.get('success'):
+                            print('✓ Webhook зарегистрирован успешно')
+                        else:
+                            print(f'✗ Ошибка регистрации webhook: {result.get("message", "")}')
                 except MAXAPIError as e:
-                    print(f'✗ Ошибка регистрации webhook: {e}')
+                    print(f'✗ Ошибка проверки/регистрации webhook: {e}')
 
         # Проверка подключения
         try:
@@ -126,6 +136,8 @@ class Command(BaseCommand):
         try:
             marker = None
             last_heartbeat = time.time()
+            consecutive_errors = 0
+            max_retries = 3
             while _running:
                 try:
                     # Получаем обновления через Long Polling
@@ -136,6 +148,7 @@ class Command(BaseCommand):
                         types=['message_created', 'bot_started', 'bot_added'],
                     )
 
+                    consecutive_errors = 0
                     updates = result.get('updates', [])
                     marker = result.get('marker')
 
@@ -153,9 +166,24 @@ class Command(BaseCommand):
                         last_heartbeat = time.time()
 
                 except MAXAPIError as e:
-                    print(f'ERROR опроса: {e}')
-                    sys.stdout.flush()
-                    time.sleep(interval)
+                    error_str = str(e)
+                    if 'ReadTimeout' in error_str:
+                        consecutive_errors += 1
+                        if consecutive_errors <= max_retries:
+                            retry_delay = min(5 * consecutive_errors, 30)
+                            print(f'ERROR опроса (повтор {consecutive_errors}/{max_retries}): {e}')
+                            sys.stdout.flush()
+                            time.sleep(retry_delay)
+                            continue
+                        else:
+                            print(f'ERROR опроса (макс попыток): {e}')
+                            sys.stdout.flush()
+                            consecutive_errors = 0
+                            time.sleep(interval)
+                    else:
+                        print(f'ERROR опроса: {e}')
+                        sys.stdout.flush()
+                        time.sleep(interval)
                 except Exception as e:
                     print(f'ERROR: {e}')
                     import traceback

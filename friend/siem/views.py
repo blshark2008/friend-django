@@ -663,6 +663,7 @@ def host_detail(request, pk):
 
 class IngestViewSet(viewsets.ViewSet):
     """Приём событий от агентов."""
+    permission_classes = []
 
     def create(self, request):
         events = request.data
@@ -1188,8 +1189,7 @@ class SIEMDashboardView(generics.GenericAPIView):
 
 class LoginHistoryIngestViewSet(viewsets.ViewSet):
     """Приём истории входов от агентов."""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def create(self, request):
         logins = request.data
@@ -1233,8 +1233,7 @@ class LoginHistoryIngestViewSet(viewsets.ViewSet):
 
 class ExtendedHostInfoViewSet(viewsets.ViewSet):
     """Приём расширенной информации о хосте (OS, антивирус, MAC и т.д.)."""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def create(self, request):
         serializer = ExtendedHostInfoSerializer(data=request.data)

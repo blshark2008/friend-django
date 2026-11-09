@@ -1,0 +1,108 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block title %}Журнал событий — «Друг»{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-journal-text me-2"></i>Журнал событий</h2>
+</div>
+
+<!-- Фильтр -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small text-muted">Тип события</label>
+                <select name="event" class="form-select">
+                    <option value="">Все события</option>
+                    <option value="step_sent" {% if request.GET.event == 'step_sent' %}selected{% endif %}>Шаг отправлен</option>
+                    <option value="answer_received" {% if request.GET.event == 'answer_received' %}selected{% endif %}>Ответ получен</option>
+                    <option value="deadline_expired" {% if request.GET.event == 'deadline_expired' %}selected{% endif %}>Дедлайн истёк</option>
+                    <option value="escalation" {% if request.GET.event == 'escalation' %}selected{% endif %}>Эскалация</option>
+                    <option value="run_started" {% if request.GET.event == 'run_started' %}selected{% endif %}>Запуск начат</option>
+                    <option value="run_completed" {% if request.GET.event == 'run_completed' %}selected{% endif %}>Запуск завершён</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-filter"></i> Фильтр
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Журнал -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        {% if logs %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Время</th>
+                        <th>Событие</th>
+                        <th>Сценарий</th>
+                        <th>Данные</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="ps-4">{{ log.created_at|date:"d.m.Y H:i:s" }}</td>
+                        <td>
+                            <span class="badge bg-info">{{ log.get_event_type_display }}</span>
+                        </td>
+                        <td>
+                            <a href="{% url 'scenarios:run_detail' log.run.pk %}" class="text-decoration-none">
+                                {{ log.run.scenario.name }}
+                            </a>
+                        </td>
+                        <td><small>{{ log.payload_json|truncatewords:5 }}</small></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-journal-text text-muted" style="font-size: 3rem;"></i>
+            <p class="text-muted mt-3">Записей в журнале не найдено</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if is_paginated %}
+    <div class="card-footer bg-white border-top-0 py-3">
+        <nav>
+            <ul class="pagination justify-content-center mb-0">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Первая</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                {% endif %}
+                <li class="page-item disabled">
+                    <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Последняя</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

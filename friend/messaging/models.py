@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from accounts.models import User
 
 
 class Message(models.Model):
@@ -169,3 +170,61 @@ class MessageRecipient(models.Model):
 
     def __str__(self):
         return f"{self.recipient.get_full_name()} — {self.message.title or 'Без заголовка'} ({self.get_delivery_status_display()})"
+
+
+class MailGroup(models.Model):
+    """Группа рассылки — набор пользователей и подразделений."""
+
+    name = models.CharField('Название', max_length=255)
+    description = models.TextField('Описание', blank=True, default='')
+    users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        verbose_name='Пользователи',
+        blank=True,
+        related_name='mail_groups',
+    )
+    departments = models.ManyToManyField(
+        'accounts.Department',
+        verbose_name='Подразделения',
+        blank=True,
+        related_name='mail_groups',
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name='Создана',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_mail_groups',
+    )
+    created_at = models.DateTimeField('Создана', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлена', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Группа рассылки'
+        verbose_name_plural = 'Группы рассылки'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def member_count(self):
+        """Общее количество уникальных пользователей в группе."""
+        direct_count = self.users.count()
+        dept_users = User.objects.filter(
+            department__in=self.departments.all(),
+            archive_status=User.STATUS_ACTIVE,
+        ).exclude(pk__in=self.users.all())
+        return direct_count + dept_users.count()
+
+    @property
+    def user_ids(self):
+        """Все ID пользователей в группе (без дублей)."""
+        direct_ids = set(self.users.values_list('pk', flat=True))
+        dept_ids = set(
+            User.objects.filter(
+                department__in=self.departments.all(),
+                archive_status=User.STATUS_ACTIVE,
+            ).values_list('pk', flat=True)
+        )
+        return direct_ids | dept_ids

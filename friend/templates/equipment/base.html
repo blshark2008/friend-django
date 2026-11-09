@@ -16,6 +16,9 @@
         <i class="bi bi-chevron-left"></i>
     </button>
 
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
+
     <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-brand">
@@ -126,6 +129,16 @@
             </div>
         </div>
 
+        <!-- User menu -->
+        <div class="sidebar-user-menu">
+            <div class="d-flex flex-column align-items-center text-center gap-2">
+                <span class="text-white-50"><i class="bi bi-person-circle"></i> {{ user.get_full_name|default:user.username }}</span>
+                <a href="{% url 'accounts:logout' %}" class="btn btn-sm btn-outline-danger w-100">
+                    <i class="bi bi-box-arrow-right"></i> Выйти
+                </a>
+            </div>
+        </div>
+
     </nav>
 
     <!-- Main content -->
@@ -133,16 +146,10 @@
         <!-- Top bar -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <button class="btn btn-sm btn-outline-secondary d-md-none me-2" onclick="document.getElementById('sidebar').classList.toggle('show')">
+                <button class="btn btn-sm btn-outline-secondary d-md-none me-2" onclick="openMobileSidebar()">
                     <i class="bi bi-list"></i>
                 </button>
                 {% block page_title %}{% endblock %}
-            </div>
-            <div>
-                <span class="text-muted me-2"><i class="bi bi-person-circle"></i> {{ user.get_full_name|default:user.username }}</span>
-                <a href="{% url 'accounts:logout' %}" class="btn btn-sm btn-outline-danger">
-                    <i class="bi bi-box-arrow-right"></i> Выход
-                </a>
             </div>
         </div>
 
@@ -175,6 +182,20 @@
             }
             // Save state
             localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+        }
+
+        function openMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.add('show');
+            if (overlay) overlay.classList.add('show');
+        }
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.remove('show');
+            if (overlay) overlay.classList.remove('show');
         }
 
         // Restore sidebar state on page load

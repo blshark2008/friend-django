@@ -1,0 +1,155 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block title %}{{ role.name }} — Роль — «Друг»{% endblock %}
+
+{% block extra_js %}
+{{ all_users|json_script:"all-users" }}
+<script>
+(function () {
+    const allUsers = JSON.parse(document.getElementById('all-users').textContent);
+    const existingIds = new Set(
+        Array.from(document.querySelectorAll('.remove-role-btn')).map(b => b.dataset.id)
+    );
+
+    function renderSearchResults(containerId, items) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        if (items.length === 0) {
+            container.innerHTML = '<div class="text-muted small text-center py-2">Ничего не найдено</div>';
+            return;
+        }
+        items.forEach(function (item) {
+            const div = document.createElement('div');
+            div.className = 'd-flex justify-content-between align-items-center py-1 px-2';
+            const label = item.last_name + ' ' + item.first_name.charAt(0) + '.' +
+                (item.patronymic ? ' ' + item.patronymic.charAt(0) + '.' : '') +
+                (item.department__name ? ' <span class="text-muted">(' + item.department__name + ')</span>' : '');
+            const alreadyAssigned = existingIds.has(String(item.pk));
+            div.innerHTML =
+                '<span class="small">' + label + '</span>' +
+                '<button type="button" class="btn btn-sm btn-success p-0 px-2 add-role-btn" data-id="' + item.pk + '"' +
+                    (alreadyAssigned ? ' disabled style="opacity:0.4"' : '') + ' title="Привязать"><i class="bi bi-plus-lg"></i></button>';
+            container.appendChild(div);
+        });
+    }
+
+    document.getElementById('searchUsers').addEventListener('input', function () {
+        const q = this.value.toLowerCase();
+        const filtered = allUsers.filter(function (u) {
+            const full = (u.last_name + ' ' + u.first_name + ' ' + (u.patronymic || '') + ' ' + (u.department__name || '')).toLowerCase();
+            return full.includes(q);
+        });
+        renderSearchResults('userSearchResults', filtered);
+        document.getElementById('userSearchResults').style.display = 'block';
+    });
+
+    document.addEventListener('click', function (e) {
+        const addBtn = e.target.closest('.add-role-btn');
+        if (addBtn && !addBtn.disabled) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url "scenarios:role_add_user" role.pk %}';
+            form.innerHTML = '<input type="hidden" name="user_id" value="' + addBtn.dataset.id + '">' + '{% csrf_token %}';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+})();
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <!-- Info card -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-people me-2"></i>{{ role.name }}
+                </h5>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'scenarios:role_edit' role.pk %}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i>Редактировать
+                    </a>
+                    <a href="{% url 'scenarios:role_delete' role.pk %}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash me-1"></i>Удалить
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <small class="text-muted d-block">Статус</small>
+                        {% if role.is_active %}
+                            <span class="badge bg-success">Активна</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Неактивна</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted d-block">Привязано сотрудников</small>
+                        <span class="badge bg-primary fs-6">{{ employee_roles.count }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Employees list -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-person-badge me-2"></i>Сотрудники</h6>
+            </div>
+            <div class="card-body p-0">
+                {% if employee_roles %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <tbody>
+                            {% for er in employee_roles %}
+                            <tr>
+                                <td>
+                                    <strong>{{ er.employee.last_name }}</strong> {{ er.employee.first_name|first }}. {{ er.employee.patronymic|first }}.
+                                    {% if er.employee.department %}
+                                    <br><small class="text-muted"><i class="bi bi-building me-1"></i>{{ er.employee.department.name }}</small>
+                                    {% endif %}
+                                    {% if er.employee.position %}
+                                    <br><small class="text-muted"><i class="bi bi-briefcase me-1"></i>{{ er.employee.position.name }}</small>
+                                    {% endif %}
+                                    {% if er.scope_department %}
+                                    <br><small class="text-info"><i class="bi bi-map me-1"></i>Scope: {{ er.scope_department.name }}</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <form method="POST" action="{% url 'scenarios:role_remove_user' role.pk %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="user_id" value="{{ er.employee.pk }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger p-0 px-2 remove-role-btn" data-id="{{ er.employee.pk }}" title="Отвязать">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-3 text-muted small">К роли не привязано сотрудников</div>
+                {% endif %}
+            </div>
+            <!-- Add user -->
+            <div class="card-footer bg-white">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="searchUsers" placeholder="Поиск сотрудника для привязки...">
+                </div>
+                <div id="userSearchResults" class="border rounded p-2 mt-1" style="max-height:150px;overflow-y:auto;display:none;"></div>
+            </div>
+        </div>
+
+        <a href="{% url 'scenarios:role_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>К списку ролей
+        </a>
+    </div>
+</div>
+{% endblock %}

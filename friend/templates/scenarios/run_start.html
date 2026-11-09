@@ -1,0 +1,59 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block title %}Запуск: {{ scenario.name }} — «Друг»{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-play-circle me-2"></i>
+                    Запуск сценария: {{ scenario.name }}
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Сценарий</label>
+                        <div class="form-control-plaintext">
+                            <strong>{{ scenario.name }}</strong> v{{ scenario.version }}
+                            <div class="small text-muted">{{ scenario.category.name }}</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_corpus" class="form-label">Корпус</label>
+                        <input type="text" name="corpus" class="form-control" placeholder="Например: Корпус 1">
+                        <div class="form-text">Будет подставлен в текст как {corpus}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_floor" class="form-label">Этаж</label>
+                        <input type="text" name="floor" class="form-control" placeholder="Например: 2">
+                        <div class="form-text">Будет подставлен в текст как {floor}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_date" class="form-label">Дата/время</label>
+                        <input type="text" name="date" class="form-control" value="{{ now|date:'d.m.Y H:i' }}" readonly>
+                        <div class="form-text">Текущее время</div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-play-fill me-1"></i>Запустить
+                        </button>
+                        <a href="{% url 'scenarios:scenario_editor' scenario.pk %}" class="btn btn-outline-secondary">
+                            Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

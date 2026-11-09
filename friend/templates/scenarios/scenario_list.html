@@ -1,0 +1,170 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block title %}Сценарии оповещений — «Друг»{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-diagram-3 me-2"></i>Сценарии оповещений</h2>
+    <a href="{% url 'scenarios:scenario_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Новый сценарий
+    </a>
+</div>
+
+<!-- Статистика -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-primary bg-opacity-10 text-primary me-3">
+                        <i class="bi bi-file-earmark"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Всего сценариев</div>
+                        <div class="h4 mb-0">{{ scenarios|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-success bg-opacity-10 text-success me-3">
+                        <i class="bi bi-play-circle"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Активных запусков</div>
+                        <div class="h4 mb-0">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-info bg-opacity-10 text-info me-3">
+                        <i class="bi bi-folder"></i>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Категорий</div>
+                        <div class="h4 mb-0">{{ categories|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-warning bg-opacity-10 text-warning me-3">
+                        <i class="bi bi-diagram-2"></i>
+                    </div>
+                    <div>
+                    <div class="text-muted small">Веток</div>
+                    <div class="h4 mb-0">{{ total_branches }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтр по категориям -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small text-muted">Категория</label>
+                <select name="category" class="form-select">
+                    <option value="">Все категории</option>
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}" {% if request.GET.category == cat.id|stringformat:"d" %}selected{% endif %}>
+                            {{ cat.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-filter"></i> Фильтр
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Список сценариев -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        {% if scenarios %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Сценарий</th>
+                        <th>Категория</th>
+                        <th>Версия</th>
+                        <th>Веток</th>
+                        <th>Статус</th>
+                        <th>Дата создания</th>
+                        <th style="width:120px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for scenario in scenarios %}
+                    <tr>
+                        <td class="ps-4">
+                            <a href="{% url 'scenarios:scenario_editor' scenario.pk %}" class="text-decoration-none">
+                                <strong>{{ scenario.name }}</strong>
+                            </a>
+                            {% if scenario.description %}
+                                <div class="small text-muted">{{ scenario.description|truncatewords:10 }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ scenario.category.name }}</span>
+                        </td>
+                        <td>v{{ scenario.version }}</td>
+                        <td>{{ scenario.branches.count }}</td>
+                        <td>
+                            {% if scenario.is_active %}
+                                <span class="badge bg-success">Активен</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Неактивен</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ scenario.created_at|date:"d.m.Y" }}</td>
+                        <td class="text-end pe-4">
+                            <form method="post" action="{% url 'scenarios:scenario_start' scenario.pk %}" style="display:inline;" onsubmit="return confirm('Запустить сценарий «{{ scenario.name }}»?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-success me-1" title="Запустить">
+                                    <i class="bi bi-play-fill"></i> Запустить
+                                </button>
+                            </form>
+                            <a href="{% url 'scenarios:scenario_editor' scenario.pk %}" class="btn btn-sm btn-outline-primary" title="Редактировать">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-diagram-3 text-muted" style="font-size: 3rem;"></i>
+            <p class="text-muted mt-3">Сценариев не найдено</p>
+            <a href="{% url 'scenarios:scenario_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Создать первый сценарий
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

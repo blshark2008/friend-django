@@ -1,0 +1,165 @@
+/* ============================================================================
+   Приложение emergency — стили для оповещений ГОиЧС
+   ============================================================================ */
+
+/* ===== Карточки статистики ===== */
+.stat-card .icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.emergency-card .icon-box {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+/* ===== Карточка оповещения ===== */
+.emergency-alert-card {
+    border: 2px solid #dc3545 !important;
+}
+
+.emergency-alert-card .card-header {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+/* ===== Содержимое оповещения ===== */
+.message-content {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: #212529;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 0.5rem;
+    min-height: 100px;
+}
+
+/* ===== Бейджи типов оповещений ===== */
+.badge-emergency {
+    background-color: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+}
+
+.badge-evacuation {
+    background-color: rgba(255, 193, 7, 0.15);
+    color: #ffc107;
+}
+
+.badge-shelter {
+    background-color: rgba(13, 202, 240, 0.15);
+    color: #0aaaf3;
+}
+
+.badge-all-clear {
+    background-color: rgba(25, 135, 84, 0.15);
+    color: #198754;
+}
+
+.badge-drill {
+    background-color: rgba(108, 117, 125, 0.15);
+    color: #6c757d;
+}
+
+/* ===== Статусы доставки ===== */
+.delivery-status-delivered {
+    color: #198754;
+}
+
+.delivery-status-failed {
+    color: #dc3545;
+}
+
+.delivery-status-pending {
+    color: #ffc107;
+}
+
+.delivery-status-read {
+    color: #0d6efd;
+}
+
+/* ===== Анимация оповещения ===== */
+@keyframes pulse-emergency {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.02); }
+}
+
+.emergency-pulse {
+    animation: pulse-emergency 2s infinite;
+}
+
+/* ===== Стили для выбора получателей ===== */
+.recipient-select {
+    min-height: 200px;
+}
+
+.recipient-select option {
+    padding: 0.5rem;
+}
+
+.recipient-select optgroup {
+    font-weight: 600;
+}
+
+/* ===== Прогресс отправки ===== */
+.send-progress {
+    height: 6px;
+    border-radius: 3px;
+}
+
+.send-progress .progress-bar {
+    transition: width 0.5s ease;
+}
+
+/* ===== Адаптивность ===== */
+@media (max-width: 768px) {
+    .stat-card .card-body {
+        padding: 1rem;
+    }
+
+    .stat-card .h4 {
+        font-size: 1.25rem;
+    }
+
+    .message-content {
+        padding: 0.75rem;
+        font-size: 0.95rem;
+    }
+
+    .emergency-alert-card .card-header {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+
+    .emergency-alert-card .card-header .col-auto {
+        margin-top: 0.5rem;
+    }
+}
+
+/* ===== Кнопки ===== */
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+.btn-danger:focus,
+.btn-danger.focus {
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.5);
+}
+
+/* ===== Таблица срочных оповещений ===== */
+.table-danger td {
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+.table-danger:hover td {
+    background-color: rgba(220, 53, 69, 0.1);
+}

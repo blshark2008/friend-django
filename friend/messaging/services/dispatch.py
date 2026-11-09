@@ -131,7 +131,7 @@ def _send_via_email(message: Message, email: str) -> bool:
     from django.core.mail import send_mail
     from django.conf import settings
 
-    subject = message.title or 'Сообщение от администрации'
+    subject = message.title or 'Сообщение от администрации НИИ КПССЗ'
     try:
         send_mail(
             subject=subject,

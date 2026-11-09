@@ -14,171 +14,176 @@
 {% endblock %}
 
 {% block content %}
-<!-- Информация о закреплении -->
-<div class="card mb-4">
-    <div class="card-header bg-light">
-        <h6 class="mb-0"><i class="bi bi-people me-2"></i>Закрепление</h6>
-    </div>
-    <div class="card-body">
-        <div class="assign-info-item mb-3">
-            <label class="form-label fw-semibold mb-1">Закреплён за:</label>
-            <div>
-                {% if assigned_user %}
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span>
-                        <i class="bi bi-person-fill me-1 text-primary"></i>
-                        {{ assigned_user.last_name }} {{ assigned_user.first_name|slice:":1" }}. {{ assigned_user.patronymic|slice:":1" }}.
-                        {% if assigned_user.department %}
-                        <br><small class="text-muted">{{ assigned_user.department.name }}</small>
-                        {% endif %}
-                    </span>
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-btn"
-                            data-role="user"
-                            data-equipment-type="{{ equipment_type }}"
-                            data-equipment-pk="{{ instance.pk }}"
-                            title="Удалить">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-                {% else %}
-                <span class="text-muted">Не закреплено</span>
-                {% endif %}
-                <button type="button" class="btn btn-sm btn-outline-primary mt-2 assign-btn"
-                        data-role="user"
-                        data-equipment-type="{{ equipment_type }}"
-                        data-equipment-pk="{{ instance.pk }}"
-                        data-current-user-id="{{ assigned_user.id|default:'' }}"
-                        data-bs-toggle="modal"
-                        data-bs-target="#assignModal"
-                        title="Изменить">
-                    <i class="bi bi-pencil-square"></i> Изменить
-                </button>
-            </div>
-        </div>
-        <div class="assign-info-item">
-            <label class="form-label fw-semibold mb-1">МОЛ:</label>
-            <div>
-                {% if mol_assignment %}
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span>
-                        <i class="bi bi-person-check-fill me-1"></i>
-                        {{ mol_assignment.mol.last_name }} {{ mol_assignment.mol.first_name|slice:":1" }}. {{ mol_assignment.mol.patronymic|slice:":1" }}.
-                        {% if mol_assignment.mol.department %}
-                        <br><small class="text-muted">{{ mol_assignment.mol.department.name }}</small>
-                        {% endif %}
-                    </span>
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-btn"
-                            data-role="mol"
-                            data-equipment-type="{{ equipment_type }}"
-                            data-equipment-pk="{{ instance.pk }}"
-                            title="Удалить">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
-                </div>
-                {% else %}
-                <span class="text-muted">Не назначено</span>
-                {% endif %}
-                <button type="button" class="btn btn-sm btn-outline-secondary mt-2 assign-btn"
-                        data-role="mol"
-                        data-equipment-type="{{ equipment_type }}"
-                        data-equipment-pk="{{ instance.pk }}"
-                        data-current-mol-id="{{ mol_assignment.mol.id|default:'' }}"
-                        data-bs-toggle="modal"
-                        data-bs-target="#assignModal"
-                        title="Изменить">
-                    <i class="bi bi-pencil-square"></i> Изменить
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<form method="post">
+    {% csrf_token %}
 
-<!-- Форма редактирования -->
-<div class="card">
-    <div class="card-body">
-        <form method="post">
-            {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        {% for error in form.non_field_errors %}
+        {{ error }}
+        {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
 
-            {% if form.non_field_errors %}
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                {% for error in form.non_field_errors %}
-                {{ error }}
-                {% endfor %}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <!-- Замена пользователя -->
+    <div class="card mb-3">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-person-badge me-2"></i>Замена пользователя</h6>
+        </div>
+        <div class="card-body">
+            {% if instance.assigned_user %}
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <strong>Текущий пользователь:</strong>
+                    <span class="ms-2">{{ instance.assigned_user.get_full_name|default:instance.assigned_user.username }}</span>
+                    <span class="text-muted small ms-2">
+                        {% if instance.assigned_user.department %}· {{ instance.assigned_user.department.name }}{% endif %}
+                    </span>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignUserModal">
+                        <i class="bi bi-pencil me-1"></i>Заменить
+                    </button>
+                    <form method="post" action="{% url 'equipment:clear_assign' equipment_type instance.pk %}" style="display:inline" onsubmit="return confirm('Освободить оборудование от пользователя?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger" title="Освободить от пользователя">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
+            {% else %}
+            <div class="text-muted small mb-3">Пользователь не назначен</div>
             {% endif %}
-
-            {% for field in form %}
-            <div class="mb-3">
-                <label class="form-label fw-semibold">{{ field.label }}</label>
-                {{ field }}
-                {% if field.errors %}
-                <div class="invalid-feedback d-block">{{ field.errors.0 }}</div>
-                {% endif %}
-                {% if field.help_text %}
-                <div class="form-text">{{ field.help_text }}</div>
-                {% endif %}
-            </div>
-            {% endfor %}
-
-            <div class="d-flex gap-2 btn-group-mobile">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-check-lg me-1"></i> Сохранить
-                </button>
-                <a href="{% if from_inventory %}{% url 'equipment:inventory' %}{% else %}{% url 'equipment:detail' equipment_type instance.pk %}{% endif %}" class="btn btn-secondary">
-                    <i class="bi bi-x-lg me-1"></i> Отмена
-                </a>
-            </div>
-        </form>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignUserModal">
+                <i class="bi bi-person-plus me-1"></i>
+                {% if instance.assigned_user %}Заменить пользователя{% else %}Назначить пользователя{% endif %}
+            </button>
+        </div>
     </div>
-</div>
 
-<!-- Hidden field for redirect target -->
-<input type="hidden" id="redirectTarget" value="{% if from_inventory %}inventory{% else %}detail{% endif %}">
+    <!-- Замена МОЛ -->
+    <div class="card mb-3">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-person-check me-2"></i>Замена МОЛ</h6>
+        </div>
+        <div class="card-body">
+            <div class="mb-0">
+                <label class="form-label fw-semibold">{{ form.responsible_user.label }}</label>
+                {{ form.responsible_user }}
+                {% if form.responsible_user.errors %}
+                <div class="invalid-feedback d-block">{{ form.responsible_user.errors.0 }}</div>
+                {% endif %}
+                {% if form.responsible_user.help_text %}
+                <div class="form-text">{{ form.responsible_user.help_text }}</div>
+                {% endif %}
+                {% if instance.responsible_user %}
+                <div class="mt-1 text-muted small">Текущий МОЛ: <strong>{{ instance.responsible_user.get_full_name|default:instance.responsible_user.username }}</strong></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
-<!-- Modal: Assign User/MOL -->
-<div class="modal fade" id="assignModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <!-- Корректировка идентификаторов -->
+    <div class="card mb-3">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-upc-scan me-2"></i>Корректировка идентификаторов</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-semibold">{{ form.inventory_number.label }}</label>
+                    {{ form.inventory_number }}
+                    {% if form.inventory_number.errors %}
+                    <div class="invalid-feedback d-block">{{ form.inventory_number.errors.0 }}</div>
+                    {% endif %}
+                    {% if form.inventory_number.help_text %}
+                    <div class="form-text">{{ form.inventory_number.help_text }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-semibold">{{ form.serial_number.label }}</label>
+                    {{ form.serial_number }}
+                    {% if form.serial_number.errors %}
+                    <div class="invalid-feedback d-block">{{ form.serial_number.errors.0 }}</div>
+                    {% endif %}
+                    {% if form.serial_number.help_text %}
+                    <div class="form-text">{{ form.serial_number.help_text }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <label class="form-label fw-semibold">{{ form.model.label }}</label>
+                    {{ form.model }}
+                    {% if form.model.errors %}
+                    <div class="invalid-feedback d-block">{{ form.model.errors.0 }}</div>
+                    {% endif %}
+                    {% if form.model.help_text %}
+                    <div class="form-text">{{ form.model.help_text }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Размещение -->
+    <div class="card mb-3">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Размещение</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-semibold">{{ form.location.label }}</label>
+                    {{ form.location }}
+                    {% if form.location.errors %}
+                    <div class="invalid-feedback d-block">{{ form.location.errors.0 }}</div>
+                    {% endif %}
+                    {% if form.location.help_text %}
+                    <div class="form-text">{{ form.location.help_text }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-semibold">{{ form.place.label }}</label>
+                    {{ form.place }}
+                    {% if form.place.errors %}
+                    <div class="invalid-feedback d-block">{{ form.place.errors.0 }}</div>
+                    {% endif %}
+                    {% if form.place.help_text %}
+                    <div class="form-text">{{ form.place.help_text }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Кнопки -->
+    <div class="d-flex gap-2 btn-group-mobile">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i> Сохранить
+        </button>
+        <a href="{% if from_inventory %}{% url 'equipment:inventory' %}{% else %}{% url 'equipment:detail' equipment_type instance.pk %}{% endif %}" class="btn btn-secondary">
+            <i class="bi bi-x-lg me-1"></i> Отмена
+        </a>
+    </div>
+</form>
+
+<!-- Модальное окно: Назначить/Заменить пользователя -->
+<div class="modal fade" id="assignUserModal" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="assignModalTitle">
-                    <i class="bi bi-person-plus me-2"></i>Выбрать сотрудника
-                </h5>
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Назначить пользователя</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">ФИО</label>
-                    <input type="text" class="form-control" id="assignSearchFio" placeholder="Введите ФИО...">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="userSearchInput" placeholder="ФИО или табельный номер">
+                    <button type="button" class="btn btn-primary" id="userSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Табельный номер</label>
-                    <input type="text" class="form-control" id="assignSearchTab" placeholder="Табельный №">
-                </div>
-                <button type="button" class="btn btn-primary w-100 mb-3" id="assignSearchBtn">
-                    <i class="bi bi-search me-1"></i> Найти
-                </button>
-
-                <div id="assignResults" class="table-responsive">
-                    <table class="table table-hover table-sm mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 100px;"></th>
-                                <th>ФИО</th>
-                                <th>Табельный №</th>
-                                <th>Подразделение</th>
-                            </tr>
-                        </thead>
-                        <tbody id="assignUsersList"></tbody>
-                    </table>
-                </div>
-                <div id="assignEmpty" class="text-center text-muted py-4">
-                    <i class="bi bi-person-circle" style="font-size: 2rem;"></i>
-                    <p class="mt-2">Введите параметры поиска</p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <div id="userSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
             </div>
         </div>
     </div>
@@ -188,205 +193,92 @@
 
 {% block extra_js %}
 <script>
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
+// Поиск пользователей
+let userSearchTimeout = null;
 
-document.addEventListener('DOMContentLoaded', function() {
-    const assignModal = document.getElementById('assignModal');
-    if (!assignModal) return;
-
-    let currentRole = '';
-    let currentEquipmentType = '';
-    let currentEquipmentPk = '';
-
-    assignModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        currentRole = button.dataset.role;
-        currentEquipmentType = button.dataset.equipmentType;
-        currentEquipmentPk = button.dataset.equipmentPk;
-
-        const title = document.getElementById('assignModalTitle');
-        if (currentRole === 'mol') {
-            title.innerHTML = '<i class="bi bi-person-badge me-2"></i>Выбрать МОЛ';
-        } else {
-            title.innerHTML = '<i class="bi bi-person-plus me-2"></i>Выбрать сотрудника';
-        }
-
-        // Reset search
-        document.getElementById('assignSearchFio').value = '';
-        document.getElementById('assignSearchTab').value = '';
-        document.getElementById('assignUsersList').innerHTML = '';
-        document.getElementById('assignEmpty').classList.remove('d-none');
-    });
-
-    // Search
-    document.getElementById('assignSearchBtn').addEventListener('click', function() {
-        const fio = document.getElementById('assignSearchFio').value.trim();
-        const tab = document.getElementById('assignSearchTab').value.trim();
-
-        if (!fio && !tab) {
-            alert('Введите параметры поиска');
-            return;
-        }
-
-        this.disabled = true;
-        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-
-        const params = new URLSearchParams();
-        if (fio) params.set('fio', fio);
-        if (tab) params.set('tab_number', tab);
-
-        fetch(`/equipment/quick-assign-users/?${params.toString()}`)
-            .then(r => r.json())
-            .then(data => {
-                const listDiv = document.getElementById('assignUsersList');
-                const emptyDiv = document.getElementById('assignEmpty');
-
-                if (data.users.length === 0) {
-                    listDiv.innerHTML = '';
-                    emptyDiv.classList.remove('d-none');
-                    emptyDiv.innerHTML = '<i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i><p class="mt-2">Пользователи не найдены</p>';
-                    return;
-                }
-
-                emptyDiv.classList.add('d-none');
-                listDiv.innerHTML = data.users.map(u => `
-                    <tr>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-success assign-user-btn"
-                                    data-user-id="${u.id}"
-                                    data-user-name="${u.last_name} ${u.first_name}">
-                                <i class="bi bi-check-lg"></i>
-                            </button>
-                        </td>
-                        <td>${u.last_name} ${u.first_name} ${u.patronymic}</td>
-                        <td>${u.tab_number || '—'}</td>
-                        <td>${u.department || '—'}</td>
-                    </tr>
-                `).join('');
-
-                // Click handlers
-                listDiv.querySelectorAll('.assign-user-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const userId = this.dataset.userId;
-                        const endpoint = currentRole === 'mol'
-                            ? `/equipment/assign-mol/${currentEquipmentType}/${currentEquipmentPk}/`
-                            : `/equipment/assign/${currentEquipmentType}/${currentEquipmentPk}/`;
-
-                        this.disabled = true;
-                        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-
-                        fetch(endpoint, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken'),
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                            body: new URLSearchParams({ 'user': userId }),
-                        })
-                        .then(async r => {
-                            const data = await r.json();
-                            if (r.ok && data.success) {
-                                const target = document.getElementById('redirectTarget').value;
-                                if (target === 'inventory') {
-                                    location.href = '{% url "equipment:inventory" %}';
-                                } else {
-                                    location.reload();
-                                }
-                            } else {
-                                alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
-                                this.disabled = false;
-                                this.innerHTML = '<i class="bi bi-check-lg"></i> Выбрать';
-                            }
-                        })
-                        .catch(err => {
-                            alert('Ошибка: ' + err.message);
-                            this.disabled = false;
-                            this.innerHTML = '<i class="bi bi-check-lg"></i> Выбрать';
-                        });
-                    });
-                });
-            })
-            .catch(err => {
-                console.error('Search error:', err);
-                alert('Ошибка при поиске');
-            })
-            .finally(() => {
-                this.disabled = false;
-                this.innerHTML = '<i class="bi bi-search"></i> Найти';
-            });
-    });
-
-    // Enter key search
-    ['assignSearchFio', 'assignSearchTab'].forEach(id => {
-        document.getElementById(id).addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('assignSearchBtn').click();
-            }
-        });
-    });
-
-    // Remove buttons
-    document.querySelectorAll('.remove-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const role = this.dataset.role;
-            const equipmentType = this.dataset.equipmentType;
-            const equipmentPk = this.dataset.equipmentPk;
-            const roleLabel = role === 'user' ? 'сотрудника' : 'МОЛ';
-
-            if (!confirm(`Снять ${roleLabel} с оборудования?`)) {
+function searchUsers(query) {
+    fetch("{% url 'equipment:search_users' %}?q=" + encodeURIComponent(query))
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('userSearchResults');
+            if (data.users.length === 0) {
+                container.innerHTML = '<div class="list-group-item text-muted">Ничего не найдено</div>';
                 return;
             }
+            container.innerHTML = data.users.map(u => `
+                <button type="button" class="list-group-item list-group-item-action" onclick="assignUser(${u.id}, '${u.name.replace(/'/g, "\\'")}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${u.name}</strong>
+                            <div class="small text-muted">
+                                Таб. №${u.tab_number}
+                                ${u.department ? ' · ' + u.department : ''}
+                                ${u.position ? ' · ' + u.position : ''}
+                            </div>
+                        </div>
+                        <i class="bi bi-check-circle text-success"></i>
+                    </div>
+                </button>
+            `).join('');
+        })
+        .catch(err => console.error('searchUsers error:', err));
+}
 
-            this.disabled = true;
-            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-
-            const endpoint = role === 'mol'
-                ? `/equipment/assign-mol/${equipmentType}/${equipmentPk}/`
-                : `/equipment/assign/${equipmentType}/${equipmentPk}/`;
-
-            fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: new URLSearchParams({ 'user': '' }),
-            })
-            .then(async r => {
-                const data = await r.json();
-                if (r.ok && data.success) {
-                    const target = document.getElementById('redirectTarget').value;
-                    if (target === 'inventory') {
-                        location.href = '{% url "equipment:inventory" %}';
-                    } else {
-                        location.reload();
-                    }
-                } else {
-                    alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
-                    this.disabled = false;
-                    this.innerHTML = '<i class="bi bi-x-lg"></i>';
+// Назначить пользователя
+function assignUser(userId, userName) {
+    // Получаем CSRF токен из cookies
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
                 }
-            })
-            .catch(err => {
-                alert('Ошибка: ' + err.message);
-                this.disabled = false;
-                this.innerHTML = '<i class="bi bi-x-lg"></i>';
-            });
-        });
+            }
+        }
+        return cookieValue;
+    }
+    
+    const csrfToken = getCookie('csrftoken');
+    
+    fetch("{% url 'equipment:assign_ajax' equipment_type instance.pk %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+        },
+        body: 'user_id=' + userId + '&action=replace'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
+        }
+    })
+    .catch(err => console.error('assignUser error:', err));
+}
+
+// Обработчики поиска
+const userInput = document.getElementById('userSearchInput');
+const userBtn = document.getElementById('userSearchBtn');
+if (userInput) {
+    userInput.addEventListener('input', function() {
+        clearTimeout(userSearchTimeout);
+        userSearchTimeout = setTimeout(() => searchUsers(this.value.trim()), 300);
     });
-});
+}
+if (userBtn) {
+    userBtn.addEventListener('click', function() {
+        const q = document.getElementById('userSearchInput').value.trim();
+        if (q.length >= 2) {
+            searchUsers(q);
+        }
+    });
+}
 </script>
 {% endblock %}

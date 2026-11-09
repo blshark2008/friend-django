@@ -1,0 +1,41 @@
+{% extends "emergency/base.html" %}
+{% load static %}
+
+{% block title %}Удаление оповещения — «Друг»{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Подтверждение удаления</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="mb-3">Вы уверены, что хотите удалить оповещение:</p>
+                <div class="alert alert-light border">
+                    <strong>{{ alert.title }}</strong>
+                    <div class="small text-muted mt-1">
+                        Отправитель: {{ alert.sender.get_full_name|default:alert.sender.username }}<br>
+                        Создано: {{ alert.created_at|date:"d.m.Y H:i" }}
+                    </div>
+                </div>
+                <p class="text-danger small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Это действие нельзя отменить. Все записи о доставке также будут удалены.
+                </p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash me-1"></i>Удалить
+                        </button>
+                        <a href="{% url 'emergency:alert_detail' alert.pk %}" class="btn btn-outline-secondary">
+                            Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

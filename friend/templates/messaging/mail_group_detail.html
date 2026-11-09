@@ -1,0 +1,287 @@
+{% extends "messaging/base.html" %}
+{% load static %}
+
+{% block title %}{{ group.name }} — Группа рассылки — «Друг»{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-people-fill me-2"></i>{{ group.name }}</h2>
+    <div class="d-flex gap-2">
+        <a href="{% url 'messaging:mail_group_edit' group.pk %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i>Редактировать
+        </a>
+        <a href="{% url 'messaging:mail_group_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Назад к списку
+        </a>
+    </div>
+</div>
+
+<!-- Информация о группе -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Всего участников</div>
+                <div class="h3 mb-0 text-primary">{{ group.member_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Пользователей</div>
+                <div class="h3 mb-0 text-info">{{ direct_users.count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Подразделений</div>
+                <div class="h3 mb-0 text-success">{{ direct_depts.count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Описание -->
+{% if group.description %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h6 class="text-muted small mb-2">Описание</h6>
+        <p class="mb-0">{{ group.description|linebreaks }}</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Пользователи -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-people me-2"></i>Пользователи ({{ direct_users.count }})</h6>
+        <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addUserModal">
+            <i class="bi bi-person-plus me-1"></i>Добавить
+        </button>
+    </div>
+    <div class="card-body p-0">
+        {% if direct_users %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <tbody>
+                    {% for user in direct_users %}
+                    <tr>
+                        <td>
+                            <strong>{{ user.get_full_name }}</strong>
+                            <div class="small text-muted">
+                                {% if user.department %}{{ user.department.name }}{% endif %}
+                                {% if user.department and user.position %} · {% endif %}
+                                {% if user.position %}{{ user.position.name }}{% endif %}
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <form method="post" action="{% url 'messaging:mail_group_remove_user' group.pk %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="user_id" value="{{ user.pk }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted small">Пользователи не добавлены</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Подразделения -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-building me-2"></i>Подразделения ({{ direct_depts.count }})</h6>
+        <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addDeptModal">
+            <i class="bi bi-building-plus me-1"></i>Добавить
+        </button>
+    </div>
+    <div class="card-body p-0">
+        {% if direct_depts %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <tbody>
+                    {% for dept in direct_depts %}
+                    <tr>
+                        <td>
+                            <strong>{{ dept.name }}</strong>
+                            {% if dept.parent %}
+                            <div class="small text-muted">Вышестоящее: {{ dept.parent.name }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <form method="post" action="{% url 'messaging:mail_group_remove_dept' group.pk %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="dept_id" value="{{ dept.pk }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted small">Подразделения не добавлены</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Модальное окно: Добавить пользователя -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Добавить пользователя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="userSearchInput" placeholder="ФИО или табельный номер">
+                    <button type="button" class="btn btn-primary" id="userSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
+                </div>
+                <div id="userSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно: Добавить подразделение -->
+<div class="modal fade" id="addDeptModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-building-plus me-2"></i>Добавить подразделение</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="deptSearchInput" placeholder="Название подразделения">
+                    <button type="button" class="btn btn-success" id="deptSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
+                </div>
+                <div id="deptSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Поиск пользователей
+function searchUsers(query) {
+    fetch(`{% url 'messaging:search_users' %}?q=${encodeURIComponent(query)}`)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('userSearchResults');
+            if (data.users.length === 0) {
+                container.innerHTML = '<div class="list-group-item text-muted">Ничего не найдено</div>';
+                return;
+            }
+            container.innerHTML = data.users.map(u => {
+                return `<button type="button" class="list-group-item list-group-item-action" 
+                    onclick="addUser(${u.id}, '${u.name.replace(/'/g, "\\'")}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${u.name}</strong>
+                            <div class="small text-muted">Таб. №${u.tab_number} · ${u.department}</div>
+                        </div>
+                        <i class="bi bi-plus-circle text-primary"></i>
+                    </div>
+                </button>`;
+            }).join('');
+        });
+}
+
+function addUser(userId, userName) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `{% url 'messaging:mail_group_add_user' group.pk %}`;
+    form.innerHTML = `
+        {% csrf_token %}
+        <input type="hidden" name="user_id" value="${userId}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+const userInput = document.getElementById('userSearchInput');
+const userBtn = document.getElementById('userSearchBtn');
+if (userInput) {
+    userInput.addEventListener('input', function() {
+        const q = this.value.trim();
+        if (q.length >= 2) searchUsers(q);
+    });
+}
+if (userBtn) {
+    userBtn.addEventListener('click', function() {
+        const q = document.getElementById('userSearchInput').value.trim();
+        if (q.length >= 2) searchUsers(q);
+    });
+}
+
+// Поиск подразделений
+function searchDepartments(query) {
+    fetch(`{% url 'messaging:search_departments' %}?q=${encodeURIComponent(query)}`)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('deptSearchResults');
+            if (data.departments.length === 0) {
+                container.innerHTML = '<div class="list-group-item text-muted">Ничего не найдено</div>';
+                return;
+            }
+            container.innerHTML = data.departments.map(d => {
+                return `<button type="button" class="list-group-item list-group-item-action" 
+                    onclick="addDept(${d.id}, '${d.name.replace(/'/g, "\\'")}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${d.name}</strong>
+                            <div class="small text-muted">Код: ${d.code} · Вышест.: ${d.parent}</div>
+                        </div>
+                        <i class="bi bi-plus-circle text-success"></i>
+                    </div>
+                </button>`;
+            }).join('');
+        });
+}
+
+function addDept(deptId, deptName) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `{% url 'messaging:mail_group_add_dept' group.pk %}`;
+    form.innerHTML = `
+        {% csrf_token %}
+        <input type="hidden" name="dept_id" value="${deptId}">
+    `;
+    document.body.appendChild(form);
+    form.submit();
+}
+
+const deptInput = document.getElementById('deptSearchInput');
+const deptBtn = document.getElementById('deptSearchBtn');
+if (deptInput) {
+    deptInput.addEventListener('input', function() {
+        const q = this.value.trim();
+        if (q.length >= 2) searchDepartments(q);
+    });
+}
+if (deptBtn) {
+    deptBtn.addEventListener('click', function() {
+        const q = document.getElementById('deptSearchInput').value.trim();
+        if (q.length >= 2) searchDepartments(q);
+    });
+}
+</script>
+{% endblock %}

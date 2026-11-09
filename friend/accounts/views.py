@@ -4,8 +4,9 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.utils import timezone
 
-from rest_framework import viewsets
+from rest_framework import viewsets, serializers
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from .forms import LoginForm, UserEditForm
 from .models import Department, Position
@@ -49,6 +50,41 @@ class PositionViewSet(viewsets.ModelViewSet):
     queryset = Position.objects.all()
     serializer_class = PositionSerializer
     permission_classes = [IsAuthenticated]
+
+
+# ============================================================================
+# API для пользователей
+# ============================================================================
+
+class UserSimpleSerializer(serializers.ModelSerializer):
+    """Сериализатор для списка пользователей (минимальные поля)."""
+    full_name = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'tab_number', 'last_name', 'first_name', 'patronymic', 'full_name', 'department']
+
+    def get_full_name(self, obj):
+        parts = [obj.last_name, obj.first_name]
+        if obj.patronymic:
+            parts.append(obj.patronymic)
+        return ' '.join(parts)
+
+    def get_department(self, obj):
+        if obj.department:
+            return obj.department.name
+        return None
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    """API для получения списка пользователей."""
+    queryset = User.objects.filter(
+        archive_status=User.STATUS_ACTIVE
+    ).select_related('department', 'position')
+    serializer_class = UserSimpleSerializer
+    permission_classes = [IsAuthenticated]
+    paginate_by = 500
 
 
 class HomeView(LoginRequiredMixin, TemplateView):

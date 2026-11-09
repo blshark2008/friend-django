@@ -32,24 +32,30 @@ class MAXClient:
             'Authorization': self.token,
         }
 
-    def _get(self, endpoint: str, params: dict = None) -> dict:
+    def _get(self, endpoint: str, params: dict = None, timeout: int = 60) -> dict:
         """GET запрос к API."""
         url = f'{self.base_url}{endpoint}'
         try:
-            response = requests.get(url, headers=self._headers(), params=params, timeout=30)
+            response = requests.get(url, headers=self._headers(), params=params, timeout=timeout)
             response.raise_for_status()
             return response.json()
+        except requests.ReadTimeout:
+            logger.error(f'MAX API GET timeout on {endpoint}: request took longer than {timeout}s')
+            raise MAXAPIError(f'GET {endpoint}: ReadTimeout after {timeout}s')
         except requests.RequestException as e:
             logger.error(f'MAX API GET error on {endpoint}: {e}')
             raise MAXAPIError(f'GET {endpoint}: {e}')
 
-    def _post(self, endpoint: str, data: dict = None, params: dict = None) -> dict:
+    def _post(self, endpoint: str, data: dict = None, params: dict = None, timeout: int = 60) -> dict:
         """POST запрос к API."""
         url = f'{self.base_url}{endpoint}'
         try:
-            response = requests.post(url, headers=self._headers(), json=data, params=params, timeout=30)
+            response = requests.post(url, headers=self._headers(), json=data, params=params, timeout=timeout)
             response.raise_for_status()
             return response.json()
+        except requests.ReadTimeout:
+            logger.error(f'MAX API POST timeout on {endpoint}: request took longer than {timeout}s')
+            raise MAXAPIError(f'POST {endpoint}: ReadTimeout after {timeout}s')
         except requests.RequestException as e:
             logger.error(f'MAX API POST error on {endpoint}: {e}')
             raise MAXAPIError(f'POST {endpoint}: {e}')
@@ -72,6 +78,7 @@ class MAXClient:
             format: Разметка текста — 'markdown' или 'html'
             disable_link_preview: Не генерировать превью ссылок
             buttons: Список кнопок для inline_keyboard
+                     Каждая кнопка: {'type': 'callback', 'text': '...', 'payload': '...'}
 
         Returns:
             dict с объектом Message
@@ -98,7 +105,7 @@ class MAXClient:
             payload['attachments'] = [{
                 'type': 'inline_keyboard',
                 'payload': {
-                    'buttons': [buttons]  # MAX требует двумерный массив
+                    'buttons': [buttons]
                 }
             }]
 
@@ -127,7 +134,18 @@ class MAXClient:
         if types:
             params['types'] = ','.join(types)
 
-        return self._get('/updates', params=params)
+        # HTTP timeout должен быть больше long-poll timeout, чтобы запрос не таймит раньше сервера
+        http_timeout = max(timeout + 10, 45)
+        return self._get('/updates', params=params, timeout=http_timeout)
+
+    def get_subscriptions(self) -> list:
+        """
+        Получить список зарегистрированных webhook-подписок.
+
+        Returns:
+            list — список subscription объектов
+        """
+        return self._get('/subscriptions')
 
     def subscribe_webhook(self, url: str, update_types: list = None,
                           secret: str = None) -> dict:
@@ -155,7 +173,7 @@ class MAXClient:
         # DELETE /subscriptions — используем requests напрямую
         url = f'{self.base_url}/subscriptions'
         try:
-            response = requests.delete(url, headers=self._headers(), timeout=30)
+            response = requests.delete(url, headers=self._headers(), timeout=60)
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
@@ -174,3 +192,7 @@ class MAXClient:
             payload['text'] = text
 
         return self._post('/answers', data=payload)
+
+    def answer_callback_simple(self, callback_id: str) -> dict:
+        """Простой ответ на callback (без текста). MAX API: POST /answers?callback_id=..."""
+        return self._post('/answers', data={'callback_id': callback_id})

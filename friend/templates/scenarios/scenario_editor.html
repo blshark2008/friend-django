@@ -1,0 +1,178 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block title %}Редактор: {{ scenario.name }} — «Друг»{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-diagram-3 me-2"></i>{{ scenario.name }}</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'scenarios:scenario_list' %}">Сценарии</a></li>
+                <li class="breadcrumb-item active">Редактор</li>
+            </ol>
+        </nav>
+    </div>
+    <div>
+        <a href="{% url 'scenarios:scenario_edit' scenario.pk %}" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-gear me-1"></i>Настройки
+        </a>
+        <a href="{% url 'scenarios:scenario_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Назад
+        </a>
+    </div>
+</div>
+
+<!-- Вкладки веток -->
+<ul class="nav nav-tabs mb-4" id="branchTabs" role="tablist">
+    {% for branch in branches %}
+    <li class="nav-item" role="presentation">
+        <a class="nav-link {% if forloop.first %}active{% endif %}" href="#branch-{{ branch.code }}" role="tab" data-branch="{{ branch.code }}">
+            {{ branch.name }} <span class="badge bg-secondary">{{ branch.steps.count }}</span>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+<div class="mb-4">
+    <a href="{% url 'scenarios:branch_create' %}?scenario={{ scenario.pk }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-plus-lg"></i> Добавить ветку
+    </a>
+</div>
+
+<!-- Контент вкладок -->
+<div class="tab-content" id="branchTabsContent">
+    {% for branch in branches %}
+    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="branch-{{ branch.code }}" role="tabpanel">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ol me-2"></i>
+                    Ветка "{{ branch.name }}" ({{ branch.code }})
+                </h5>
+                <div>
+                    <a href="{% url 'scenarios:branch_edit' branch.pk %}" class="btn btn-sm btn-outline-secondary me-2">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{% url 'scenarios:branch_delete' branch.pk %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить ветку и все шаги?')">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if branch.steps.exists %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 scenario-table">
+                        <thead>
+                            <tr>
+                                <th class="ps-3" style="width: 50px;">№</th>
+                                <th>Код результата</th>
+                                <th>Текст сообщения</th>
+                                <th>JSON сбора</th>
+                                <th>Рассылка</th>
+                                <th>Дедлайн</th>
+                                <th class="text-end" style="width: 100px;">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for step in branch.steps.all %}
+                            <tr>
+                                <td class="ps-3 fw-bold">{{ step.step_order }}</td>
+                                <td>
+                                    {% if step.prev_result_code %}
+                                        <span class="badge bg-info">{{ step.prev_result_code }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="step-text" style="max-width: 300px;">
+                                        {{ step.message_text|truncatewords:8 }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ step.message_json.type|default:"—" }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ step.mailing_list_json|length }} получ.
+                                    </small>
+                                </td>
+                                <td>
+                                    {% if step.deadline_min %}
+                                        <span class="badge bg-warning text-dark">{{ step.deadline_min }} мин</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-3">
+                                    <a href="{% url 'scenarios:step_edit' step.pk %}" class="btn btn-sm btn-outline-primary me-1" title="Редактировать">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'scenarios:step_delete' step.pk %}" class="btn btn-sm btn-outline-danger" title="Удалить" onclick="return confirm('Удалить шаг?')">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted mb-2">Шагов в ветке нет</p>
+                    <a href="{% url 'scenarios:step_create' %}?branch={{ branch.pk }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-lg me-1"></i>Добавить первый шаг
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-white">
+                <a href="{% url 'scenarios:step_create' %}?branch={{ branch.pk }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Добавить шаг
+                </a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-diagram-3 text-muted" style="font-size: 3rem;"></i>
+            <p class="text-muted mt-3">Веток не найдено</p>
+            <a href="{% url 'scenarios:branch_create' %}?scenario={{ scenario.pk }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Создать первую ветку
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var tabs = document.querySelectorAll('#branchTabs a[data-branch]');
+    tabs.forEach(function (tab) {
+        tab.addEventListener('click', function (e) {
+            e.preventDefault();
+            var branchCode = this.getAttribute('data-branch');
+
+            // Убираем active со всех табов
+            tabs.forEach(function (t) { t.classList.remove('active'); });
+            this.classList.add('active');
+
+            // Скрываем все pane
+            document.querySelectorAll('#branchTabsContent > div').forEach(function (pane) {
+                pane.classList.remove('show', 'active');
+            });
+
+            // Показываем нужную
+            var target = document.getElementById('branch-' + branchCode);
+            if (target) {
+                target.classList.add('show', 'active');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

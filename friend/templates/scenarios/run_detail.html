@@ -1,0 +1,232 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block title %}Запуск: {{ run.scenario.name }} — «Друг»{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-play-circle me-2"></i>{{ run.scenario.name }}</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'scenarios:scenario_list' %}">Сценарии</a></li>
+                <li class="breadcrumb-item active">Запуск</li>
+            </ol>
+        </nav>
+    </div>
+    <div>
+        {% if run.status == 'running' %}
+        <form method="post" action="{% url 'scenarios:run_cancel' run.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Отменить запуск?')">
+                <i class="bi bi-stop-circle me-1"></i>Отменить
+            </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'scenarios:run_list' %}" class="btn btn-outline-secondary ms-2">
+            <i class="bi bi-arrow-left me-1"></i>Назад
+        </a>
+    </div>
+</div>
+
+<!-- Статистика запуска -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body">
+                <div class="text-muted small">Статус</div>
+                <div class="mt-1">
+                    {% if run.status == 'running' %}
+                        <span class="badge bg-success fs-6">Выполняется</span>
+                    {% elif run.status == 'completed' %}
+                        <span class="badge bg-secondary fs-6">Завершён</span>
+                    {% elif run.status == 'cancelled' %}
+                        <span class="badge bg-warning text-dark fs-6">Отменён</span>
+                    {% else %}
+                        <span class="badge bg-info fs-6">Ожидание</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body">
+                <div class="text-muted small">Отправлено</div>
+                <div class="h4 mb-0 mt-1">{{ step_runs|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body">
+                <div class="text-muted small">Ответов</div>
+                <div class="h4 mb-0 mt-1 text-success">{{ answers|length }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body">
+                <div class="text-muted small">Запущен</div>
+                <div class="h6 mb-0 mt-1">{{ run.started_at|date:"d.m.Y H:i" }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Вкладки -->
+<ul class="nav nav-tabs mb-4" id="runTabs" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-steps">Шаги</button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-answers">Ответы</button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-logs">Журнал</button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- Шаги -->
+    <div class="tab-pane fade show active" id="tab-steps">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                {% if step_runs %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Шаг</th>
+                                <th>Ветка</th>
+                                <th>Получатель</th>
+                                <th>Статус</th>
+                                <th>Отправлено</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sr in step_runs %}
+                            <tr>
+                                <td class="ps-4">Шаг {{ sr.step.step_order }}</td>
+                                <td>{{ sr.step.branch.name }}</td>
+                                <td>{{ sr.recipient.get_full_name|default:sr.recipient.username }}</td>
+                                <td>
+                                    {% if sr.status == 'answered' %}
+                                        <span class="badge bg-success">Ответ получен</span>
+                                    {% elif sr.status == 'expired' %}
+                                        <span class="badge bg-warning text-dark">Просрочено</span>
+                                    {% elif sr.status == 'cancelled' %}
+                                        <span class="badge bg-secondary">Отменено</span>
+                                    {% else %}
+                                        <span class="badge bg-info">Отправлено</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ sr.sent_at|date:"d.m.Y H:i"|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted mb-0">Шагов нет</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Ответы -->
+    <div class="tab-pane fade" id="tab-answers">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                {% if answers %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Сотрудник</th>
+                                <th>Шаг</th>
+                                <th>Ответ</th>
+                                <th>Получен</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for answer in answers %}
+                            <tr>
+                                <td class="ps-4">{{ answer.employee.get_full_name }}</td>
+                                <td>Шаг {{ answer.step_run.step.step_order }}</td>
+                                <td><code>{{ answer.answer_json|truncatewords:5 }}</code></td>
+                                <td>{{ answer.received_at|date:"d.m.Y H:i" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted mb-0">Ответов нет</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Журнал -->
+    <div class="tab-pane fade" id="tab-logs">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                {% if logs %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0" style="font-size:0.85rem;">
+                        <thead>
+                            <tr>
+                                <th class="ps-3" style="width:140px;">Время</th>
+                                <th style="width:120px;">Событие</th>
+                                <th>Детали</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                            <tr>
+                                <td class="ps-3 text-muted">{{ log.created_at|date:"H:i:s" }}</td>
+                                <td>
+                                    {% if log.event_type == 'run_started' %}
+                                        <span class="badge bg-success">Запуск</span>
+                                    {% elif log.event_type == 'step_sent' %}
+                                        <span class="badge bg-info">Отправлено</span>
+                                    {% elif log.event_type == 'answer_received' %}
+                                        <span class="badge bg-warning">Ответ</span>
+                                    {% elif log.event_type == 'deadline_expired' %}
+                                        <span class="badge bg-danger">Дедлайн</span>
+                                    {% elif log.event_type == 'escalation' %}
+                                        <span class="badge bg-warning text-dark">Эскалация</span>
+                                    {% elif log.event_type == 'run_completed' %}
+                                        <span class="badge bg-secondary">Завершён</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ log.get_event_type_display }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if log.payload_json %}
+                                        <pre class="mb-0" style="white-space:pre-wrap;max-width:600px;">{{ log.payload_json|truncatewords:10 }}</pre>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted mb-0">Записей в журнале нет</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

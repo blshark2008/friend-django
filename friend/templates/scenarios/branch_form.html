@@ -1,0 +1,55 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block title %}{% if object %}Редактирование —{% else %}Новая —{% endif %} Ветка — «Друг»{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-{% if object %}pencil{% else %}plus{% endif %} me-2"></i>
+                    {% if object %}Редактирование{% else %}Новая{% endif %} ветка
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="{{ form.scenario.id_for_label }}" class="form-label">{{ form.scenario.label }}</label>
+                        {{ form.scenario }}
+                        {% if form.scenario.errors %}
+                            <div class="invalid-feedback d-block">{{ form.scenario.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback d-block">{{ form.name.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i>Сохранить
+                        </button>
+                        {% if object and object.scenario_id %}
+                        <a href="{% url 'scenarios:scenario_editor' object.scenario_id %}" class="btn btn-outline-secondary">
+                            Отмена
+                        </a>
+                        {% else %}
+                        <a href="{% url 'scenarios:scenario_list' %}" class="btn btn-outline-secondary">
+                            Отмена
+                        </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

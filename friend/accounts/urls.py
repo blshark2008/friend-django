@@ -1,7 +1,7 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
 from django.contrib.auth import views as auth_views
-from .views import DepartmentViewSet, PositionViewSet
+from .views import DepartmentViewSet, PositionViewSet, UserViewSet
 from .views import (
     HomeView, UserListView, DepartmentListView, DashboardView,
     PositionListView, archive_user, restore_user,
@@ -14,6 +14,7 @@ from .views import LoginView, LogoutView
 router = DefaultRouter()
 router.register(r'departments', DepartmentViewSet)
 router.register(r'positions', PositionViewSet)
+router.register(r'users', UserViewSet)
 
 app_name = 'accounts'
 

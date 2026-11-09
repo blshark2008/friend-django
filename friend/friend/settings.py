@@ -37,11 +37,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     'accounts',
     'equipment',
     'siem',
     'training',
     'messaging',
+    'scenarios',
 ]
 
 MIDDLEWARE = [
@@ -150,16 +152,33 @@ SKILLSPACE_BASE_URL = 'https://api.skillspace.ru'
 SKILLSPACE_WEBHOOK_BASE_URL = 'https://skillspace.ru'
 
 # Email settings
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-EMAIL_HOST = 'localhost'
-EMAIL_PORT = 25
-DEFAULT_FROM_EMAIL = 'noreply@friend.local'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.yandex.ru'
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_HOST_USER = 'blshark2008@yandex.ru'
+EMAIL_HOST_PASSWORD = 'vgdbdncejuopbqpv'
+DEFAULT_FROM_EMAIL = 'blshark2008@yandex.ru'
 
 # MAX Bot settings
 MAX_BOT_TOKEN = 'f9LHodD0cOIYMz2y4innjHTr1GbEaOS0kX_FdLooS7xj1JzkdrVufdvwwwpOmfJ8vaemQcwdhNJOz8b52Sdw'
 MAX_API_BASE_URL = 'https://platform-api2.max.ru'
+# MAX_BOT_API_URL больше не используется — bot_api_client работает напрямую через MAX API
 MAX_WEBHOOK_PATH = '/max/webhook/'
 MAX_WEBHOOK_SECRET = ''
+# Webhook URL — устанавливается через deploy/deploy.sh
+MAX_WEBHOOK_URL = 'https://84.54.59.213/max/webhook/'
 
 # Telegram Bot settings (для будущих рассылок через Telegram)
 TELEGRAM_BOT_TOKEN = ''
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}

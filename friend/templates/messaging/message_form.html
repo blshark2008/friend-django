@@ -16,9 +16,9 @@
 
 <div class="row">
     <div class="col-lg-8">
-        <div class="card border-0 shadow-sm table-card">
+        <div class="card border-0 shadow-sm">
             <div class="card-body p-4">
-                <form method="post">
+                <form method="post" id="messageForm">
                     {% csrf_token %}
 
                     <div class="mb-3">
@@ -38,43 +38,37 @@
                         {% endif %}
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="{{ form.priority.id_for_label }}" class="form-label">{{ form.priority.label }}</label>
-                            {{ form.priority }}
-                            {% if form.priority.errors %}
-                                <div class="invalid-feedback d-block">{{ form.priority.errors }}</div>
-                            {% endif %}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.channel.id_for_label }}" class="form-label">{{ form.channel.label }}</label>
-                            {{ form.channel }}
-                            {% if form.channel.errors %}
-                                <div class="invalid-feedback d-block">{{ form.channel.errors }}</div>
-                            {% endif %}
-                        </div>
+                    <div class="mb-4">
+                        <label for="{{ form.priority.id_for_label }}" class="form-label">{{ form.priority.label }}</label>
+                        {{ form.priority }}
+                        {% if form.priority.errors %}
+                            <div class="invalid-feedback d-block">{{ form.priority.errors }}</div>
+                        {% endif %}
                     </div>
 
                     <hr>
-                    <h6 class="mb-3">Получатели</h6>
 
+                    <!-- Список получателей -->
                     <div class="mb-3">
-                        <label for="{{ form.recipients.id_for_label }}" class="form-label">{{ form.recipients.label }}</label>
-                        {{ form.recipients }}
-                        {% if form.recipients.errors %}
-                            <div class="invalid-feedback d-block">{{ form.recipients.errors }}</div>
-                        {% endif %}
-                        <div class="form-text">Выберите отдельных получателей</div>
+                        <h6 class="mb-2"><i class="bi bi-people me-1"></i>Получатели</h6>
+                        <div id="recipientsList" class="mb-2"></div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                                <i class="bi bi-person-plus me-1"></i>Добавить получателей
+                            </button>
+                            <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addDeptModal">
+                                <i class="bi bi-building me-1"></i>Добавить подразделение
+                            </button>
+                            <button type="button" class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal">
+                                <i class="bi bi-people-fill me-1"></i>Добавить группу рассылки
+                            </button>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="{{ form.department.id_for_label }}" class="form-label">{{ form.department.label }}</label>
-                        {{ form.department }}
-                        {% if form.department.errors %}
-                            <div class="invalid-feedback d-block">{{ form.department.errors }}</div>
-                        {% endif %}
-                        <div class="form-text">Или выберите подразделение для массовой рассылки</div>
-                    </div>
+                    <!-- Скрытые поля для отправки формы -->
+                    <input type="hidden" name="recipients" id="id_recipients" value="">
+                    <input type="hidden" name="departments" id="id_departments" value="">
+                    <input type="hidden" name="mail_groups" id="id_mail_groups" value="">
 
                     <div class="d-flex gap-2 mt-4">
                         <button type="submit" class="btn btn-primary">
@@ -97,36 +91,387 @@
             </div>
             <div class="card-body">
                 <ul class="small text-muted mb-0">
-                    <li class="mb-2">Сообщения отправляются только пользователям с включёнными каналами уведомлений</li>
-                    <li class="mb-2">При рассылке по подразделению сообщение получат все активные сотрудники</li>
+                    <li class="mb-2">Сообщения отправляются пользователям с включёнными каналами уведомлений</li>
+                    <li class="mb-2">Дубликаты получателей автоматически исключаются</li>
                     <li>Сообщения со статусом «Черновик» можно редактировать</li>
                 </ul>
             </div>
         </div>
+    </div>
+</div>
 
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white">
-                <h6 class="mb-0"><i class="bi bi-lightning me-1"></i>Каналы отправки</h6>
+<!-- Модальное окно: Добавить получателей -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Добавить получателей</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="card-body">
-                <div class="mb-2">
-                    <strong>MAX</strong>
-                    <div class="small text-muted">Корпоративный мессенджер</div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="userSearchInput" placeholder="ФИО или табельный номер">
+                    <button type="button" class="btn btn-primary" id="userSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
                 </div>
-                <div class="mb-2">
-                    <strong>Telegram</strong>
-                    <div class="small text-muted">Личный Telegram пользователя</div>
-                </div>
-                <div class="mb-2">
-                    <strong>Корпоративная почта</strong>
-                    <div class="small text-muted">Корпоративный email</div>
-                </div>
-                <div>
-                    <strong>Личная почта</strong>
-                    <div class="small text-muted">Личный email пользователя</div>
-                </div>
+                <div id="userSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Модальное окно: Добавить подразделение -->
+<div class="modal fade" id="addDeptModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-building me-2"></i>Добавить подразделение</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="deptSearchInput" placeholder="Название подразделения">
+                    <button type="button" class="btn btn-success" id="deptSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
+                </div>
+                <div id="deptSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно: Добавить группу рассылки -->
+<div class="modal fade" id="addGroupModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-people-fill me-2"></i>Добавить группу рассылки</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="groupSearchInput" placeholder="Название группы рассылки">
+                    <button type="button" class="btn btn-info text-white" id="groupSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
+                </div>
+                <div id="groupSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Хранилище выбранных получателей, подразделений и групп рассылки
+let selectedUsers = new Set();
+let selectedDepts = new Set();
+let selectedGroups = new Set();
+
+// Обновление скрытых полей формы
+function updateHiddenFields() {
+    document.getElementById('id_recipients').value = Array.from(selectedUsers).join(',');
+    document.getElementById('id_departments').value = Array.from(selectedDepts).join(',');
+    document.getElementById('id_mail_groups').value = Array.from(selectedGroups).join(',');
+    renderRecipientsList();
+}
+
+// Отрисовка списка получателей
+function renderRecipientsList() {
+    const container = document.getElementById('recipientsList');
+    let html = '';
+
+    // Пользователи
+    if (selectedUsers.size > 0) {
+        html += '<div class="mb-2"><small class="text-muted">Получатели:</small></div>';
+        selectedUsers.forEach(id => {
+            const el = document.querySelector(`.user-item[data-id="${id}"]`);
+            if (el) {
+                html += `<span class="badge bg-primary me-1 mb-1">
+                    ${el.dataset.name}
+                    <button type="button" class="btn-close btn-close-white ms-1" onclick="removeUser(${id})" style="font-size:0.5rem;"></button>
+                </span>`;
+            }
+        });
+    }
+
+    // Подразделения
+    if (selectedDepts.size > 0) {
+        html += '<div class="mb-2"><small class="text-muted">Подразделения:</small></div>';
+        selectedDepts.forEach(id => {
+            const el = document.querySelector(`.dept-item[data-id="${id}"]`);
+            if (el) {
+                html += `<span class="badge bg-success me-1 mb-1">
+                    ${el.dataset.name}
+                    <button type="button" class="btn-close btn-close-white ms-1" onclick="removeDept(${id})" style="font-size:0.5rem;"></button>
+                </span>`;
+            }
+        });
+    }
+
+    // Группы рассылки
+    if (selectedGroups.size > 0) {
+        html += '<div class="mb-2"><small class="text-muted">Группы рассылки:</small></div>';
+        selectedGroups.forEach(id => {
+            const el = document.querySelector(`.group-item[data-id="${id}"]`);
+            if (el) {
+                html += `<span class="badge bg-info text-dark me-1 mb-1">
+                    <i class="bi bi-people-fill me-1"></i>${el.dataset.name}
+                    <button type="button" class="btn-close btn-close-white ms-1" onclick="removeGroup(${id})" style="font-size:0.5rem;"></button>
+                </span>`;
+            }
+        });
+    }
+
+    if (!html) {
+        html = '<div class="text-muted small">Получатели не выбраны</div>';
+    }
+
+    container.innerHTML = html;
+}
+
+// Удаление пользователя
+function removeUser(id) {
+    selectedUsers.delete(id);
+    updateHiddenFields();
+}
+
+// Удаление подразделения
+function removeDept(id) {
+    selectedDepts.delete(id);
+    updateHiddenFields();
+}
+
+// Удаление группы рассылки
+function removeGroup(id) {
+    selectedGroups.delete(id);
+    updateHiddenFields();
+}
+
+// Поиск пользователей
+let userSearchTimeout = null;
+
+function searchUsers(query) {
+    console.log('searchUsers:', query);
+    fetch(`{% url 'messaging:search_users' %}?q=${encodeURIComponent(query)}`)
+        .then(r => {
+            console.log('response status:', r.status);
+            return r.json();
+        })
+        .then(data => {
+            console.log('data:', data);
+            const container = document.getElementById('userSearchResults');
+            if (data.users.length === 0) {
+                container.innerHTML = '<div class="list-group-item text-muted">Ничего не найдено</div>';
+                return;
+            }
+            container.innerHTML = data.users.map(u => {
+                const isSelected = selectedUsers.has(u.id);
+                return `<button type="button" class="list-group-item list-group-item-action ${isSelected ? 'disabled' : ''}" 
+                    ${!isSelected ? `onclick="addUser(${u.id}, '${u.name.replace(/'/g, "\\'")}', '${u.tab_number}', '${u.department}', '${u.position.replace(/'/g, "\\'")}')"`: ''}>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${u.name}</strong>
+                            <div class="small text-muted">Таб. №${u.tab_number} · ${u.department}</div>
+                        </div>
+                        ${isSelected ? '<span class="badge bg-success">Добавлен</span>' : '<i class="bi bi-plus-circle"></i>'}
+                    </div>
+                </button>`;
+            }).join('');
+        })
+        .catch(err => console.error('searchUsers error:', err));
+}
+
+const userInput = document.getElementById('userSearchInput');
+const userBtn = document.getElementById('userSearchBtn');
+if (userInput) {
+    userInput.addEventListener('input', function() {
+        clearTimeout(userSearchTimeout);
+        userSearchTimeout = setTimeout(() => searchUsers(this.value.trim()), 300);
+    });
+}
+if (userBtn) {
+    userBtn.addEventListener('click', function() {
+        const q = document.getElementById('userSearchInput').value.trim();
+        console.log('btn clicked, query:', q);
+        if (q.length >= 2) {
+            searchUsers(q);
+        }
+    });
+}
+
+// Добавить пользователя
+function addUser(id, name, tabNumber, department, position) {
+    selectedUsers.add(id);
+
+    // Создаём элемент для отображения в списке
+    const badge = document.createElement('span');
+    badge.className = 'user-item d-none';
+    badge.dataset.id = id;
+    badge.dataset.name = name;
+    document.getElementById('recipientsList').parentElement.appendChild(badge);
+
+    updateHiddenFields();
+
+    // Обновляем результат поиска
+    const btn = document.querySelector(`#userSearchResults button[onclick*="addUser(${id},"]`);
+    if (btn) {
+        btn.classList.add('disabled');
+        btn.removeAttribute('onclick');
+        const badge = btn.querySelector('.badge, .bi-plus-circle');
+        if (badge) {
+            badge.outerHTML = '<span class="badge bg-success">Добавлен</span>';
+        }
+    }
+}
+
+// Поиск подразделений
+let deptSearchTimeout = null;
+
+function searchDepartments(query) {
+    console.log('searchDepartments:', query);
+    fetch(`{% url 'messaging:search_departments' %}?q=${encodeURIComponent(query)}`)
+        .then(r => r.json())
+        .then(data => {
+            console.log('dept data:', data);
+            const container = document.getElementById('deptSearchResults');
+            if (data.departments.length === 0) {
+                container.innerHTML = '<div class="list-group-item text-muted">Ничего не найдено</div>';
+                return;
+            }
+            container.innerHTML = data.departments.map(d => {
+                const isSelected = selectedDepts.has(d.id);
+                return `<button type="button" class="list-group-item list-group-item-action ${isSelected ? 'disabled' : ''}" 
+                    ${!isSelected ? `onclick="addDept(${d.id}, '${d.name.replace(/'/g, "\\'")}', '${d.code}', '${d.parent.replace(/'/g, "\\'")}')"`: ''}>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${d.name}</strong>
+                            <div class="small text-muted">Код: ${d.code} · Вышест.: ${d.parent}</div>
+                        </div>
+                        ${isSelected ? '<span class="badge bg-success">Добавлено</span>' : '<i class="bi bi-plus-circle"></i>'}
+                    </div>
+                </button>`;
+            }).join('');
+        })
+        .catch(err => console.error('searchDepartments error:', err));
+}
+
+const deptInput = document.getElementById('deptSearchInput');
+const deptBtn = document.getElementById('deptSearchBtn');
+if (deptInput) {
+    deptInput.addEventListener('input', function() {
+        clearTimeout(deptSearchTimeout);
+        deptSearchTimeout = setTimeout(() => searchDepartments(this.value.trim()), 300);
+    });
+}
+if (deptBtn) {
+    deptBtn.addEventListener('click', function() {
+        const q = document.getElementById('deptSearchInput').value.trim();
+        console.log('dept btn clicked, query:', q);
+        if (q.length >= 2) {
+            searchDepartments(q);
+        }
+    });
+}
+
+// Добавить подразделение
+function addDept(id, name, code, parent) {
+    selectedDepts.add(id);
+
+    // Создаём элемент для отображения в списке
+    const badge = document.createElement('span');
+    badge.className = 'dept-item d-none';
+    badge.dataset.id = id;
+    badge.dataset.name = name;
+    document.getElementById('recipientsList').parentElement.appendChild(badge);
+
+    updateHiddenFields();
+
+    // Обновляем результат поиска
+    const btn = document.querySelector(`#deptSearchResults button[onclick*="addDept(${id},"]`);
+    if (btn) {
+        btn.classList.add('disabled');
+        btn.removeAttribute('onclick');
+        const badge = btn.querySelector('.badge, .bi-plus-circle');
+        if (badge) {
+            badge.outerHTML = '<span class="badge bg-success">Добавлено</span>';
+        }
+    }
+}
+
+// Поиск групп рассылки
+let groupSearchTimeout = null;
+
+function searchGroups(query) {
+    fetch(`{% url 'messaging:search_mail_groups' %}?q=${encodeURIComponent(query)}`)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('groupSearchResults');
+            if (data.groups.length === 0) {
+                container.innerHTML = '<div class="list-group-item text-muted">Ничего не найдено</div>';
+                return;
+            }
+            container.innerHTML = data.groups.map(g => {
+                const isSelected = selectedGroups.has(g.id);
+                return `<button type="button" class="list-group-item list-group-item-action ${isSelected ? 'disabled' : ''}"
+                    ${!isSelected ? `onclick="addGroup(${g.id}, '${g.name.replace(/'/g, "\\'")}', ${g.member_count})"`: ''}>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${g.name}</strong>
+                            <div class="small text-muted">${g.description}</div>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-info text-dark me-1">${g.member_count} уч.</span>
+                            ${isSelected ? '<span class="badge bg-success">Добавлено</span>' : '<i class="bi bi-plus-circle"></i>'}
+                        </div>
+                    </div>
+                </button>`;
+            }).join('');
+        })
+        .catch(err => console.error('searchGroups error:', err));
+}
+
+const groupInput = document.getElementById('groupSearchInput');
+const groupBtn = document.getElementById('groupSearchBtn');
+if (groupInput) {
+    groupInput.addEventListener('input', function() {
+        clearTimeout(groupSearchTimeout);
+        groupSearchTimeout = setTimeout(() => searchGroups(this.value.trim()), 300);
+    });
+}
+if (groupBtn) {
+    groupBtn.addEventListener('click', function() {
+        const q = document.getElementById('groupSearchInput').value.trim();
+        if (q.length >= 2) {
+            searchGroups(q);
+        }
+    });
+}
+
+// Добавить группу рассылки
+function addGroup(id, name, memberCount) {
+    selectedGroups.add(id);
+
+    // Создаём элемент для отображения в списке
+    const badge = document.createElement('span');
+    badge.className = 'group-item d-none';
+    badge.dataset.id = id;
+    badge.dataset.name = name;
+    document.getElementById('recipientsList').parentElement.appendChild(badge);
+
+    updateHiddenFields();
+
+    // Обновляем результат поиска
+    const btn = document.querySelector(`#groupSearchResults button[onclick*="addGroup(${id},"]`);
+    if (btn) {
+        btn.classList.add('disabled');
+        btn.removeAttribute('onclick');
+        const badge = btn.querySelector('.badge, .bi-plus-circle');
+        if (badge) {
+            badge.outerHTML = '<span class="badge bg-success">Добавлено</span>';
+        }
+    }
+}
+
+// Инициализация при загрузке
+updateHiddenFields();
+</script>
 {% endblock %}

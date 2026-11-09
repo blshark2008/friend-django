@@ -11,198 +11,192 @@
     .search-box {
         border: 2px solid #dee2e6;
         border-radius: 12px;
-        padding: 2rem;
+        padding: 1.25rem;
         background: #f8f9fa;
     }
-    .stat-card {
-        border: none;
-        border-radius: 12px;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    .result-card {
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        margin-bottom: 0.75rem;
+        transition: box-shadow 0.2s;
     }
-    .stat-card .card-body {
-        padding: 1.5rem;
+    .result-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-    .stat-number {
-        font-size: 2rem;
-        font-weight: 700;
-        line-height: 1;
-    }
-    .stat-label {
-        font-size: 0.85rem;
+    .result-card .field-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
         color: #6c757d;
-        margin-top: 0.5rem;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.1rem;
     }
-    .search-type-btn {
-        border: 2px solid #dee2e6;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        cursor: pointer;
-        transition: all 0.2s;
-        background: #fff;
+    .result-card .field-value {
+        font-size: 0.85rem;
+        word-break: break-word;
     }
-    .search-type-btn:hover {
-        border-color: #3498db;
-        background: #f0f8ff;
+    .result-card .field-value code {
+        font-size: 0.85rem;
     }
-    .search-type-btn.active {
-        border-color: #3498db;
-        background: #3498db;
-        color: #fff;
-    }
-    .search-type-btn .bi {
-        font-size: 1.25rem;
-        margin-bottom: 0.25rem;
-    }
-    .search-type-btn .label {
-        display: block;
-        font-size: 0.8rem;
+    @media (max-width: 767.98px) {
+        .search-box {
+            padding: 1rem;
+        }
+        .result-card .row > [class*="col-"] {
+            padding: 0.35rem 0.5rem;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<!-- Статистика -->
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="card-body text-center">
-                <div class="stat-number text-primary">{{ total_count }}</div>
-                <div class="stat-label">Найдено результатов</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="card-body text-center">
-                <a href="{% url 'equipment:assigned_equipment' %}" class="text-decoration-none text-primary fw-bold">
-                    <i class="bi bi-people me-1"></i>Закрепленное оборудование
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Поиск -->
-<div class="search-box mb-4">
+<div class="search-box mb-3">
     <form method="get" action="{% url 'equipment:inventory_search' %}">
-        <div class="row g-3 align-items-end">
-            <div class="col-md-6">
-                <label class="form-label fw-semibold">Поиск</label>
-                <input type="text" name="q" class="form-control form-control-lg" 
-                       placeholder="Введите запрос..." value="{{ search_query }}">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label fw-semibold">Поле поиска</label>
-                <select name="type" class="form-select form-select-lg">
-                    {% for type_value, type_label in search_types %}
-                    <option value="{{ type_value }}" {% if search_type == type_value %}selected{% endif %}>{{ type_label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary btn-lg w-100">
-                    <i class="bi bi-search me-1"></i>Найти
-                </button>
-            </div>
+        <div class="mb-2">
+            <input type="text" name="q" class="form-control form-control-lg" 
+                   placeholder="Поиск по всем полям..." value="{{ search_query }}"
+                   autofocus>
         </div>
+        <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-search me-1"></i>Найти
+        </button>
     </form>
-</div>
-
-<!-- Быстрый поиск -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Быстрый поиск</h6>
-    </div>
-    <div class="card-body">
-        <div class="row g-2">
-            <div class="col-6 col-md-4 col-lg-2">
-                <a href="{% url 'equipment:inventory_search' %}?q=&type=inventory" class="search-type-btn text-center text-decoration-none d-block">
-                    <i class="bi bi-upc-scan d-block"></i>
-                    <span class="label">Инв. номер</span>
-                </a>
-            </div>
-            <div class="col-6 col-md-4 col-lg-2">
-                <a href="{% url 'equipment:inventory_search' %}?q=&type=serial" class="search-type-btn text-center text-decoration-none d-block">
-                    <i class="bi bi-upc d-block"></i>
-                    <span class="label">Серийный номер</span>
-                </a>
-            </div>
-            <div class="col-6 col-md-4 col-lg-2">
-                <a href="{% url 'equipment:inventory_search' %}?q=&type=name" class="search-type-btn text-center text-decoration-none d-block">
-                    <i class="bi bi-tag d-block"></i>
-                    <span class="label">Наименование</span>
-                </a>
-            </div>
-            <div class="col-6 col-md-4 col-lg-2">
-                <a href="{% url 'equipment:inventory_search' %}?q=&type=hostname" class="search-type-btn text-center text-decoration-none d-block">
-                    <i class="bi bi-hdd-network d-block"></i>
-                    <span class="label">Имя в сети</span>
-                </a>
-            </div>
-            <div class="col-6 col-md-4 col-lg-2">
-                <a href="{% url 'equipment:inventory_search' %}?q=&type=mac" class="search-type-btn text-center text-decoration-none d-block">
-                    <i class="bi bi-ethernet d-block"></i>
-                    <span class="label">MAC-адрес</span>
-                </a>
-            </div>
-            <div class="col-6 col-md-4 col-lg-2">
-                <a href="{% url 'equipment:inventory_search' %}?q=&type=user" class="search-type-btn text-center text-decoration-none d-block">
-                    <i class="bi bi-people d-block"></i>
-                    <span class="label">Пользователь</span>
-                </a>
-            </div>
-        </div>
-    </div>
 </div>
 
 <!-- Результаты поиска -->
 {% if search_query %}
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Результаты поиска</h6>
-        <span class="badge bg-primary">{{ total_count }} шт.</span>
+<div class="mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0"><i class="bi bi-list-ul me-1"></i>Результаты</h6>
+        <span class="badge bg-primary">{{ total_count }}</span>
     </div>
-    <div class="table-responsive">
-        <table class="table table-sm table-hover mb-0">
-            <thead>
-                <tr>
-                    <th>Инв. номер</th>
-                    <th>Наименование</th>
-                    <th>Категория</th>
-                    <th>Серийный номер</th>
-                    <th>Имя в сети</th>
-                    <th>MAC-адрес</th>
-                    <th>Закреплён</th>
-                    <th>МОЛ</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for eq in equipment_list %}
-                <tr>
-                    <td><code>{{ eq.inventory_number }}</code></td>
-                    <td>{{ eq.name|default:"—" }}</td>
-                    <td>{{ eq.category|default:"—" }}</td>
-                    <td>{{ eq.serial_number|default:"—" }}</td>
-                    <td>{{ eq.hostname|default:"—" }}</td>
-                    <td>{{ eq.mac_address|default:"—" }}</td>
-                    <td>{{ eq.assigned_user|default:"—" }}</td>
-                    <td>{{ eq.responsible_user|default:"—" }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="8" class="text-center text-muted py-4">
-                        <i class="bi bi-search me-2"></i>Ничего не найдено по запросу "{{ search_query }}"
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+
+    {% for eq in equipment_list %}
+    <div class="result-card card">
+        <div class="card-header d-flex justify-content-between align-items-center py-1 px-2 bg-light">
+            <small class="text-muted"><i class="bi bi-hash me-1"></i>#{{ eq.pk }}</small>
+            {% if eq.category %}
+            <a href="{% url 'equipment:edit' eq.category.slug eq.pk %}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-pencil-square me-1"></i>Редактировать
+            </a>
+            {% else %}
+            <span class="text-muted small">Без категории</span>
+            {% endif %}
+        </div>
+        <div class="card-body p-2">
+            <div class="row g-1">
+                <!-- Инв. номер -->
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Инв. номер</div>
+                    <div class="field-value"><code>{{ eq.inventory_number }}</code></div>
+                </div>
+                <!-- Наименование -->
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Наименование</div>
+                    <div class="field-value">{{ eq.name|default:"—" }}</div>
+                </div>
+                <!-- Модель -->
+                {% if eq.model %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Модель</div>
+                    <div class="field-value">{{ eq.model }}</div>
+                </div>
+                {% endif %}
+                <!-- Бренд -->
+                {% if eq.brand %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Бренд</div>
+                    <div class="field-value">{{ eq.brand.name }}</div>
+                </div>
+                {% endif %}
+                <!-- Категория -->
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Категория</div>
+                    <div class="field-value">{{ eq.category|default:"—" }}</div>
+                </div>
+                <!-- Серийный номер -->
+                {% if eq.serial_number %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Серийный номер</div>
+                    <div class="field-value"><code>{{ eq.serial_number }}</code></div>
+                </div>
+                {% endif %}
+                <!-- Имя в сети -->
+                {% if eq.hostname %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Имя в сети</div>
+                    <div class="field-value"><code>{{ eq.hostname }}</code></div>
+                </div>
+                {% endif %}
+                <!-- MAC -->
+                {% if eq.mac_address %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">MAC-адрес</div>
+                    <div class="field-value"><code>{{ eq.mac_address }}</code></div>
+                </div>
+                {% endif %}
+                <!-- IP -->
+                {% if eq.ip_address %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">IP-адрес</div>
+                    <div class="field-value"><code>{{ eq.ip_address }}</code></div>
+                </div>
+                {% endif %}
+                <!-- ОС -->
+                {% if eq.os %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">ОС</div>
+                    <div class="field-value">{{ eq.os }}</div>
+                </div>
+                {% endif %}
+                <!-- Процессор -->
+                {% if eq.cpu %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Процессор</div>
+                    <div class="field-value">{{ eq.cpu }}</div>
+                </div>
+                {% endif %}
+                <!-- Расположение -->
+                {% if eq.location %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Кабинет</div>
+                    <div class="field-value">{{ eq.location }}</div>
+                </div>
+                {% endif %}
+                <!-- Закреплён -->
+                {% if eq.assigned_user %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Закреплён</div>
+                    <div class="field-value">{{ eq.assigned_user.get_full_name|default:eq.assigned_user }}</div>
+                </div>
+                {% endif %}
+                <!-- МОЛ -->
+                {% if eq.responsible_user %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">МОЛ</div>
+                    <div class="field-value">{{ eq.responsible_user.get_full_name|default:eq.responsible_user }}</div>
+                </div>
+                {% endif %}
+                <!-- Статус -->
+                {% if eq.status %}
+                <div class="col-6 col-md-3">
+                    <div class="field-label">Статус</div>
+                    <div class="field-value">{{ eq.get_status_display|default:eq.status }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
+    {% empty %}
+    <div class="alert alert-info mb-3">
+        <i class="bi bi-search me-2"></i>Ничего не найдено по запросу "{{ search_query }}"
+    </div>
+    {% endfor %}
 </div>
 {% else %}
-<div class="alert alert-info">
+<div class="alert alert-info mb-3">
     <i class="bi bi-info-circle me-2"></i>
-    Введите запрос для поиска оборудования. Используйте быстрый поиск или введите значение в поле выше.
+    Введите запрос для поиска оборудования. Ищется по всем полям: наименованию, номерам, именам, адресам и т.д.
 </div>
 {% endif %}
 {% endblock %}

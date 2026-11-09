@@ -1,0 +1,169 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block title %}{{ group.name }} — Группа рассылки — «Друг»{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <!-- Info card -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-people-fill me-2"></i>{{ group.name }}
+                </h5>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'scenarios:mail_group_edit' group.pk %}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i>Редактировать
+                    </a>
+                    <a href="{% url 'scenarios:mail_group_delete' group.pk %}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash me-1"></i>Удалить
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <small class="text-muted d-block">Описание</small>
+                        <span>{{ group.description|default:"—" }}</span>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-muted d-block">Создана</small>
+                        <span>{{ group.created_at|date:"d.m.Y H:i" }} ({{ group.created_by|default:"—" }})</span>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Всего участников</small>
+                        <span class="badge bg-primary fs-6">{{ group.member_count }}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Прямые сотрудники</small>
+                        <span class="badge bg-info fs-6">{{ direct_users.count }}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Подразделения</small>
+                        <span class="badge bg-success fs-6">{{ direct_depts.count }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Direct users -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-person-badge me-2"></i>Прямые сотрудники</h6>
+            </div>
+            <div class="card-body p-0">
+                {% if direct_users %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <tbody>
+                            {% for u in direct_users %}
+                            <tr>
+                                <td>
+                                    <strong>{{ u.last_name }}</strong> {{ u.first_name|first }}. {{ u.patronymic|first }}.
+                                    {% if u.department %}
+                                    <br><small class="text-muted"><i class="bi bi-building me-1"></i>{{ u.department.name }}</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <form method="POST" action="{% url 'scenarios:mail_group_remove_user' group.pk %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="user_id" value="{{ u.pk }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger p-0 px-2" title="Удалить">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-3 text-muted small">Нет прямых сотрудников</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Direct departments -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-building me-2"></i>Подразделения</h6>
+            </div>
+            <div class="card-body p-0">
+                {% if direct_depts %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <tbody>
+                            {% for d in direct_depts %}
+                            <tr>
+                                <td>
+                                    <strong>{{ d.name }}</strong>
+                                    {% if d.parent %}
+                                    <br><small class="text-muted">Родитель: {{ d.parent.name }}</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <form method="POST" action="{% url 'scenarios:mail_group_remove_dept' group.pk %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="dept_id" value="{{ d.pk }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger p-0 px-2" title="Удалить">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-3 text-muted small">Нет подразделений</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Calculated members (from departments) -->
+        {% if all_users %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Все участники ({{ all_users.count }})</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Сотрудник</th>
+                                <th>Подразделение</th>
+                                <th>Должность</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in all_users %}
+                            <tr>
+                                <td>
+                                    <strong>{{ u.last_name }}</strong> {{ u.first_name|first }}. {{ u.patronymic|first }}.
+                                    {% if u.pk in direct_users_ids %}
+                                    <span class="badge bg-primary ms-1">прямой</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ u.department.name|default:"—" }}</td>
+                                <td>{{ u.position.name|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <a href="{% url 'scenarios:mail_group_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>К списку групп
+        </a>
+    </div>
+</div>
+{% endblock %}

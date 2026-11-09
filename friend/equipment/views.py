@@ -7,6 +7,8 @@ from django.utils import timezone
 from django.shortcuts import render, get_object_or_404, redirect, Http404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
+User = get_user_model()
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView
 from django.db.models import Q, Count, Prefetch
@@ -18,6 +20,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from .models import (
     Equipment, EquipmentAssignment, EquipmentMOLAssignment, EquipmentFieldSetting,
     EquipmentCategory, ExcludeKeyword, FilterKeyword, EQUIPMENT_STATUS_CHOICES,
+    EQUIPMENT_SUBTYPES,
     City, Building, Floor, Room,
 )
 from .forms import (
@@ -1463,20 +1466,118 @@ def assign_user(request, equipment_type, pk):
     return render(request, 'equipment/equipment_list.html', _sidebar_counts())
 
 def change_assigned_user_ajax(request, equipment_type, pk):
-    """Стуб: AJAX назначение пользователя."""
-    return JsonResponse({'status': 'ok'})
+    """AJAX назначение/замена пользователя на оборудовании."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    equipment = get_object_or_404(Equipment, pk=pk, archived=False)
+    user_id = request.POST.get('user_id')
+    action = request.POST.get('action', 'assign')
+    
+    if not user_id:
+        return JsonResponse({'error': 'user_id required'}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    
+    if action == 'assign':
+        # Проверяем, закреплен ли уже пользователь
+        existing = equipment.assignments.filter(is_active=True, user=user).first()
+        if existing:
+            return JsonResponse({'error': 'User already assigned', 'already_assigned': True})
+        
+        # Создаём новое назначение
+        EquipmentAssignment.objects.create(
+            user=user,
+            equipment=equipment,
+            is_active=True,
+        )
+        # Обновляем поле assigned_user
+        equipment.assigned_user = user
+        equipment.save()
+        
+        return JsonResponse({
+            'status': 'ok',
+            'user_name': user.get_full_name(),
+            'user_id': user.id,
+            'action': 'assigned',
+        })
+    
+    elif action == 'replace':
+        # Деактивируем текущие назначения
+        equipment.assignments.filter(is_active=True).update(is_active=False)
+        
+        # Создаём новое назначение
+        EquipmentAssignment.objects.create(
+            user=user,
+            equipment=equipment,
+            is_active=True,
+        )
+        equipment.assigned_user = user
+        equipment.save()
+        
+        return JsonResponse({
+            'status': 'ok',
+            'user_name': user.get_full_name(),
+            'user_id': user.id,
+            'action': 'replaced',
+        })
+    
+    return JsonResponse({'error': 'Invalid action'}, status=400)
 
 def clear_assigned_user(request, equipment_type, pk):
-    """Стуб: освобождение от пользователя."""
-    return redirect('equipment:equipment_list')
+    """Освобождение от пользователя."""
+    equipment = get_object_or_404(Equipment, pk=pk, archived=False)
+    
+    # Деактивируем активные назначения
+    equipment.assignments.filter(is_active=True).update(is_active=False)
+    
+    # Очищаем поле assigned_user
+    equipment.assigned_user = None
+    equipment.save()
+    
+    return redirect('equipment:edit', equipment_type=equipment_type, pk=pk)
 
 def lookup_user_by_serial(request):
     """Стуб: поиск пользователя по серийному."""
     return JsonResponse({})
 
 def search_users_ajax(request):
-    """Стуб: AJAX поиск пользователей."""
-    return JsonResponse({})
+    """AJAX поиск пользователей по ФИО или табельному номеру."""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Only GET allowed'}, status=405)
+    
+    query = request.GET.get('q', '').strip()
+    
+    if not query:
+        return JsonResponse({'users': []})
+    
+    # Поиск по ФИО или табельному номеру
+    users = User.objects.filter(
+        Q(last_name__icontains=query) |
+        Q(first_name__icontains=query) |
+        Q(patronymic__icontains=query) |
+        Q(tab_number__icontains=query) |
+        Q(username__icontains=query)
+    ).distinct()[:50]
+    
+    users_data = []
+    for user in users:
+        users_data.append({
+            'id': user.id,
+            'name': user.get_full_name(),
+            'last_name': user.last_name,
+            'first_name': user.first_name,
+            'patronymic': user.patronymic,
+            'tab_number': user.tab_number or '—',
+            'username': user.username,
+            'department': user.department.name if user.department else None,
+            'position': user.position.name if user.position else None,
+        })
+    
+    return JsonResponse({'users': users_data})
 
 def quick_assign_users(request):
     """Стуб: быстрое назначение."""
@@ -1531,16 +1632,83 @@ def assign_mol(request, equipment_type, pk):
     return render(request, 'equipment/equipment_list.html', _sidebar_counts())
 
 def assign_mol_ajax(request, equipment_type, pk):
-    """Стуб: AJAX назначение МОЛ."""
-    return JsonResponse({'status': 'ok'})
+    """AJAX назначение МОЛ."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    equipment = get_object_or_404(Equipment, pk=pk, archived=False)
+    user_id = request.POST.get('user_id')
+    action = request.POST.get('action', 'assign')
+    
+    if not user_id:
+        return JsonResponse({'error': 'user_id required'}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    
+    if action == 'assign':
+        # Проверяем, назначен ли уже пользователь как МОЛ
+        existing = equipment.mol_assignments.filter(is_active=True, mol=user).first()
+        if existing:
+            return JsonResponse({'error': 'User already MOL', 'already_assigned': True})
+        
+        # Создаём новое назначение МОЛ
+        EquipmentMOLAssignment.objects.create(
+            mol=user,
+            equipment=equipment,
+            is_active=True,
+        )
+        # Обновляем поле responsible_user
+        equipment.responsible_user = user
+        equipment.save()
+        
+        return JsonResponse({
+            'status': 'ok',
+            'user_name': user.get_full_name(),
+            'user_id': user.id,
+            'action': 'assigned',
+        })
+    
+    elif action == 'replace':
+        # Деактивируем текущие назначения МОЛ
+        equipment.mol_assignments.filter(is_active=True).update(is_active=False)
+        
+        # Создаём новое назначение МОЛ
+        EquipmentMOLAssignment.objects.create(
+            mol=user,
+            equipment=equipment,
+            is_active=True,
+        )
+        equipment.responsible_user = user
+        equipment.save()
+        
+        return JsonResponse({
+            'status': 'ok',
+            'user_name': user.get_full_name(),
+            'user_id': user.id,
+            'action': 'replaced',
+        })
+    
+    return JsonResponse({'error': 'Invalid action'}, status=400)
 
 def change_responsible_user_ajax(request, equipment_type, pk):
-    """Стуб: AJAX изменение ответственного."""
-    return JsonResponse({'status': 'ok'})
+    """AJAX изменение ответственного (МОЛ)."""
+    return assign_mol_ajax(request, equipment_type, pk)
 
 def clear_responsible_user(request, equipment_type, pk):
-    """Стуб: освобождение от МОЛ."""
-    return redirect('equipment:equipment_list')
+    """Освобождение от МОЛ."""
+    equipment = get_object_or_404(Equipment, pk=pk, archived=False)
+    
+    # Деактивируем активные назначения МОЛ
+    equipment.mol_assignments.filter(is_active=True).update(is_active=False)
+    
+    # Очищаем поле responsible_user
+    equipment.responsible_user = None
+    equipment.save()
+    
+    return JsonResponse({'status': 'ok', 'action': 'cleared'})
 
 def assign_mol_batch(request):
     """Стуб: массовое назначение МОЛ."""
@@ -1629,56 +1797,42 @@ def assigned_equipment(request):
 
 @login_required
 def inventory_search(request):
-    """Инвентаризационный поиск — поиск оборудования по любым полям."""
+    """Инвентаризационный поиск — поиск оборудования по всем полям."""
     search_query = request.GET.get('q', '').strip()
-    search_type = request.GET.get('type', 'all')
-    
+
     equipment_qs = Equipment.objects.filter(archived=False).select_related(
         'assigned_user', 'responsible_user', 'category', 'subcategory', 'brand'
     ).order_by('-is_active', 'category', 'inventory_number')
-    
+
     if search_query:
-        if search_type == 'inventory':
-            equipment_qs = equipment_qs.filter(inventory_number__icontains=search_query)
-        elif search_type == 'serial':
-            equipment_qs = equipment_qs.filter(serial_number__icontains=search_query)
-        elif search_type == 'name':
-            equipment_qs = equipment_qs.filter(name__icontains=search_query)
-        elif search_type == 'hostname':
-            equipment_qs = equipment_qs.filter(hostname__icontains=search_query)
-        elif search_type == 'mac':
-            equipment_qs = equipment_qs.filter(mac_address__icontains=search_query)
-        elif search_type == 'user':
-            equipment_qs = equipment_qs.filter(
-                Q(assigned_user__first_name__icontains=search_query) |
-                Q(assigned_user__last_name__icontains=search_query) |
-                Q(responsible_user__first_name__icontains=search_query) |
-                Q(responsible_user__last_name__icontains=search_query)
-            )
-        else:
-            equipment_qs = equipment_qs.filter(
-                Q(name__icontains=search_query) |
-                Q(inventory_number__icontains=search_query) |
-                Q(serial_number__icontains=search_query) |
-                Q(hostname__icontains=search_query) |
-                Q(mac_address__icontains=search_query)
-            )
-    
+        equipment_qs = equipment_qs.filter(
+            Q(name__icontains=search_query) |
+            Q(inventory_number__icontains=search_query) |
+            Q(serial_number__icontains=search_query) |
+            Q(hostname__icontains=search_query) |
+            Q(mac_address__icontains=search_query) |
+            Q(ip_address__icontains=search_query) |
+            Q(model__icontains=search_query) |
+            Q(brand__name__icontains=search_query) |
+            Q(cpu__icontains=search_query) |
+            Q(os__icontains=search_query) |
+            Q(antivirus_engine__icontains=search_query) |
+            Q(location__icontains=search_query) |
+            Q(place__icontains=search_query) |
+            Q(phone_number__icontains=search_query) |
+            Q(extension__icontains=search_query) |
+            Q(status__icontains=search_query) |
+            Q(assigned_user__first_name__icontains=search_query) |
+            Q(assigned_user__last_name__icontains=search_query) |
+            Q(responsible_user__first_name__icontains=search_query) |
+            Q(responsible_user__last_name__icontains=search_query)
+        )
+
     context = {
         **_sidebar_counts(),
         'equipment_list': equipment_qs[:100],
         'total_count': equipment_qs.count(),
         'search_query': search_query,
-        'search_type': search_type,
-        'search_types': [
-            ('all', 'Все поля'),
-            ('inventory', 'Инвентарный номер'),
-            ('serial', 'Серийный номер'),
-            ('name', 'Наименование'),
-            ('hostname', 'Имя в сети'),
-            ('mac', 'MAC-адрес'),
-            ('user', 'Пользователь'),
-        ],
     }
     return render(request, 'equipment/inventory_search.html', context)
 

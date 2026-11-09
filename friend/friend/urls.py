@@ -18,9 +18,10 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+
 from rest_framework.routers import DefaultRouter
 from siem import views as siem_views
-from messaging.views import max_webhook
+from messaging.views import max_webhook, api_max_webhook
 
 router = DefaultRouter()
 router.register(r'api/siem/ingest', siem_views.IngestViewSet, basename='ingest')
@@ -33,8 +34,11 @@ urlpatterns = [
     path('siem/', include('siem.urls')),
     path('training/', include('training.urls')),
     path('messaging/', include('messaging.urls', namespace='messaging')),
+    path('scenarios/', include('scenarios.urls', namespace='scenarios')),
     # MAX Bot webhook
     path('max/webhook/', max_webhook, name='max_webhook'),
+    # API для webhook relay
+    path('api/max/webhook/', api_max_webhook, name='api_max_webhook'),
 ]
 
 # API-маршруты для агентов

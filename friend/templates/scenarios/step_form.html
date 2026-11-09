@@ -1,0 +1,286 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block extra_js %}
+<script src="{% static 'scenarios/js/json_editor.js' %}"></script>
+{{ mailing_list_data|json_script:"mailing-list-data" }}
+<script>
+window._mailingListData = JSON.parse(document.getElementById('mailing-list-data').textContent);
+</script>
+<script src="{% static 'scenarios/js/mailing_list_editor.js' %}"></script>
+<script src="{% static 'scenarios/js/exclusion_list_editor.js' %}"></script>
+{% endblock %}
+
+{% block title %}{% if object %}Редактирование —{% else %}Новый —{% endif %} Шаг — «Друг»{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-{% if object %}pencil{% else %}plus{% endif %} me-2"></i>
+                    {% if object %}Редактирование{% else %}Новый{% endif %} шаг
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="{{ form.branch.id_for_label }}" class="form-label">{{ form.branch.label }}</label>
+                            {{ form.branch }}
+                            {% if form.branch.errors %}
+                                <div class="invalid-feedback d-block">{{ form.branch.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.prev_result_code.id_for_label }}" class="form-label">{{ form.prev_result_code.label }}</label>
+                            <div class="input-group">
+                                {{ form.prev_result_code }}
+                                <button type="button" class="btn btn-outline-primary" id="pickResultCodeBtn" title="Выбрать из доступных">
+                                    <i class="bi bi-hand-index"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">Пусто для первого шага</div>
+                            {% if form.prev_result_code.errors %}
+                                <div class="invalid-feedback d-block">{{ form.prev_result_code.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.message_text.id_for_label }}" class="form-label">{{ form.message_text.label }}</label>
+                        {{ form.message_text }}
+                        <div class="form-text">Используйте переменные: {user.name}, {user.department}, {corpus}, {floor}</div>
+                        {% if form.message_text.errors %}
+                            <div class="invalid-feedback d-block">{{ form.message_text.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.message_json.id_for_label }}" class="form-label">{{ form.message_json.label }}</label>
+                        {{ form.message_json }}
+                        <div class="form-text">
+                            JSON для сбора ответа. Примеры:<br>
+                            Кнопки: <code>{"type": "buttons", "options": [{"text": "Да", "result_code": "YES"}]}</code><br>
+                            Число: <code>{"type": "number", "result_code": "COUNT", "validation": {"min": 0, "max": 100}}</code><br>
+                            Текст: <code>{"type": "text_pattern", "result_code": "DATA", "pattern": "^(\\w+)\\s*(\\d+)$", "fields": ["name", "count"]}</code>
+                        </div>
+                        {% if form.message_json.errors %}
+                            <div class="invalid-feedback d-block">{{ form.message_json.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.mailing_list_json.id_for_label }}" class="form-label">{{ form.mailing_list_json.label }}</label>
+                        {{ form.mailing_list_json }}
+                        <div class="form-text">
+                            JSON списка рассылки. Примеры:<br>
+                            По роли: <code>[{"type": "role", "name": "старшая медсестра"}]</code><br>
+                            По подразделению: <code>[{"type": "department", "value": "КДЛ"}]</code><br>
+                            По табельному: <code>[{"type": "user", "value": "00304"}]</code>
+                        </div>
+                        {% if form.mailing_list_json.errors %}
+                            <div class="invalid-feedback d-block">{{ form.mailing_list_json.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.exclusion_list_json.id_for_label }}" class="form-label">{{ form.exclusion_list_json.label }}</label>
+                        {{ form.exclusion_list_json }}
+                        <div class="form-text">
+                            JSON исключений. Примеры:<br>
+                            По сотруднику: <code>[{"type": "user", "value": 123}]</code><br>
+                            По роли: <code>[{"type": "role", "value": 456}]</code><br>
+                            По подразделению: <code>[{"type": "department", "value": 789}]</code><br>
+                            По группе: <code>[{"type": "mail_group", "value": 10}]</code>
+                        </div>
+                        {% if form.exclusion_list_json.errors %}
+                            <div class="invalid-feedback d-block">{{ form.exclusion_list_json.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.db_write_json.id_for_label }}" class="form-label">{{ form.db_write_json.label }}</label>
+                        <div class="input-group">
+                            {{ form.db_write_json }}
+                            <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#jsonBuilder-db_write_json">
+                                <i class="bi bi-gear"></i> Генератор JSON
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            JSON для записи в базу. Пример: <code>{"evacuated": "да", "count": "{answer.COUNT}"}</code>
+                        </div>
+                        {% if form.db_write_json.errors %}
+                            <div class="invalid-feedback d-block">{{ form.db_write_json.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="{{ form.deadline_min.id_for_label }}" class="form-label">{{ form.deadline_min.label }}</label>
+                            {{ form.deadline_min }}
+                            <div class="form-text">0 — без дедлайна</div>
+                            {% if form.deadline_min.errors %}
+                                <div class="invalid-feedback d-block">{{ form.deadline_min.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.escalate_to_json.id_for_label }}" class="form-label">{{ form.escalate_to_json.label }}</label>
+                            <div class="input-group">
+                                {{ form.escalate_to_json }}
+                                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#jsonBuilder-escalate_to_json">
+                                    <i class="bi bi-gear"></i> Генератор JSON
+                                </button>
+                            </div>
+                            {% if form.escalate_to_json.errors %}
+                                <div class="invalid-feedback d-block">{{ form.escalate_to_json.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i>Сохранить
+                        </button>
+                        {% if object and object.branch and object.branch.scenario_id %}
+                        <a href="{% url 'scenarios:scenario_editor' object.branch.scenario_id %}" class="btn btn-outline-secondary">
+                            Отмена
+                        </a>
+                        {% else %}
+                        <a href="{% url 'scenarios:scenario_list' %}" class="btn btn-outline-secondary">
+                            Отмена
+                        </a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно: выбор result_code -->
+<div class="modal fade" id="resultCodeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Выбор кода результата</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="resultCodeLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2">Загрузка...</p>
+                </div>
+                <div id="resultCodeEmpty" class="text-center py-4 d-none">
+                    <i class="bi bi-info-circle text-muted" style="font-size:2rem;"></i>
+                    <p class="mt-2 text-muted">Нет доступных вариантов ответов</p>
+                </div>
+                <div class="table-responsive d-none" id="resultCodeTable">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Шаг</th>
+                                <th>Вопрос</th>
+                                <th>Вариант</th>
+                                <th>Код</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultCodeBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var btn = document.getElementById('pickResultCodeBtn');
+    var modal = document.getElementById('resultCodeModal');
+    var loading = document.getElementById('resultCodeLoading');
+    var empty = document.getElementById('resultCodeEmpty');
+    var table = document.getElementById('resultCodeTable');
+    var tbody = document.getElementById('resultCodeBody');
+
+    if (!btn || !modal) return;
+
+    // Получаем branch_id
+    var branchId = '';
+    var branchSelect = document.querySelector('select[name="branch"]');
+    if (branchSelect) branchId = branchSelect.value;
+    if (!branchId) {
+        var hiddenBranch = document.querySelector('input[name="branch"]');
+        if (hiddenBranch) branchId = hiddenBranch.value;
+    }
+
+    // Обработчик кнопки
+    btn.addEventListener('click', function () {
+        if (!branchId) return;
+
+        var currentCode = '';
+        var codeInput = document.querySelector('input[name="prev_result_code"]');
+        if (codeInput) currentCode = codeInput.value;
+
+        // Показываем модалку
+        var bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+
+        // Загружаем данные
+        loading.classList.remove('d-none');
+        empty.classList.add('d-none');
+        table.classList.add('d-none');
+        tbody.innerHTML = '';
+
+        fetch('/scenarios/api/available-codes/?branch=' + branchId + '&current_code=' + encodeURIComponent(currentCode))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                loading.classList.add('d-none');
+
+                if (!data.options || data.options.length === 0) {
+                    empty.classList.remove('d-none');
+                    return;
+                }
+
+                data.options.forEach(function (opt) {
+                    var stepLabel = 'Шаг ' + opt.step_order;
+                    if (opt.prev_result_code && opt.prev_result_code !== '(первый шаг)') {
+                        stepLabel += ' [' + opt.prev_result_code + ']';
+                    }
+
+                    var row = document.createElement('tr');
+                    row.style.cursor = 'pointer';
+                    row.innerHTML =
+                        '<td>' + stepLabel + '</td>' +
+                        '<td title="' + esc(opt.message_text) + '">' + esc(opt.message_text.substring(0, 80)) + '</td>' +
+                        '<td>' + esc(opt.button_text) + '</td>' +
+                        '<td><code>' + esc(opt.result_code) + '</code>' +
+                        (opt.ask_number ? ' <span class="badge bg-warning">+число</span>' : '') + '</td>';
+
+                    row.addEventListener('click', function () {
+                        var codeInput = document.querySelector('input[name="prev_result_code"]');
+                        if (codeInput) codeInput.value = opt.result_code;
+                        bsModal.hide();
+                    });
+
+                    tbody.appendChild(row);
+                });
+
+                table.classList.remove('d-none');
+            })
+            .catch(function () {
+                loading.classList.add('d-none');
+                empty.classList.remove('d-none');
+            });
+    });
+
+    function esc(str) {
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+})();
+</script>
+{% endblock %}

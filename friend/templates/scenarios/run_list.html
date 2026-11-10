@@ -8,51 +8,73 @@
     <h2><i class="bi bi-play-circle me-2"></i>Запуски сценариев</h2>
 </div>
 
+<!-- Кнопка группового удаления -->
+<div id="bulkDeleteBar" class="alert alert-warning d-none mb-3" role="alert">
+    <div class="d-flex align-items-center">
+        <span class="me-3" id="selectedCount">Выбрано: 0</span>
+        <button type="button" class="btn btn-sm btn-danger" onclick="bulkDeleteRuns()">
+            <i class="bi bi-trash me-1"></i>Удалить выбранные
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="clearSelection()">
+            <i class="bi bi-x me-1"></i>Очистить
+        </button>
+    </div>
+</div>
+
 <!-- Список запусков -->
 <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
         {% if runs %}
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead>
-                    <tr>
-                        <th class="ps-4">Сценарий</th>
-                        <th>Запустил</th>
-                        <th>Статус</th>
-                        <th>Запущен</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for run in runs %}
-                    <tr>
-                        <td class="ps-4">
-                            <strong>{{ run.scenario.name }}</strong>
-                            <div class="small text-muted">v{{ run.scenario.version }}</div>
-                        </td>
-                        <td>{{ run.started_by.get_full_name|default:run.started_by.username }}</td>
-                        <td>
-                            {% if run.status == 'running' %}
-                                <span class="badge bg-success">Выполняется</span>
-                            {% elif run.status == 'completed' %}
-                                <span class="badge bg-secondary">Завершён</span>
-                            {% elif run.status == 'cancelled' %}
-                                <span class="badge bg-warning text-dark">Отменён</span>
-                            {% else %}
-                                <span class="badge bg-info">Ожидание</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ run.started_at|date:"d.m.Y H:i" }}</td>
-                        <td class="text-end pe-4">
-                            <a href="{% url 'scenarios:run_detail' run.pk %}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-eye"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <form id="runDeleteForm" method="post" action="{% url 'scenarios:run_bulk_delete' %}">
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th class="ps-4" style="width: 40px;">
+                                <input type="checkbox" class="form-check-input" id="selectAllCheckbox" onclick="toggleSelectAll(this)">
+                            </th>
+                            <th>Сценарий</th>
+                            <th>Запустил</th>
+                            <th>Статус</th>
+                            <th>Запущен</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for run in runs %}
+                        <tr>
+                            <td class="ps-4">
+                                <input type="checkbox" class="form-check-input run-checkbox" name="run_ids" value="{{ run.pk }}" onclick="updateSelectAll()">
+                            </td>
+                            <td class="ps-4">
+                                <strong>{{ run.scenario.name }}</strong>
+                                <div class="small text-muted">v{{ run.scenario.version }}</div>
+                            </td>
+                            <td>{{ run.started_by.get_full_name|default:run.started_by.username }}</td>
+                            <td>
+                                {% if run.status == 'running' %}
+                                    <span class="badge bg-success">Выполняется</span>
+                                {% elif run.status == 'completed' %}
+                                    <span class="badge bg-secondary">Завершён</span>
+                                {% elif run.status == 'cancelled' %}
+                                    <span class="badge bg-warning text-dark">Отменён</span>
+                                {% else %}
+                                    <span class="badge bg-info">Ожидание</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ run.started_at|date:"d.m.Y H:i" }}</td>
+                            <td class="text-end pe-4">
+                                <a href="{% url 'scenarios:run_detail' run.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </form>
         {% else %}
         <div class="text-center py-5">
             <i class="bi bi-play-circle text-muted" style="font-size: 3rem;"></i>
@@ -61,4 +83,57 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+function toggleSelectAll(checkbox) {
+    const checkboxes = document.querySelectorAll('.run-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateSelectAll();
+}
+
+function updateSelectAll() {
+    const checkboxes = document.querySelectorAll('.run-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const bulkDeleteBar = document.getElementById('bulkDeleteBar');
+    const selectedCount = document.getElementById('selectedCount');
+    
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+    
+    selectAllCheckbox.checked = allChecked && checkboxes.length > 0;
+    selectAllCheckbox.indeterminate = !allChecked && anyChecked;
+    
+    if (anyChecked) {
+        const count = Array.from(checkboxes).filter(cb => cb.checked).length;
+        selectedCount.textContent = `Выбрано: ${count}`;
+        bulkDeleteBar.classList.remove('d-none');
+    } else {
+        bulkDeleteBar.classList.add('d-none');
+    }
+}
+
+function clearSelection() {
+    const checkboxes = document.querySelectorAll('.run-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+    document.getElementById('selectAllCheckbox').checked = false;
+    document.getElementById('selectAllCheckbox').indeterminate = false;
+    document.getElementById('bulkDeleteBar').classList.add('d-none');
+}
+
+function bulkDeleteRuns() {
+    const checkboxes = document.querySelectorAll('.run-checkbox:checked');
+    if (checkboxes.length === 0) {
+        alert('Выберите запуска для удаления');
+        return;
+    }
+    
+    if (!confirm(`Удалить ${checkboxes.length} запуск(ов)?`)) {
+        return;
+    }
+    
+    document.getElementById('runDeleteForm').submit();
+}
+</script>
 {% endblock %}

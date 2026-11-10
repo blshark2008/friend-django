@@ -1,0 +1,405 @@
+{% extends "scenarios/base.html" %}
+{% load static %}
+
+{% block title %}Обработка ответов: {{ scenario.name }} — «Друг»{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="bi bi-gear-square me-2"></i>Настройка обработки ответов</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'scenarios:scenario_list' %}">Сценарии</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'scenarios:scenario_editor' scenario.pk %}">{{ scenario.name }}</a></li>
+                <li class="breadcrumb-item active">Обработка ответов</li>
+            </ol>
+        </nav>
+    </div>
+    <div>
+        <a href="{% url 'scenarios:scenario_editor' scenario.pk %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Назад к редактору
+        </a>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- ТАБЛИЦА 1: Все шаги пользователя с ответами -->
+<!-- ============================================ -->
+<h4 class="mb-3"><i class="bi bi-list-check me-2"></i>Шаги с ответами пользователей</h4>
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-0">
+        {% if branches %}
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0" style="font-size: 0.875rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3" style="width: 50px;">№</th>
+                        <th style="width: 150px;">Ветка</th>
+                        <th>Текст шага</th>
+                        <th style="width: 120px;">Код ответа</th>
+                        <th>Тип ответа</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for branch in branches %}
+                    {% for step in branch.steps.all %}
+                    <tr>
+                        <td class="ps-3 fw-bold">{{ step.step_order }}</td>
+                        <td>
+                            <span class="badge bg-info">{{ branch.code }}</span>
+                            <small class="d-block text-muted">{{ branch.name }}</small>
+                        </td>
+                        <td style="max-width: 300px;">{{ step.message_text|truncatewords:10 }}</td>
+                        <td>
+                            {% with msg_type=step.message_json.type %}
+                                {% if msg_type == "buttons" or msg_type == "buttons_with_number" %}
+                                    {% for opt in step.message_json.options %}
+                                        <span class="badge bg-secondary me-1 mb-1">{{ opt.result_code }}</span>
+                                    {% endfor %}
+                                {% elif step.message_json.result_code %}
+                                    <span class="badge bg-secondary">{{ step.message_json.result_code }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            <small class="text-muted">
+                                {{ step.message_json.type|default:"—" }}
+                            </small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-3 text-muted">Шагов в сценарии нет</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <p class="text-muted mb-0">Веток и шагов не найдено</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- ТАБЛИЦА 2: Свод данных (конфигурация)        -->
+<!-- ============================================ -->
+<h4 class="mb-3"><i class="bi bi-table me-2"></i>Свод данных</h4>
+
+<!-- Форма добавления -->
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <form id="addConfigForm" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="scenario_id" value="{{ scenario.pk }}">
+            <div class="col-md-3">
+                <label class="form-label small text-muted">Текст для сводной таблицы</label>
+                <input type="text" class="form-control form-control-sm" id="displayTextInput" placeholder="Например: Согласен" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small text-muted">Код результата</label>
+                <select class="form-select form-select-sm" id="resultCodeInput" required>
+                    <option value="">— Выберите код —</option>
+                    {% for branch in branches %}
+                    {% for step in branch.steps.all %}
+                        {% with msg_type=step.message_json.type %}
+                            {% if msg_type == "buttons" or msg_type == "buttons_with_number" %}
+                            <optgroup label="{{ branch.name }} (Шаг {{ step.step_order }})">
+                                {% for opt in step.message_json.options %}
+                                <option value="{{ opt.result_code }}">
+                                    {{ opt.result_code }} — {{ opt.text|truncatewords:5 }}
+                                </option>
+                                {% endfor %}
+                            </optgroup>
+                            {% elif step.message_json.result_code %}
+                            <option value="{{ step.message_json.result_code }}">
+                                {{ step.message_json.result_code }} — {{ step.message_text|truncatewords:5 }}
+                            </option>
+                            {% endif %}
+                        {% endwith %}
+                    {% endfor %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-sm btn-primary w-100">
+                    <i class="bi bi-plus-lg me-1"></i>Добавить
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Таблица сводных данных -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        {% if configs %}
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0" style="font-size: 0.875rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3" style="width: 50px;">№</th>
+                        <th>Текст</th>
+                        <th style="width: 150px;">Код результата</th>
+                        <th style="width: 80px;" class="text-center">Числ.</th>
+                        <th class="text-end" style="width: 120px;">Действия</th>
+                    </tr>
+                </thead>
+                    <tbody>
+                    {% for config in configs %}
+                    <tr data-config-id="{{ config.pk }}">
+                        <td class="ps-3 fw-bold">{{ forloop.counter }}</td>
+                        <td>
+                            <span class="edit-display-text">{{ config.display_text }}</span>
+                            <input type="text" class="form-control form-control-sm edit-display-text-input" 
+                                   value="{{ config.display_text }}" style="display:none;">
+                        </td>
+                        <td>
+                            <span class="edit-result-code"><span class="badge bg-secondary">{{ config.result_code }}</span></span>
+                            <input type="text" class="form-control form-control-sm edit-result-code-input" 
+                                   value="{{ config.result_code }}" style="display:none;">
+                        </td>
+                        <td>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input edit-aggregate-checkbox" type="checkbox" 
+                                       {% if config.aggregate_numeric %}checked{% endif %}
+                                       title="Агрегировать числовые">
+                                <label class="form-check-label small text-muted" title="Агрегировать числовые">
+                                    <i class="bi bi-calculator"></i>
+                                </label>
+                            </div>
+                        </td>
+                        <td class="text-end pe-3">
+                            <button type="button" class="btn btn-sm btn-outline-primary edit-config-btn"
+                                    data-config-id="{{ config.pk }}"
+                                    onclick="toggleEdit(this)">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success save-config-btn"
+                                    data-config-id="{{ config.pk }}"
+                                    style="display:none;"
+                                    onclick="saveConfig(this)">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary cancel-config-btn"
+                                    data-config-id="{{ config.pk }}"
+                                    style="display:none;"
+                                    onclick="cancelEdit(this)">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger delete-config-btn"
+                                    data-config-id="{{ config.pk }}"
+                                    data-display-text="{{ config.display_text }}"
+                                    onclick="confirmDelete(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <p class="text-muted mb-0">Конфигурации не добавлены. Используйте форму выше.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Добавление конфигурации
+document.getElementById('addConfigForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const scenarioId = document.querySelector('input[name="scenario_id"]').value;
+    const displayText = document.getElementById('displayTextInput').value.trim();
+    const resultCode = document.getElementById('resultCodeInput').value;
+    
+    if (!displayText || !resultCode) {
+        alert('Заполните текст и выберите код результата');
+        return;
+    }
+    
+    fetch('{% url "scenarios:api_answer_config_add" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            scenario_id: scenarioId,
+            result_code: resultCode,
+            display_text: displayText
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        alert('Ошибка соединения');
+        console.error(error);
+    });
+});
+
+// Подтверждение удаления
+function confirmDelete(btn) {
+    const configId = btn.dataset.configId;
+    const displayText = btn.dataset.displayText;
+    if (confirm('Удалить конфигурацию "' + displayText + '"?')) {
+        deleteConfig(configId);
+    }
+}
+
+// Переключение режима редактирования
+function toggleEdit(btn) {
+    const row = btn.closest('tr');
+    const displayTextSpan = row.querySelector('.edit-display-text');
+    const displayTextInput = row.querySelector('.edit-display-text-input');
+    const resultCodeSpan = row.querySelector('.edit-result-code');
+    const resultCodeInput = row.querySelector('.edit-result-code-input');
+    const aggregateCheckbox = row.querySelector('.edit-aggregate-checkbox');
+    
+    // Показать инпуты, скрыть текст
+    displayTextSpan.style.display = 'none';
+    displayTextInput.style.display = 'block';
+    displayTextInput.focus();
+    
+    resultCodeSpan.style.display = 'none';
+    resultCodeInput.style.display = 'block';
+    
+    // Показать кнопки сохранить/отмена, скрыть кнопку редактирования
+    btn.style.display = 'none';
+    row.querySelector('.save-config-btn').style.display = 'inline-block';
+    row.querySelector('.cancel-config-btn').style.display = 'inline-block';
+    
+    // Сохраняем оригинальные значения (извлекаем из badge)
+    row.dataset.originalDisplayText = displayTextSpan.textContent.trim();
+    row.dataset.originalResultCode = resultCodeSpan.querySelector('span.badge')?.textContent.trim() || resultCodeSpan.textContent.trim();
+    row.dataset.originalAggregate = aggregateCheckbox.checked ? 'true' : 'false';
+}
+
+// Отмена редактирования
+function cancelEdit(btn) {
+    const row = btn.closest('tr');
+    const displayTextSpan = row.querySelector('.edit-display-text');
+    const displayTextInput = row.querySelector('.edit-display-text-input');
+    const resultCodeSpan = row.querySelector('.edit-result-code');
+    const resultCodeInput = row.querySelector('.edit-result-code-input');
+    const aggregateCheckbox = row.querySelector('.edit-aggregate-checkbox');
+    
+    // Вернуть оригинальные значения
+    displayTextSpan.textContent = row.dataset.originalDisplayText;
+    displayTextInput.value = row.dataset.originalDisplayText;
+    
+    resultCodeSpan.innerHTML = `<span class="badge bg-secondary">${row.dataset.originalResultCode}</span>`;
+    resultCodeInput.value = row.dataset.originalResultCode;
+    
+    // Показать текст, скрыть инпуты
+    displayTextSpan.style.display = 'inline';
+    displayTextInput.style.display = 'none';
+    
+    resultCodeSpan.style.display = 'inline';
+    resultCodeInput.style.display = 'none';
+    
+    // Показать кнопку редактирования, скрыть кнопки сохранить/отмена
+    row.querySelector('.edit-config-btn').style.display = 'inline-block';
+    row.querySelector('.save-config-btn').style.display = 'none';
+    row.querySelector('.cancel-config-btn').style.display = 'none';
+}
+
+// Сохранение конфигурации
+function saveConfig(btn) {
+    const row = btn.closest('tr');
+    const configId = row.dataset.configId;
+    const displayTextInput = row.querySelector('.edit-display-text-input');
+    const resultCodeInput = row.querySelector('.edit-result-code-input');
+    const aggregateCheckbox = row.querySelector('.edit-aggregate-checkbox');
+    
+    const displayText = displayTextInput.value.trim();
+    const resultCode = resultCodeInput.value.trim();
+    const aggregateNumeric = aggregateCheckbox.checked;
+    
+    if (!displayText) {
+        alert('Текст не может быть пустым');
+        return;
+    }
+    if (!resultCode) {
+        alert('Код результата не может быть пустым');
+        return;
+    }
+    
+    fetch('{% url "scenarios:api_answer_config_update" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            config_id: configId,
+            display_text: displayText,
+            result_code: resultCode,
+            aggregate_numeric: aggregateNumeric
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Обновить отображение
+            const displayTextSpan = row.querySelector('.edit-display-text');
+            const resultCodeSpan = row.querySelector('.edit-result-code');
+            displayTextSpan.textContent = displayText;
+            resultCodeSpan.innerHTML = `<span class="badge bg-secondary">${resultCode}</span>`;
+            
+            // Обновляем сохраненное значение для отмены
+            row.dataset.originalResultCode = resultCode;
+            
+            // Вернуть в режим просмотра
+            cancelEdit(row.querySelector('.cancel-config-btn'));
+        } else {
+            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        alert('Ошибка соединения');
+        console.error(error);
+    });
+}
+
+// Удаление конфигурации
+function deleteConfig(configId) {
+    fetch('{% url "scenarios:api_answer_config_delete" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            config_id: configId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        alert('Ошибка соединения');
+        console.error(error);
+    });
+}
+</script>
+{% endblock %}

@@ -18,11 +18,7 @@ window.MessageJsonEditor = (function () {
         },
         number: {
             table: false,
-            fields: [
-                { key: 'result_code', label: 'Код результата', type: 'text', required: true, placeholder: 'COUNT, AMOUNT, etc.' },
-                { key: 'validation.min', label: 'Минимум', type: 'number', default: '' },
-                { key: 'validation.max', label: 'Максимум', type: 'number', default: '' },
-            ]
+            fields: []
         },
         text_pattern: {
             table: false,
@@ -105,19 +101,30 @@ window.MessageJsonEditor = (function () {
         html += '<select class="form-select d-inline-block w-auto" id="' + containerId + '_type">';
         html += '<option value="">— Выберите тип —</option>';
         html += '<option value="buttons" ' + (currentType === 'buttons' ? 'selected' : '') + '>Кнопки</option>';
-        html += '<option value="number" ' + (currentType === 'number' ? 'selected' : '') + '>Число с валидацией</option>';
+        html += '<option value="number" ' + (currentType === 'number' ? 'selected' : '') + '>Число</option>';
         html += '<option value="text_pattern" ' + (currentType === 'text_pattern' ? 'selected' : '') + '>Текст по шаблону</option>';
         html += '<option value="buttons_with_number" ' + (currentType === 'buttons_with_number' ? 'selected' : '') + '>Кнопки + запрос числа</option>';
         html += '</select>';
 
         if (currentType) {
             var schema = FIELD_SCHEMAS[currentType];
-            if (!schema.table) {
-                // Поля для не-табличных типов
-                html += '<button class="btn btn-primary btn-sm mt-2" onclick="MessageJsonEditor.editFields(\'' + containerId + '\')">' +
-                    '<i class="bi bi-pencil me-1"></i>Настроить</button>';
-            } else {
+            if (schema.table) {
                 html += '<div class="mt-2"><span class="badge bg-info">' + rows.length + ' строк</span></div>';
+            } else {
+                // Поля для не-табличных типов (number, text_pattern)
+                html += '<div class="mt-3">';
+                schema.fields.forEach(function (f) {
+                    var val = getNestedValue(currentData, f.key);
+                    html += '<div class="mb-2">';
+                    html += '<label class="form-label small">' + f.label + '</label>';
+                    if (f.type === 'number') {
+                        html += '<input type="number" class="form-control form-control-sm json-field-input" data-key="' + f.key + '" data-default="' + (f.default || '') + '" value="' + (val !== undefined && val !== null ? esc(String(val)) : (f.default || '')) + '">';
+                    } else {
+                        html += '<input type="text" class="form-control form-control-sm json-field-input" data-key="' + f.key + '" placeholder="' + (f.placeholder || '') + '" value="' + (val !== undefined && val !== null ? esc(String(val)) : '') + '">';
+                    }
+                    html += '</div>';
+                });
+                html += '</div>';
             }
         }
 
@@ -157,6 +164,14 @@ window.MessageJsonEditor = (function () {
         html += '<pre class="bg-light border rounded p-2 mb-0" style="max-height:200px;overflow:auto;font-size:0.85rem;" id="' + containerId + '_preview">Пусто — выберите тип и заполните данные</pre>';
         html += '</div>';
 
+        // Отображение сгенерированного result_code для number/text_pattern
+        html += '<div class="mt-2 d-none" id="' + containerId + '_result_code_info">';
+        html += '<div class="alert alert-info py-2 mb-0">';
+        html += '<small><strong>result_code:</strong> <code id="' + containerId + '_result_code_value"></code></small>';
+        html += '<small class="ms-2 text-muted">— используйте это значение в prev_result_code следующего шага</small>';
+        html += '</div>';
+        html += '</div>';
+
         container.innerHTML = html;
 
         // Обработчик изменения типа
@@ -170,61 +185,28 @@ window.MessageJsonEditor = (function () {
             }
         });
 
+        // Обработчики полей для не-табличных типов
+        var fieldInputs = container.querySelectorAll('.json-field-input');
+        fieldInputs.forEach(function (input) {
+            input.addEventListener('input', function () {
+                var key = this.getAttribute('data-key');
+                var value = this.value;
+                
+                // Обновляем currentData
+                if (key.indexOf('.') >= 0) {
+                    // Вложенное поле (например, validation.min)
+                    var parts = key.split('.');
+                    if (!currentData[parts[0]]) currentData[parts[0]] = {};
+                    currentData[parts[0]][parts[1]] = value;
+                } else {
+                    currentData[key] = value;
+                }
+                
+                autoSave();
+            });
+        });
+
         updatePreview(container.id);
-    }
-
-    function editFields(containerId) {
-        var schema = FIELD_SCHEMAS[currentType];
-        var win = window.open('', '_blank', 'width=500,height=400');
-        var html = '<!DOCTYPE html><html><head><title>Настройка JSON</title>';
-        html += '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">';
-        html += '</head><body class="p-4"><h5>Настройка: ' + currentType + '</h5>';
-        html += '<form id="fieldsForm">';
-
-        schema.fields.forEach(function (f) {
-            html += '<div class="mb-3">';
-            html += '<label class="form-label">' + f.label + '</label>';
-            html += '<input type="text" class="form-control" name="' + f.key + '" ';
-            if (f.type === 'number') html += 'type="number" ';
-            html += 'placeholder="' + (f.placeholder || '') + '" ';
-            if (f.required) html += 'required ';
-            var val = getNestedValue(currentData, f.key);
-            if (val !== undefined && val !== null) html += 'value="' + esc(String(val)) + '"';
-            html += '>';
-            html += '</div>';
-        });
-
-        html += '<button type="submit" class="btn btn-primary">Сохранить</button>';
-        html += '<button type="button" class="btn btn-secondary" onclick="window.close()">Отмена</button>';
-        html += '</form></body></html>';
-
-        win.document.write(html);
-        win.document.close();
-
-        win.document.getElementById('fieldsForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-            var fd = new FormData(this);
-            var newResultCode = fd.get('result_code');
-            var newMin = fd.get('validation.min');
-            var newMax = fd.get('validation.max');
-            var newPattern = fd.get('pattern');
-            var newFields = fd.get('fields');
-
-            currentData = { type: currentType };
-            currentData.result_code = newResultCode || '';
-
-            if (currentType === 'number') {
-                currentData.validation = {};
-                if (newMin !== '') currentData.validation.min = Number(newMin);
-                if (newMax !== '') currentData.validation.max = Number(newMax);
-            } else if (currentType === 'text_pattern') {
-                currentData.pattern = newPattern || '';
-                currentData.fields = newFields ? newFields.split(',').map(function (f) { return f.trim(); }).filter(Boolean) : [];
-            }
-
-            autoSave();
-            win.close();
-        });
     }
 
     function addRow(containerId) {
@@ -427,6 +409,19 @@ window.MessageJsonEditor = (function () {
 
         var json = buildJSON();
         preview.textContent = JSON.stringify(json, null, 2);
+
+        // Обновляем отображение result_code
+        var infoDiv = document.getElementById(containerId + '_result_code_info');
+        var valueSpan = document.getElementById(containerId + '_result_code_value');
+        if (infoDiv && valueSpan) {
+            var rc = json.result_code;
+            if (rc) {
+                infoDiv.classList.remove('d-none');
+                valueSpan.textContent = rc;
+            } else {
+                infoDiv.classList.add('d-none');
+            }
+        }
     }
 
     function buildJSON() {
@@ -443,6 +438,17 @@ window.MessageJsonEditor = (function () {
                 }
                 return opt;
             });
+        } else if (currentType === 'number') {
+            // Генерируем result_code если ещё нет
+            if (!currentData.result_code) {
+                currentData.result_code = generateUniqueCode();
+            }
+            result.result_code = currentData.result_code;
+        } else if (currentType === 'text_pattern') {
+            // Копируем поля из currentData (result_code, pattern, fields)
+            if (currentData.result_code) result.result_code = currentData.result_code;
+            if (currentData.pattern) result.pattern = currentData.pattern;
+            if (currentData.fields) result.fields = currentData.fields;
         }
 
         return result;
@@ -475,7 +481,6 @@ window.MessageJsonEditor = (function () {
     // Public API
     return {
         init: init,
-        editFields: editFields,
         addRow: addRow,
         editRow: editRow,
         deleteRow: deleteRow

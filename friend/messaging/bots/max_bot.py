@@ -134,10 +134,15 @@ def handle_start(user_id, username):
 
 def handle_register(user_id, username):
     """Начало регистрации."""
+    # Сохраняем chat_id из текущей сессии (если есть)
+    existing_session = session_store.get(user_id) or {}
+    chat_id = existing_session.get('chat_id')
+    
     session_store.clear(user_id)
     session_store.set(user_id, {
         'state': BotState.WAITING_FIO,
         'username': username,
+        'chat_id': chat_id,  # Сохраняем chat_id для использования при регистрации
     })
     return (
         "📝 Регистрация в системе сообщений.\n\n"
@@ -271,6 +276,14 @@ def process_tab_number(user_id, tab_number):
     # Пользователь найден — автоматически регистрируем MAX канал
     user.max_id = str(user_id)
     user.notify_max = True
+    
+    # Сохраняем chat_id из сессии в БД
+    session = session_store.get(user_id) or {}
+    chat_id = session.get('chat_id')
+    if chat_id:
+        user.max_chat_id = chat_id
+        logger.info(f'Saved chat_id={chat_id} for user {user_id} during registration')
+    
     user.save()
 
     session_store.update(

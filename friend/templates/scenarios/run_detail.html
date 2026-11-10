@@ -16,10 +16,16 @@
     </div>
     <div>
         {% if run.status == 'running' %}
+        <button type="button" class="btn btn-warning me-2" onclick="confirmAbort()">
+            <i class="bi bi-megaphone me-1"></i>Отбой тревоги
+        </button>
+        <button type="button" class="btn btn-outline-danger me-2" onclick="confirmCancel()">
+            <i class="bi bi-x-circle me-1"></i>Отмена
+        </button>
         <form method="post" action="{% url 'scenarios:run_cancel' run.pk %}" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Отменить запуск?')">
-                <i class="bi bi-stop-circle me-1"></i>Отменить
+            <button type="submit" class="btn btn-outline-secondary" onclick="return confirm('Отменить запуск?')">
+                <i class="bi bi-stop-circle me-1"></i>Остановить
             </button>
         </form>
         {% endif %}
@@ -78,7 +84,10 @@
 <!-- Вкладки -->
 <ul class="nav nav-tabs mb-4" id="runTabs" role="tablist">
     <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-steps">Шаги</button>
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-summary">Свод</button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-steps">Шаги</button>
     </li>
     <li class="nav-item">
         <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-answers">Ответы</button>
@@ -89,8 +98,202 @@
 </ul>
 
 <div class="tab-content">
+    <!-- Свод -->
+    <div class="tab-pane fade show active" id="tab-summary">
+        <div id="summary-container">
+            {% if summary_data %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-table me-2"></i>Сводная таблица</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4" style="width: 50px;">№</th>
+                                    <th>Текст</th>
+                                    <th style="width: 150px;">Тип ответа</th>
+                                    <th style="width: 120px;">Сумма значений</th>
+                                    <th style="width: 200px;">Группировка ответов</th>
+                                    <th style="width: 100px;">Всего ответов</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in summary_data %}
+                                <tr>
+                                    <td class="ps-3 fw-bold">{{ forloop.counter }}</td>
+                                    <td>{{ item.config.display_text }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ item.display_label }}</span>
+                                    </td>
+                                    <td>
+                                        {% if item.has_numeric %}
+                                            <span class="fw-bold text-primary">{{ item.total_sum|floatformat:2 }}</span>
+                                        {% else %}
+                                            <span class="fw-bold text-primary">{{ item.total_count }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.value_counts %}
+                                            <div class="small">
+                                                {% for value, count in item.value_counts.items|dictsort:"-" %}
+                                                    <span class="badge bg-light text-dark me-1 mb-1">
+                                                        {{ value }} — {{ count }}
+                                                    </span>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ item.total_count }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-table text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">Сводные данные не настроены</p>
+                    <p class="text-muted small mb-3">
+                        Перейдите к <a href="{% url 'scenarios:answer_config' run.scenario.pk %}">настройке обработки ответов</a> сценария
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Свод по подразделениям -->
+            {% if summary_data %}
+            <div class="card border-0 shadow-sm mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-people me-2"></i>Свод по подразделениям</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% for item in summary_data %}
+                    {% if item.dept_data %}
+                    <div class="mb-4">
+                        <h6 class="ps-3 text-muted">
+                            <span class="badge bg-info me-1">{{ item.display_label }}</span>
+                            {{ item.config.display_text }}
+                        </h6>
+                        {% for dept in item.dept_data %}
+                        <div class="card border-0 shadow-sm mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-building me-1"></i>{{ dept.name }}
+                                    <span class="badge bg-secondary ms-2">{{ dept.total_count }} ответ</span>
+                                    {% if item.has_numeric %}
+                                    <span class="badge bg-primary ms-1">Сумма: {{ dept.total_sum|floatformat:2 }}</span>
+                                    {% endif %}
+                                </h6>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm mb-0" style="font-size: 0.875rem;">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="ps-3" style="width: 50px;">№</th>
+                                                <th>Сотрудник</th>
+                                                <th style="width: 100px;">Сумма</th>
+                                                <th>Группировка ответов</th>
+                                                <th style="width: 80px;" class="text-end">Кол-во</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for emp in dept.employees %}
+                                            <tr>
+                                                <td class="ps-3 fw-bold">{{ forloop.counter }}</td>
+                                                <td>{{ emp.name }}</td>
+                                                <td>
+                                                    {% if item.has_numeric %}
+                                                        {% if emp.total_sum %}
+                                                        <span class="fw-bold text-primary">{{ emp.total_sum|floatformat:2 }}</span>
+                                                        {% else %}
+                                                        <span class="text-muted">0</span>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <span class="fw-bold text-primary">{{ emp.answer_count }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if emp.value_counts %}
+                                                        <div class="small">
+                                                            {% for value, count in emp.value_counts.items|dictsort:"-" %}
+                                                                <span class="badge bg-light text-dark me-1 mb-1">
+                                                                    {{ value }} — {{ count }}
+                                                                </span>
+                                                            {% endfor %}
+                                                        </div>
+                                                    {% else %}
+                                                        <span class="text-muted">—</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-end">
+                                                    <span class="badge bg-info">{{ emp.answer_count }}</span>
+                                                </td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted py-3">Нет ответов</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="table-light fw-bold">
+                                                <td colspan="2" class="ps-3">Итого по подразделению</td>
+                                                <td>
+                                                    {% if item.has_numeric %}
+                                                        <span class="text-primary">{{ dept.total_sum|floatformat:2 }}</span>
+                                                    {% else %}
+                                                        <span class="text-primary">{{ dept.total_count }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if dept.value_counts %}
+                                                        <div class="small">
+                                                            {% for value, count in dept.value_counts.items|dictsort:"-" %}
+                                                                <span class="badge bg-light text-dark me-1 mb-1">
+                                                                    {{ value }} — {{ count }}
+                                                                </span>
+                                                            {% endfor %}
+                                                        </div>
+                                                    {% else %}
+                                                        <span class="text-muted">—</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-end">
+                                                    <span class="badge bg-info">{{ dept.total_count }}</span>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% for item in summary_data %}{% if not item.dept_data %}
+                    <div class="text-center py-4">
+                        <p class="text-muted mb-0">Нет данных по подразделениям</p>
+                    </div>
+                    {% endif %}{% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Шаги -->
-    <div class="tab-pane fade show active" id="tab-steps">
+    <div class="tab-pane fade" id="tab-steps">
         <div class="card border-0 shadow-sm">
             <div class="card-body p-0">
                 {% if step_runs %}
@@ -229,4 +432,314 @@
         </div>
     </div>
 </div>
+
+<script>
+// Автообновление вкладки "Свод" каждые 10 секунд
+let summaryRefreshInterval = null;
+const runId = {{ run.pk }};
+const refreshIntervalMs = 10000; // 10 секунд
+
+function loadSummaryData() {
+    fetch(`/scenarios/runs/${runId}/summary/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Ошибка загрузки сводных данных:', data.error);
+                return;
+            }
+            renderSummaryData(data);
+        })
+        .catch(error => {
+            console.error('Ошибка при загрузке:', error);
+        });
+}
+
+function renderSummaryData(data) {
+    const container = document.getElementById('summary-container');
+    if (!container) return;
+
+    if (!data.has_configs || data.summary_data.length === 0) {
+        container.innerHTML = `
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-table text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-3">Сводные данные не настроены</p>
+                    <p class="text-muted small mb-3">
+                        Перейдите к <a href="/scenarios/${runId}/answer-config/">настройке обработки ответов</a> сценария
+                    </p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+
+    // Сводная таблица
+    html += `
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-table me-2"></i>Сводная таблица</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4" style="width: 50px;">№</th>
+                                <th>Текст</th>
+                                <th style="width: 150px;">Тип ответа</th>
+                                <th style="width: 120px;">Сумма значений</th>
+                                <th style="width: 200px;">Группировка ответов</th>
+                                <th style="width: 100px;">Всего ответов</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
+
+    data.summary_data.forEach((item, index) => {
+        html += `
+            <tr>
+                <td class="ps-3 fw-bold">${index + 1}</td>
+                <td>${item.config.display_text}</td>
+                <td><span class="badge bg-info">${item.display_label}</span></td>
+                <td>
+                    ${item.has_numeric 
+                        ? `<span class="fw-bold text-primary">${item.total_sum.toFixed(2)}</span>` 
+                        : `<span class="fw-bold text-primary">${item.total_count}</span>`}
+                </td>
+                <td>
+                    ${Object.keys(item.value_counts).length > 0 
+                        ? `<div class="small">${Object.entries(item.value_counts)
+                            .sort((a, b) => b[1] - a[1])
+                            .map(([value, count]) => `<span class="badge bg-light text-dark me-1 mb-1">${value} — ${count}</span>`)
+                            .join('')}</div>`
+                        : '<span class="text-muted">—</span>'}
+                </td>
+                <td><span class="badge bg-info">${item.total_count}</span></td>
+            </tr>
+        `;
+    });
+
+    html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Свод по подразделениям
+    html += `
+        <div class="card border-0 shadow-sm mt-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-people me-2"></i>Свод по подразделениям</h5>
+            </div>
+            <div class="card-body p-0">
+    `;
+
+    data.summary_data.forEach(item => {
+        if (item.dept_data && item.dept_data.length > 0) {
+            html += `
+                <div class="mb-4">
+                    <h6 class="ps-3 text-muted">
+                        <span class="badge bg-info me-1">${item.display_label}</span>
+                        ${item.config.display_text}
+                    </h6>
+            `;
+
+            item.dept_data.forEach((dept, deptIndex) => {
+                html += `
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="bi bi-building me-1"></i>${dept.name}
+                                <span class="badge bg-secondary ms-2">${dept.total_count} ответ</span>
+                                ${item.has_numeric 
+                                    ? `<span class="badge bg-primary ms-1">Сумма: ${dept.total_sum.toFixed(2)}</span>` 
+                                    : ''}
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm mb-0" style="font-size: 0.875rem;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-3" style="width: 50px;">№</th>
+                                            <th>Сотрудник</th>
+                                            <th style="width: 100px;">Сумма</th>
+                                            <th>Группировка ответов</th>
+                                            <th style="width: 80px;" class="text-end">Кол-во</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                `;
+
+                dept.employees.forEach((emp, empIndex) => {
+                    html += `
+                        <tr>
+                            <td class="ps-3 fw-bold">${empIndex + 1}</td>
+                            <td>${emp.name}</td>
+                            <td>
+                                ${item.has_numeric 
+                                    ? (emp.total_sum !== undefined && emp.total_sum !== null 
+                                        ? `<span class="fw-bold text-primary">${emp.total_sum.toFixed(2)}</span>` 
+                                        : '<span class="text-muted">0</span>')
+                                    : `<span class="fw-bold text-primary">${emp.answer_count}</span>`}
+                            </td>
+                            <td>
+                                ${Object.keys(emp.value_counts).length > 0 
+                                    ? `<div class="small">${Object.entries(emp.value_counts)
+                                        .sort((a, b) => b[1] - a[1])
+                                        .map(([value, count]) => `<span class="badge bg-light text-dark me-1 mb-1">${value} — ${count}</span>`)
+                                        .join('')}</div>`
+                                    : '<span class="text-muted">—</span>'}
+                            </td>
+                            <td class="text-end"><span class="badge bg-info">${emp.answer_count}</span></td>
+                        </tr>
+                    `;
+                });
+
+                if (dept.employees.length === 0) {
+                    html += `<tr><td colspan="5" class="text-center text-muted py-3">Нет ответов</td></tr>`;
+                }
+
+                html += `
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="table-light fw-bold">
+                                            <td colspan="2" class="ps-3">Итого по подразделению</td>
+                                            <td>
+                                                ${item.has_numeric 
+                                                    ? `<span class="text-primary">${dept.total_sum.toFixed(2)}</span>` 
+                                                    : `<span class="text-primary">${dept.total_count}</span>`}
+                                            </td>
+                                            <td>
+                                                ${Object.keys(dept.value_counts).length > 0 
+                                                    ? `<div class="small">${Object.entries(dept.value_counts)
+                                                        .sort((a, b) => b[1] - a[1])
+                                                        .map(([value, count]) => `<span class="badge bg-light text-dark me-1 mb-1">${value} — ${count}</span>`)
+                                                        .join('')}</div>`
+                                                    : '<span class="text-muted">—</span>'}
+                                            </td>
+                                            <td class="text-end"><span class="badge bg-info">${dept.total_count}</span></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                </div>
+            `;
+        }
+    });
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+// Запуск автообновления
+function startSummaryRefresh() {
+    // Загружаем данные сразу
+    loadSummaryData();
+    
+    // Запускаем интервал
+    summaryRefreshInterval = setInterval(loadSummaryData, refreshIntervalMs);
+}
+
+// Остановка автообновления при уходе со страницы
+document.addEventListener('DOMContentLoaded', function() {
+    startSummaryRefresh();
+    
+    // Останавливаем интервал при переключении вкладок
+    const runTabs = document.getElementById('runTabs');
+    if (runTabs) {
+        runTabs.addEventListener('click', function(e) {
+            if (e.target.closest('[data-bs-toggle="tab"]')) {
+                // Если ушли со вкладки "Свод", останавливаем
+                const target = e.target.getAttribute('data-bs-target');
+                if (target !== '#tab-summary') {
+                    if (summaryRefreshInterval) {
+                        clearInterval(summaryRefreshInterval);
+                        summaryRefreshInterval = null;
+                    }
+                } else {
+                    // Если вернулись на вкладку "Свод", запускаем
+                    startSummaryRefresh();
+                }
+            }
+        });
+    }
+});
+
+// ============================================================================
+// Отбой тревоги / Отмена
+// ============================================================================
+
+function confirmAbort() {
+    if (confirm('Отбой тревоги?\n\nВсе сотрудники получат сообщение об отмене. Сценарий будет завершён.')) {
+        performAbort();
+    }
+}
+
+function confirmCancel() {
+    if (confirm('Отмена сценария?\n\nВсе сотрудники получат сообщение об отмене. Сценарий будет отменён.')) {
+        performCancel();
+    }
+}
+
+function performAbort() {
+    const runId = {{ run.pk }};
+    
+    fetch(`/scenarios/runs/${runId}/abort/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        alert('Ошибка соединения');
+        console.error(error);
+    });
+}
+
+function performCancel() {
+    const runId = {{ run.pk }};
+    
+    fetch(`/scenarios/runs/${runId}/cancel-run/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        alert('Ошибка соединения');
+        console.error(error);
+    });
+}
+</script>
 {% endblock %}

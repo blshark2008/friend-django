@@ -33,6 +33,9 @@ urlpatterns = [
     path('runs/<int:pk>/', views.RunDetailView.as_view(), name='run_detail'),
     path('runs/<int:pk>/start/', views.RunStartView.as_view(), name='run_start'),
     path('runs/<int:pk>/cancel/', views.RunCancelView.as_view(), name='run_cancel'),
+    path('runs/<int:pk>/abort/', views.run_abort_view, name='run_abort'),
+    path('runs/<int:pk>/cancel-run/', views.run_cancel_action_view, name='run_cancel_action'),
+    path('runs/bulk-delete/', views.run_bulk_delete, name='run_bulk_delete'),
 
     # Журнал
     path('journal/', views.JournalListView.as_view(), name='journal_list'),
@@ -66,4 +69,16 @@ urlpatterns = [
     path('mail-groups/<int:pk>/remove_user/', views.ScenarioMailGroupRemoveUserView.as_view(), name='mail_group_remove_user'),
     path('mail-groups/<int:pk>/add_dept/', views.ScenarioMailGroupAddDeptView.as_view(), name='mail_group_add_dept'),
     path('mail-groups/<int:pk>/remove_dept/', views.ScenarioMailGroupRemoveDeptView.as_view(), name='mail_group_remove_dept'),
+
+    # Настройка обработки ответов
+    path('<int:pk>/answer-config/', views.AnswerConfigView.as_view(), name='answer_config'),
+    path('api/answer-config-add/', views.answer_config_add, name='api_answer_config_add'),
+    path('api/answer-config-delete/', views.answer_config_delete, name='api_answer_config_delete'),
+    path('api/answer-config-update/', views.answer_config_update, name='api_answer_config_update'),
+
+    # API для сводных данных
+    path('runs/<int:pk>/summary/', views.run_summary_api, name='run_summary_api'),
+
+    # API для сохранения сообщений
+    path('api/save-messages/', views.save_scenario_messages, name='api_save_messages'),
 ]

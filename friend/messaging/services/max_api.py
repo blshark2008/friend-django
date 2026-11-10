@@ -32,7 +32,7 @@ class MAXClient:
             'Authorization': self.token,
         }
 
-    def _get(self, endpoint: str, params: dict = None, timeout: int = 60) -> dict:
+    def _get(self, endpoint: str, params: dict = None, timeout: int = 10) -> dict:
         """GET запрос к API."""
         url = f'{self.base_url}{endpoint}'
         try:
@@ -46,7 +46,7 @@ class MAXClient:
             logger.error(f'MAX API GET error on {endpoint}: {e}')
             raise MAXAPIError(f'GET {endpoint}: {e}')
 
-    def _post(self, endpoint: str, data: dict = None, params: dict = None, timeout: int = 60) -> dict:
+    def _post(self, endpoint: str, data: dict = None, params: dict = None, timeout: int = 10) -> dict:
         """POST запрос к API."""
         url = f'{self.base_url}{endpoint}'
         try:
@@ -89,10 +89,11 @@ class MAXClient:
             raise MAXAPIError('Необходимо указать текст сообщения')
 
         params = {}
-        if user_id:
-            params['user_id'] = user_id
+        # chat_id приоритетнее — для диалогов и групповых чатов
         if chat_id:
             params['chat_id'] = chat_id
+        elif user_id:
+            params['user_id'] = user_id
         if disable_link_preview is not None:
             params['disable_link_preview'] = disable_link_preview
 
@@ -100,7 +101,7 @@ class MAXClient:
         if format:
             payload['format'] = format
         
-        # Добавляем кнопки если есть
+        # Добавляем кнопки если есть — MAX API ожидает attachments.inline_keyboard
         if buttons:
             payload['attachments'] = [{
                 'type': 'inline_keyboard',
@@ -195,4 +196,18 @@ class MAXClient:
 
     def answer_callback_simple(self, callback_id: str) -> dict:
         """Простой ответ на callback (без текста). MAX API: POST /answers?callback_id=..."""
-        return self._post('/answers', data={'callback_id': callback_id})
+        # MAX API требует Authorization заголовок и валидный JSON body
+        url = f'{self.base_url}/answers'
+        try:
+            response = requests.post(
+                url,
+                headers=self._headers(),
+                json={'message': None},
+                params={'callback_id': callback_id},
+                timeout=10,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f'MAX API POST /answers error: {e}')
+            raise MAXAPIError(f'POST /answers: {e}')

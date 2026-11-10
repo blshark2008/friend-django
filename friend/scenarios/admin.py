@@ -3,6 +3,7 @@ from .models import (
     Category, Scenario, Branch, Step,
     Run, StepRun, Answer, DbValue, Log,
     Role, EmployeeRole,
+    AnswerSummaryConfig, UserCurrentRun,
 )
 
 
@@ -86,3 +87,18 @@ class EmployeeRoleAdmin(admin.ModelAdmin):
     list_display = ['employee', 'role', 'scope_department']
     list_filter = ['role', 'scope_department']
     search_fields = ['employee__last_name', 'employee__first_name']
+
+
+@admin.register(AnswerSummaryConfig)
+class AnswerSummaryConfigAdmin(admin.ModelAdmin):
+    list_display = ['scenario', 'result_code', 'display_text', 'aggregate_numeric', 'created_at']
+    list_filter = ['scenario', 'aggregate_numeric']
+    search_fields = ['result_code', 'display_text']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(UserCurrentRun)
+class UserCurrentRunAdmin(admin.ModelAdmin):
+    list_display = ['user', 'run', 'updated_at']
+    list_filter = ['run__scenario']
+    search_fields = ['user__last_name', 'user__first_name']

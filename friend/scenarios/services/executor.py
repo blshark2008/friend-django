@@ -36,6 +36,23 @@ class ScenarioExecutor:
         self.run.status = Run.STATUS_RUNNING
         self.run.save(update_fields=['status'])
 
+        # Обновляем текущий запуск для всех получателей
+        from scenarios.models import UserCurrentRun
+        recipients = set()
+        for branch in self.run.scenario.branches.all():
+            first_step = branch.steps.filter(
+                prev_result_code='',
+            ).order_by('step_order').first()
+            if first_step:
+                recipients.update(self._resolve_mailing_list(first_step))
+        
+        for recipient in recipients:
+            UserCurrentRun.objects.update_or_create(
+                user=recipient,
+                defaults={'run': self.run},
+            )
+            logger.info(f'start: set UserCurrentRun for user {recipient.pk} -> run_id={self.run.id}')
+
         # Лог
         Log.objects.create(
             run=self.run,
@@ -296,6 +313,7 @@ class ScenarioExecutor:
         user_id: int,
         message_text: str,
         button_result_code: str = None,
+        step_run: 'StepRun' = None,
     ) -> dict:
         """
         Обработка ответа пользователя.
@@ -304,22 +322,26 @@ class ScenarioExecutor:
             user_id: ID пользователя
             message_text: Текст сообщения (для текстовых ответов)
             button_result_code: Код нажатой кнопки (для кнопок)
+            step_run: Готовый step_run (если уже найден)
 
         Returns:
             dict с результатом обработки
         """
+        logger.info(f'process_answer: user_id={user_id}, button_code={button_result_code}, text={message_text[:50]}')
         # Находим активный step_run пользователя
-        step_run = StepRun.objects.filter(
-            run=self.run,
-            recipient_id=user_id,
-            status=StepRun.STATUS_SENT,
-        ).order_by('step__step_order').first()
+        if step_run is None:
+            step_run = StepRun.objects.filter(
+                run=self.run,
+                recipient_id=user_id,
+                status=StepRun.STATUS_SENT,
+            ).order_by('step__step_order').first()
 
         if not step_run:
             return {'success': False, 'error': 'Нет активного шага'}
 
         step = step_run.step
         message_json = step.message_json
+        logger.info(f'process_answer: step_id={step.id}, step_order={step.step_order}, message_json={message_json}')
 
         # Валидируем ответ
         validated_answer = self._validate_answer(message_json, message_text, button_result_code)
@@ -359,8 +381,9 @@ class ScenarioExecutor:
             # Вычисляем агрегаты шага
             aggregates = self._compute_step_aggregates(step)
 
-            # Ищем следующий шаг
-            next_step = self._find_next_step(step, validated_answer.get('result_code', ''))
+        # Ищем следующий шаг (вне транзакции)
+        next_step = self._find_next_step(step, validated_answer.get('result_code', ''))
+        logger.info(f'process_answer: next_step_id={next_step.id if next_step else None}')
 
         result = {
             'success': True,
@@ -372,9 +395,12 @@ class ScenarioExecutor:
 
         if next_step:
             # Отправляем следующий шаг
+            logger.info(f'process_answer: sending next step {next_step.id} to user {user_id}')
             self._send_next_step(next_step, user_id)
             result['next_message'] = self._substitute_vars(next_step.message_text, aggregates)
             result['next_buttons'] = next_step.message_json.get('options', [])
+        else:
+            logger.info(f'process_answer: no next step found for user {user_id}')
 
         return result
 
@@ -385,6 +411,7 @@ class ScenarioExecutor:
         if answer_type == 'buttons':
             # Проверка кнопки
             options = message_json.get('options', [])
+            logger.debug(f'Validate buttons: button_code={button_code}, options={[(o.get("text"), o.get("result_code")) for o in options]}')
             for opt in options:
                 if opt.get('result_code') == button_code:
                     return {
@@ -395,9 +422,11 @@ class ScenarioExecutor:
 
         elif answer_type == 'number':
             # Проверка числа
+            logger.info(f'_validate_answer number: text={text}, message_json={message_json}')
             try:
                 value = int(text.strip())
             except (ValueError, AttributeError):
+                logger.info(f'_validate_answer number: failed to convert text to int')
                 return None
 
             validation = message_json.get('validation', {})
@@ -405,8 +434,10 @@ class ScenarioExecutor:
             max_val = validation.get('max', float('inf'))
 
             if value < min_val or value > max_val:
+                logger.info(f'_validate_answer number: value {value} out of range [{min_val}, {max_val}]')
                 return None
 
+            logger.info(f'_validate_answer number: valid, value={value}')
             return {
                 'result_code': message_json.get('result_code', 'NUMBER'),
                 'value': value,
@@ -507,14 +538,19 @@ class ScenarioExecutor:
         return aggregates
 
     def _find_next_step(self, current_step: Step, result_code: str) -> Step:
-        """Находит следующий шаг в ветке."""
-        return current_step.branch.steps.filter(
-            step_order__gt=current_step.step_order,
+        """Находит следующий шаг в ветке по prev_result_code."""
+        logger.info(f'_find_next_step: step_id={current_step.id}, result_code={result_code}, branch_id={current_step.branch_id}')
+        candidates = current_step.branch.steps.filter(
             prev_result_code=result_code,
-        ).order_by('step_order').first()
+        ).order_by('step_order')
+        logger.info(f'_find_next_step: found {candidates.count()} candidates')
+        for c in candidates:
+            logger.info(f'  candidate: step_id={c.id}, step_order={c.step_order}, prev_result_code={c.prev_result_code!r}')
+        return candidates.first()
 
     def _send_next_step(self, step: Step, user_id: int):
         """Отправляет следующий шаг пользователю."""
+        logger.info(f'_send_next_step: step_id={step.id}, step_order={step.step_order}, user_id={user_id}')
         step_run, created = StepRun.objects.get_or_create(
             run=self.run,
             step=step,
@@ -524,6 +560,15 @@ class ScenarioExecutor:
                 'deadline_at': self._calc_deadline(step),
             },
         )
+        logger.info(f'_send_next_step: step_run_id={step_run.pk}, created={created}, status={step_run.status}')
+
+        # Обновляем текущий запуск пользователя
+        from scenarios.models import UserCurrentRun
+        UserCurrentRun.objects.update_or_create(
+            user_id=user_id,
+            defaults={'run': self.run},
+        )
+        logger.info(f'_send_next_step: updated UserCurrentRun for user {user_id} -> run_id={self.run.id}')
 
         if not created:
             # Уже есть step_run — обновляем
@@ -543,6 +588,23 @@ class ScenarioExecutor:
 
         try:
             message_text = self._substitute_vars(step.message_text)
+            logger.info(f'_send_next_step: sending message to user {user_id} (max_id={user.max_id}): {message_text[:100]}')
+
+            # Формируем кнопки из message_json
+            buttons = None
+            message_json = step.message_json
+            if isinstance(message_json, dict):
+                msg_type = message_json.get('type', '')
+                if msg_type in ('buttons', 'buttons_with_number'):
+                    options = message_json.get('options', [])
+                    buttons = []
+                    for opt in options:
+                        buttons.append({
+                            'type': 'callback',
+                            'text': opt.get('text', ''),
+                            'payload': opt.get('result_code', ''),
+                        })
+                    logger.info(f'_send_next_step: buttons={buttons}')
 
             # Отправляем через API
             from messaging.services.bot_api_client import bot_api_client
@@ -550,7 +612,9 @@ class ScenarioExecutor:
                 user_id=int(user.max_id),
                 text=message_text,
                 format='html',
+                buttons=buttons,
             )
+            logger.info(f'_send_next_step: send result={result}')
 
             if result.get('success'):
                 step_run.sent_at = django_tz.now()

@@ -37,6 +37,20 @@ class Scenario(models.Model):
     created_at = models.DateTimeField('Создано', auto_now_add=True)
     updated_at = models.DateTimeField('Обновлено', auto_now=True)
 
+    # Сообщения при завершении/отмене сценария
+    abort_message = models.TextField(
+        'Текст сообщения "Отбой"',
+        blank=True,
+        default='',
+        help_text='Сообщение, отправляемое всем сотрудникам при завершении сценария (отбой)',
+    )
+    cancel_message = models.TextField(
+        'Текст сообщения "Отмена"',
+        blank=True,
+        default='',
+        help_text='Сообщение, отправляемое всем сотрудникам при отмене сценария',
+    )
+
     class Meta:
         verbose_name = 'Сценарий'
         verbose_name_plural = 'Сценарии'
@@ -256,6 +270,32 @@ class StepRun(models.Model):
         return f'{self.step.branch} → {self.recipient} ({self.get_status_display()})'
 
 
+class UserCurrentRun(models.Model):
+    """Текущий активный запуск для пользователя."""
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        verbose_name='Сотрудник',
+        on_delete=models.CASCADE,
+        related_name='current_run',
+    )
+    run = models.ForeignKey(
+        Run,
+        verbose_name='Запуск',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='user_current_runs',
+    )
+    updated_at = models.DateTimeField('Обновлено', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Текущий запуск пользователя'
+        verbose_name_plural = 'Текущие запуски пользователей'
+
+    def __str__(self):
+        return f'{self.user} → {self.run}'
+
+
 class Answer(models.Model):
     """Ответ пользователя на шаг."""
     run = models.ForeignKey(
@@ -354,6 +394,50 @@ class Log(models.Model):
 
     def __str__(self):
         return f'{self.run} — {self.get_event_type_display()} ({self.created_at})'
+
+
+# ============================================================================
+# Обработка ответов / Свод данных
+# ============================================================================
+
+
+class AnswerSummaryConfig(models.Model):
+    """Конфигурация сводной таблицы для сценария.
+    
+    Связывает result_code с отображаемым текстом и флагом агрегации.
+    """
+    scenario = models.ForeignKey(
+        Scenario,
+        verbose_name='Сценарий',
+        on_delete=models.CASCADE,
+        related_name='answer_summary_configs',
+    )
+    result_code = models.CharField(
+        'Код результата',
+        max_length=100,
+        help_text='Result code из шага сценария',
+    )
+    display_text = models.CharField(
+        'Отображаемый текст',
+        max_length=200,
+        help_text='Текст, отображаемый в сводной таблице',
+    )
+    aggregate_numeric = models.BooleanField(
+        'Агрегировать числовые',
+        default=False,
+        help_text='Суммировать числовые ответы и считать количество',
+    )
+    created_at = models.DateTimeField('Создано', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлено', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Конфигурация сводки ответов'
+        verbose_name_plural = 'Конфигурации сводки ответов'
+        ordering = ['result_code']
+        unique_together = ['scenario', 'result_code']
+
+    def __str__(self):
+        return f'{self.scenario} — {self.result_code} ({self.display_text})'
 
 
 # ============================================================================

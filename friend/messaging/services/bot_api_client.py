@@ -16,12 +16,13 @@ logger = logging.getLogger(__name__)
 class BotAPIClient:
     """Клиент для MAX Bot API — отправляет напрямую."""
 
-    def send_message(self, user_id, text, format='html', buttons=None):
+    def send_message(self, user_id=None, chat_id=None, text='', format='html', buttons=None):
         """
         Отправить сообщение пользователю через MAX API напрямую.
 
         Args:
-            user_id: ID пользователя в MAX
+            user_id: ID пользователя в MAX (для каналов)
+            chat_id: ID чата/диалога (для диалогов и групповых чатов)
             text: Текст сообщения
             format: Разметка текста ('html', 'markdown')
             buttons: Список кнопок [{'type': 'callback', 'text': '...', 'payload': '...'}]
@@ -31,9 +32,13 @@ class BotAPIClient:
         """
         from messaging.services.max_api import MAXClient, MAXAPIError
 
+        if not user_id and not chat_id:
+            logger.error('Must specify user_id or chat_id')
+            return {'success': False, 'error': 'Missing user_id or chat_id'}
+
         try:
             client = MAXClient()
-            
+
             # Форматируем кнопки для MAX API
             max_buttons = None
             if buttons:
@@ -44,20 +49,24 @@ class BotAPIClient:
                         'text': btn.get('text', ''),
                         'payload': btn.get('payload', ''),
                     })
-            
+
             client.send_message(
-                user_id=int(user_id),
+                user_id=int(user_id) if user_id else None,
+                chat_id=int(chat_id) if chat_id else None,
                 text=text,
                 format=format,
                 buttons=max_buttons,
             )
-            logger.info(f'Message sent to user {user_id} via MAX API')
+            dest = chat_id or user_id
+            logger.info(f'Message sent to {dest} via MAX API')
             return {'success': True}
         except MAXAPIError as e:
-            logger.error(f'MAX API error sending to user {user_id}: {e}')
+            dest = chat_id or user_id
+            logger.error(f'MAX API error sending to {dest}: {e}')
             return {'success': False, 'error': str(e)}
         except Exception as e:
-            logger.error(f'Error sending message to user {user_id}: {e}')
+            dest = chat_id or user_id
+            logger.error(f'Error sending message to {dest}: {e}')
             return {'success': False, 'error': str(e)}
 
 # Глобальный клиент

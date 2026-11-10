@@ -171,10 +171,6 @@
                         <i class="bi bi-bar-chart"></i>
                         <span class="text-dark" style="font-size:0.9rem;">Статистика</span>
                     </a>
-                    <a href="{% url 'messaging:mail_group_list' %}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-2 py-2 {% if request.resolver_match.url_name == 'mail_group_list' %}active{% endif %}">
-                        <i class="bi bi-people-fill"></i>
-                        <span class="text-dark" style="font-size:0.9rem;">Группы рассылки</span>
-                    </a>
                 </div>
             </div>
 
@@ -206,10 +202,6 @@
                         <i class="bi bi-people"></i>
                         <span class="text-dark" style="font-size:0.9rem;">Роли</span>
                     </a>
-                    <a href="{% url 'scenarios:mail_group_list' %}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 px-2 py-2 {% if request.resolver_match.url_name == 'mail_group_list' %}active{% endif %}">
-                        <i class="bi bi-people-fill"></i>
-                        <span class="text-dark" style="font-size:0.9rem;">Группы рассылки</span>
-                    </a>
                 </div>
             </div>
 
@@ -221,6 +213,16 @@
     <!-- Main content -->
     <div id="content" class="flex-grow-1">
         <div class="container-fluid p-4">
+            {% if messages %}
+            <div class="messages mb-3">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% block content %}{% endblock %}
         </div>
     </div>

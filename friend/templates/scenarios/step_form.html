@@ -65,12 +65,16 @@ window._mailingListData = JSON.parse(document.getElementById('mailing-list-data'
                         <div class="form-text">
                             JSON для сбора ответа. Примеры:<br>
                             Кнопки: <code>{"type": "buttons", "options": [{"text": "Да", "result_code": "YES"}]}</code><br>
-                            Число: <code>{"type": "number", "result_code": "COUNT", "validation": {"min": 0, "max": 100}}</code><br>
+                            Число: <code>{"type": "number", "result_code": "COUNT"}</code><br>
                             Текст: <code>{"type": "text_pattern", "result_code": "DATA", "pattern": "^(\\w+)\\s*(\\d+)$", "fields": ["name", "count"]}</code>
                         </div>
                         {% if form.message_json.errors %}
                             <div class="invalid-feedback d-block">{{ form.message_json.errors }}</div>
                         {% endif %}
+                        <div class="alert alert-info mt-2">
+                            <i class="bi bi-info-circle me-1"></i>
+                            JSON для сбора ответа сохраняется автоматически при сохранении формы.
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -100,45 +104,6 @@ window._mailingListData = JSON.parse(document.getElementById('mailing-list-data'
                         {% if form.exclusion_list_json.errors %}
                             <div class="invalid-feedback d-block">{{ form.exclusion_list_json.errors }}</div>
                         {% endif %}
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="{{ form.db_write_json.id_for_label }}" class="form-label">{{ form.db_write_json.label }}</label>
-                        <div class="input-group">
-                            {{ form.db_write_json }}
-                            <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#jsonBuilder-db_write_json">
-                                <i class="bi bi-gear"></i> Генератор JSON
-                            </button>
-                        </div>
-                        <div class="form-text">
-                            JSON для записи в базу. Пример: <code>{"evacuated": "да", "count": "{answer.COUNT}"}</code>
-                        </div>
-                        {% if form.db_write_json.errors %}
-                            <div class="invalid-feedback d-block">{{ form.db_write_json.errors }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="{{ form.deadline_min.id_for_label }}" class="form-label">{{ form.deadline_min.label }}</label>
-                            {{ form.deadline_min }}
-                            <div class="form-text">0 — без дедлайна</div>
-                            {% if form.deadline_min.errors %}
-                                <div class="invalid-feedback d-block">{{ form.deadline_min.errors }}</div>
-                            {% endif %}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.escalate_to_json.id_for_label }}" class="form-label">{{ form.escalate_to_json.label }}</label>
-                            <div class="input-group">
-                                {{ form.escalate_to_json }}
-                                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#jsonBuilder-escalate_to_json">
-                                    <i class="bi bi-gear"></i> Генератор JSON
-                                </button>
-                            </div>
-                            {% if form.escalate_to_json.errors %}
-                                <div class="invalid-feedback d-block">{{ form.escalate_to_json.errors }}</div>
-                            {% endif %}
-                        </div>
                     </div>
 
                     <div class="d-flex gap-2 mt-4">
@@ -198,6 +163,33 @@ window._mailingListData = JSON.parse(document.getElementById('mailing-list-data'
 
 <script>
 (function () {
+    var messageJsonField = document.querySelector('textarea[name="message_json"]');
+
+    if (messageJsonField) {
+        // Автоматическая генерация result_code для типов number и text_pattern
+        messageJsonField.addEventListener('input', function () {
+            var jsonText = this.value || '{}';
+            try {
+                var parsed = JSON.parse(jsonText);
+                var msgType = parsed.type || '';
+                if ((msgType === 'number' || msgType === 'text_pattern') && !parsed.result_code) {
+                    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                    var code = '';
+                    for (var i = 0; i < 8; i++) {
+                        code += chars.charAt(Math.floor(Math.random() * chars.length));
+                    }
+                    parsed.result_code = code;
+                    this.value = JSON.stringify(parsed, null, 2);
+                }
+            } catch (e) {
+                // Не валидный JSON — игнорируем
+            }
+        });
+    }
+
+    // ========================================================================
+    // Модальное окно выбора result_code
+    // ========================================================================
     var btn = document.getElementById('pickResultCodeBtn');
     var modal = document.getElementById('resultCodeModal');
     var loading = document.getElementById('resultCodeLoading');
@@ -252,12 +244,26 @@ window._mailingListData = JSON.parse(document.getElementById('mailing-list-data'
 
                     var row = document.createElement('tr');
                     row.style.cursor = 'pointer';
+                    
+                    // Если код занят, подсвечиваем его
+                    if (opt.is_occupied) {
+                        row.classList.add('table-warning');
+                    }
+                    
+                    var variantBadge = '';
+                    if (opt.variant_type === 'Кнопка') {
+                        variantBadge = opt.ask_number ? ' <span class="badge bg-warning">+число</span>' : '';
+                    } else {
+                        variantBadge = ' <span class="badge bg-info">' + opt.variant_type + '</span>';
+                    }
+                    
+                    var occupiedNote = opt.is_occupied ? ' <span class="badge bg-secondary">занят</span>' : '';
+                    
                     row.innerHTML =
                         '<td>' + stepLabel + '</td>' +
                         '<td title="' + esc(opt.message_text) + '">' + esc(opt.message_text.substring(0, 80)) + '</td>' +
                         '<td>' + esc(opt.button_text) + '</td>' +
-                        '<td><code>' + esc(opt.result_code) + '</code>' +
-                        (opt.ask_number ? ' <span class="badge bg-warning">+число</span>' : '') + '</td>';
+                        '<td><code>' + esc(opt.result_code) + '</code>' + variantBadge + occupiedNote + '</td>';
 
                     row.addEventListener('click', function () {
                         var codeInput = document.querySelector('input[name="prev_result_code"]');

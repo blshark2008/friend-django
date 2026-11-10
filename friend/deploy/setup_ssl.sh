@@ -24,8 +24,8 @@ echo "Генерация сертификата..."
 openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     -keyout "$SSL_DIR/friend.key" \
     -out "$SSL_DIR/friend.crt" \
-    -subj "/C=RU/ST=Novosibirsk/L=Novosibirsk/O=Friend/OU=Dev/CN=84.54.59.213" \
-    -addext "subjectAltName=IP:84.54.59.213"
+    -subj "/C=RU/ST=Novosibirsk/L=Novosibirsk/O=Friend/OU=Dev" \
+    -addext "subjectAltName=DNS:projectgame.ru,DNS:www.projectgame.ru,IP:84.54.59.213"
 
 # Устанавливаем права
 sudo chmod 600 "$SSL_DIR/friend.key"

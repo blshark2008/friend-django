@@ -18,6 +18,12 @@
         <a href="{% url 'scenarios:scenario_edit' scenario.pk %}" class="btn btn-outline-secondary me-2">
             <i class="bi bi-gear me-1"></i>Настройки
         </a>
+        <a href="{% url 'scenarios:answer_config' scenario.pk %}" class="btn btn-outline-primary me-2">
+            <i class="bi bi-gear-square me-1"></i>Настроить обработку ответов
+        </a>
+        <button type="button" class="btn btn-outline-warning me-2" data-bs-toggle="modal" data-bs-target="#messagesModal">
+            <i class="bi bi-megaphone me-1"></i>Настроить сообщения при отмене
+        </button>
         <a href="{% url 'scenarios:scenario_list' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-1"></i>Назад
         </a>
@@ -29,7 +35,7 @@
     {% for branch in branches %}
     <li class="nav-item" role="presentation">
         <a class="nav-link {% if forloop.first %}active{% endif %}" href="#branch-{{ branch.code }}" role="tab" data-branch="{{ branch.code }}">
-            {{ branch.name }} <span class="badge bg-secondary">{{ branch.steps.count }}</span>
+            {{ branch.name }} <span class="badge bg-secondary">{{ branch.steps|length }}</span>
         </a>
     </li>
     {% endfor %}
@@ -60,13 +66,15 @@
                 </div>
             </div>
             <div class="card-body p-0">
-                {% if branch.steps.exists %}
+                {% if branch.steps %}
                 <div class="table-responsive">
                     <table class="table table-hover mb-0 scenario-table">
                         <thead>
                             <tr>
                                 <th class="ps-3" style="width: 50px;">№</th>
                                 <th>Код результата</th>
+                                <th>Коды результата действия</th>
+                                <th>Код запуска</th>
                                 <th>Текст сообщения</th>
                                 <th>JSON сбора</th>
                                 <th>Рассылка</th>
@@ -75,24 +83,51 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for step in branch.steps.all %}
+                            {% for step in branch.steps %}
                             <tr>
                                 <td class="ps-3 fw-bold">{{ step.step_order }}</td>
                                 <td>
-                                    {% if step.prev_result_code %}
-                                        <span class="badge bg-info">{{ step.prev_result_code }}</span>
+                                    {% if step.message_json.type %}
+                                        <span class="badge bg-success">{{ step.message_json.type }}</span>
                                     {% else %}
                                         <span class="text-muted">—</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <div class="step-text" style="max-width: 300px;">
-                                        {{ step.message_text|truncatewords:8 }}
-                                    </div>
+                                    {% if step.message_json.type == 'buttons' or step.message_json.type == 'buttons_with_number' %}
+                                        {% for opt in step.message_json.options %}
+                                            {% if opt.result_code %}
+                                            <span class="badge bg-warning text-dark me-1" title="{{ opt.text|default:'' }}">{{ opt.text|default:"—" }} — {{ opt.result_code }}</span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% elif step.message_json.type and step.message_json.result_code %}
+                                        <span class="badge bg-warning text-dark">{{ step.message_json.result_code }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if step.prev_result_code %}
+                                        <span class="badge bg-primary">{{ step.prev_result_code }}</span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'scenarios:step_edit' step.pk %}" class="text-decoration-none" title="Редактировать">
+                                        {{ step.message_text }}
+                                    </a>
                                 </td>
                                 <td>
                                     <small class="text-muted">
-                                        {{ step.message_json.type|default:"—" }}
+                                        {% if step.message_json.type %}
+                                            {{ step.message_json.type }}
+                                            {% if step.message_json.result_code %}
+                                                <br><code>{{ step.message_json.result_code }}</code>
+                                            {% endif %}
+                                        {% else %}
+                                            —
+                                        {% endif %}
                                     </small>
                                 </td>
                                 <td>
@@ -149,6 +184,16 @@
     {% endfor %}
 </div>
 
+<style>
+.step-text a:hover {
+    color: #0d6efd !important;
+    text-decoration: underline !important;
+}
+.step-text a {
+    color: inherit;
+}
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var tabs = document.querySelectorAll('#branchTabs a[data-branch]');
@@ -172,6 +217,90 @@ document.addEventListener('DOMContentLoaded', function () {
                 target.classList.add('show', 'active');
             }
         });
+    });
+});
+</script>
+
+<!-- Модальное окно: Настройка сообщений при отмене -->
+<div class="modal fade" id="messagesModal" tabindex="-1" aria-labelledby="messagesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="messagesModalLabel">
+                    <i class="bi bi-megaphone me-2"></i>Настройка сообщений при отмене
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <form id="messagesForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="scenario_id" value="{{ scenario.pk }}">
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-warning">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Сообщение "Отбой"
+                        </label>
+                        <p class="text-muted small">
+                            Этот текст будет отправлен всем сотрудникам при завершении сценария (отбой тревоги).
+                        </p>
+                        <textarea class="form-control" name="abort_message" rows="3" 
+                                  placeholder="Введите текст сообщения отбоя...">{{ scenario.abort_message }}</textarea>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fw-bold text-danger">
+                            <i class="bi bi-x-circle me-1"></i>Сообщение "Отмена"
+                        </label>
+                        <p class="text-muted small">
+                            Этот текст будет отправлен всем сотрудникам при отмене сценария (извините, ошиблись).
+                        </p>
+                        <textarea class="form-control" name="cancel_message" rows="3" 
+                                  placeholder="Введите текст сообщения отмены...">{{ scenario.cancel_message }}</textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveMessagesBtn">
+                    <i class="bi bi-check-lg me-1"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Сохранение сообщений
+document.getElementById('saveMessagesBtn').addEventListener('click', function() {
+    const form = document.getElementById('messagesForm');
+    const formData = new FormData(form);
+    const data = {
+        scenario_id: formData.get('scenario_id'),
+        abort_message: formData.get('abort_message'),
+        cancel_message: formData.get('cancel_message'),
+    };
+
+    fetch('/scenarios/api/save-messages/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('messagesModal'));
+            modal.hide();
+            alert('Сообщения сохранены');
+        } else {
+            alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(error => {
+        alert('Ошибка соединения');
+        console.error(error);
     });
 });
 </script>

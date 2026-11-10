@@ -108,7 +108,7 @@ class Command(BaseCommand):
                     else:
                         result = client.subscribe_webhook(
                             url=webhook_url,
-                            update_types=['message_created', 'bot_started', 'bot_added'],
+                            update_types=['message_created', 'message_callback', 'bot_started', 'bot_added'],
                             secret=secret,
                         )
                         if result.get('success'):
@@ -145,7 +145,7 @@ class Command(BaseCommand):
                         limit=100,
                         timeout=30,
                         marker=marker,
-                        types=['message_created', 'bot_started', 'bot_added'],
+                        types=['message_created', 'message_callback', 'bot_started', 'bot_added'],
                     )
 
                     consecutive_errors = 0
@@ -203,6 +203,36 @@ class Command(BaseCommand):
 def _process_update(update, client, dry_run, handle_command, handle_message, session_store):
     """Обработка одного обновления."""
     update_type = update.get('update_type', '')
+    
+    # ========================================================================
+    # ОБРАБОТКА CALLBACK ОТ КНОПКИ (message_callback)
+    # ========================================================================
+    if update_type == 'message_callback':
+        callback_data = update.get('callback', {})
+        callback_id = callback_data.get('callback_id')
+        payload = callback_data.get('payload', '')
+        user_data = callback_data.get('user', {})
+        user_id = user_data.get('user_id')
+        
+        if not user_id:
+            return
+        
+        # Отвечаем на callback (убираем индикатор загрузки в MAX)
+        if callback_id:
+            try:
+                client.answer_callback_simple(callback_id=callback_id)
+            except Exception as e:
+                print(f'  → Ошибка answer_callback: {e}')
+        
+        # В Long Polling режиме callback обрабатывается через webhook handler
+        # Здесь просто логируем
+        print(f'[message_callback] user_id={user_id}, payload={payload}, callback_id={callback_id}')
+        sys.stdout.flush()
+        return
+    
+    # ========================================================================
+    # ОБРАБОТКА СООБЩЕНИЙ (message_created, bot_started, bot_added)
+    # ========================================================================
     message_data = update.get('message', {})
     body_data = message_data.get('body', {})
     sender_data = message_data.get('sender', {})

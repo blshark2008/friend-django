@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-!84x3a%!7qt#m_vid1-o*ucy_uvb2@!rs^9p^#h#dk5elf)(qa
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '84.54.59.213', '[::1]', 'projectgame.ru', 'www.projectgame.ru']
 
 
 # Application definition
@@ -147,9 +147,11 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # Skillspace integration settings
-SKILLSPACE_API_KEY = ''  # Set your API key from Skillspace settings
-SKILLSPACE_BASE_URL = 'https://api.skillspace.ru'
-SKILLSPACE_WEBHOOK_BASE_URL = 'https://skillspace.ru'
+# Skillspace settings
+SKILLSPACE_API_KEY = '3e8fcf56-7ed2-3c73-8626-4684263b44c0'
+SKILLSPACE_SCHOOL_DOMAIN = 'kemcardio.skillspace.ru'
+SKILLSPACE_BASE_URL = f'https://{SKILLSPACE_SCHOOL_DOMAIN}/api/open/v1'
+SKILLSPACE_WEBHOOK_BASE_URL = 'https://projectgame.ru'
 
 # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -159,6 +161,89 @@ EMAIL_USE_SSL = True
 EMAIL_HOST_USER = 'blshark2008@yandex.ru'
 EMAIL_HOST_PASSWORD = 'vgdbdncejuopbqpv'
 DEFAULT_FROM_EMAIL = 'blshark2008@yandex.ru'
+
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': '/tmp/django_max_bot.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'messaging': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'scenarios': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'webhook': {
+            'handlers': ['console', 'webhook_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+    'loggers': {
+        'messaging': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'scenarios': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'webhook': {
+            'handlers': ['console', 'webhook_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': '/tmp/django_max_bot.log',
+            'formatter': 'verbose',
+        },
+        'webhook_file': {
+            'class': 'logging.FileHandler',
+            'filename': '/tmp/webhook.log',
+            'formatter': 'verbose',
+        },
+    },
+}
 
 # MAX Bot settings
 MAX_BOT_TOKEN = 'f9LHodD0cOIYMz2y4innjHTr1GbEaOS0kX_FdLooS7xj1JzkdrVufdvwwwpOmfJ8vaemQcwdhNJOz8b52Sdw'

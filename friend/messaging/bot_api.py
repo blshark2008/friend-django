@@ -113,8 +113,7 @@ class BotAPIHandler(BaseHTTPRequestHandler):
                         'text': btn.get('text', ''),
                         'payload': btn.get('payload', ''),
                     })
-                # MAX API ожидает 2D-массив: [[кнопка1, кнопка2], [кнопка3]]
-                # Все кнопки в одном ряду
+                # MAX API ожидает attachments.inline_keyboard — 2D-массив (ряды кнопок)
                 payload['attachments'] = [{
                     'type': 'inline_keyboard',
                     'payload': {

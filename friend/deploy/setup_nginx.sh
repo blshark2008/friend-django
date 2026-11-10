@@ -67,7 +67,7 @@ else
     sudo tee "$NGINX_CONF" > /dev/null <<'NGINX_EOF'
 server {
     listen 443 ssl http2;
-    server_name 84.54.59.213;
+    server_name 84.54.59.213 projectgame.ru www.projectgame.ru;
 
     ssl_certificate     /etc/nginx/ssl/friend.crt;
     ssl_certificate_key /etc/nginx/ssl/friend.key;
@@ -98,6 +98,21 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # Training webhook endpoint
+    location /training/ {
+        proxy_pass http://127.0.0.1:8000/training/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        proxy_read_timeout 30s;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 30s;
+        
+        client_max_body_size 10M;
+    }
+
     location /nginx-health {
         access_log off;
         return 200 "ok";
@@ -111,9 +126,13 @@ server {
 
 server {
     listen 80;
-    server_name 84.54.59.213;
+    server_name 84.54.59.213 projectgame.ru www.projectgame.ru;
     
     location /max/webhook/ {
+        return 301 https://$host$request_uri;
+    }
+    
+    location /training/ {
         return 301 https://$host$request_uri;
     }
     
@@ -154,10 +173,11 @@ echo "============================================"
 echo "  ✓ Nginx настроен!"
 echo "============================================"
 echo ""
-echo "  Webhook URL: https://84.54.59.213/max/webhook/"
+echo "  Webhook URL (MAX): https://projectgame.ru/max/webhook/"
+echo "  Webhook URL (Training): https://projectgame.ru/training/webhook/"
 echo ""
 echo "  Проверка:"
-echo "  curl -k https://84.54.59.213/nginx-health"
+echo "  curl -k https://projectgame.ru/nginx-health"
 echo ""
 echo "  Логи:"
 echo "  sudo tail -f /var/log/nginx/error.log"

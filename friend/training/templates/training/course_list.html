@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Обучение — Курсы Skillspace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'training/css/training.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="{% url 'training:type_list' %}">Типы обучения</a></li>
+                <li class="breadcrumb-item active">Курсы Skillspace</li>
+            </ol>
+        </nav>
+        <h1><i class="bi bi-book-fill me-2"></i>Курсы Skillspace</h1>
+    </div>
+    <div class="d-flex gap-2">
+        {% if last_updated %}
+        <small class="text-muted align-self-center">Обновлено: {{ last_updated }}</small>
+        {% endif %}
+        <form method="get" class="d-inline">
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-clockwise me-1"></i>Обновить
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Всего курсов</div>
+                <div class="h3 mb-0">{{ courses|length }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Courses list -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        {% if courses %}
+        <div class="row">
+            {% for course in courses %}
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card border h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">{{ course.name }}</h6>
+                        {% if course.shortDescription %}
+                        <p class="card-text text-muted small">{{ course.shortDescription|truncatewords:20 }}</p>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <small class="text-muted">UUID: {{ course.id }}</small>
+                            {% if course.id in course_active_map %}
+                            <button class="btn btn-sm course-toggle-btn"
+                                    data-course-id="{{ course.id }}"
+                                    data-active="true"
+                                    title="Скрыть курс">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-secondary course-toggle-btn"
+                                    data-course-id="{{ course.id }}"
+                                    data-active="false"
+                                    title="Показать курс">
+                                <i class="bi bi-eye-slash"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+            <i class="bi bi-book fs-1 d-block mb-3"></i>
+            <p>Курсы не загружены</p>
+            <form method="get">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Попробовать обновить
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        document.cookie.split(';').forEach(function(c) {
+            c = c.replace(/^ +/, '');
+            if (c.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(c.substring(name.length + 1));
+            }
+        });
+    }
+    return cookieValue;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.course-toggle-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var courseId = this.dataset.courseId;
+            var icon = this.querySelector('i');
+
+            fetch('/training/types/courses/' + courseId + '/toggle/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.status === 'ok') {
+                    var newActive = data.is_active;
+                    btn.dataset.active = newActive;
+                    if (newActive) {
+                        btn.title = 'Скрыть курс';
+                        icon.className = 'bi bi-eye';
+                        btn.classList.remove('btn-outline-secondary');
+                    } else {
+                        btn.title = 'Показать курс';
+                        icon.className = 'bi bi-eye-slash';
+                        btn.classList.add('btn-outline-secondary');
+                    }
+                }
+            })
+            .catch(function(err) {
+                console.error('Toggle error:', err);
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
+{% endblock %}

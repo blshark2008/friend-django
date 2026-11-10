@@ -126,24 +126,6 @@ def max_webhook(request):
                         button_result_code=callback_payload,
                     )
                     logger.info(f'Webhook: callback processed: {result}')
-                    
-                    if result.get('success') and result.get('next_step_id'):
-                        next_message = result.get('next_message', '')
-                        if next_message:
-                            try:
-                                from scenarios.models import Step
-                                next_step = Step.objects.filter(
-                                    pk=result['next_step_id'],
-                                    branch__scenario_id=result['scenario_id'],
-                                ).first()
-                                buttons = _extract_buttons_from_message_json(
-                                    next_step.message_json if next_step else None
-                                )
-                                client = MAXClient()
-                                client.send_message(chat_id=chat_id, text=next_message, buttons=buttons)
-                                logger.info(f'Webhook: next step sent to user {django_user.pk}')
-                            except MAXAPIError as e:
-                                logger.error(f'Webhook: ошибка отправки следующего шага: {e}')
                 except Exception as e:
                     logger.error(f'Webhook: ошибка обработки callback: {e}')
             else:
@@ -214,25 +196,6 @@ def max_webhook(request):
                     button_result_code=callback_payload,
                 )
                 logger.info(f'Webhook: answer processed: {result}')
-                
-                # Если есть следующий шаг — отправляем сообщение с кнопками
-                if result.get('success') and result.get('next_step_id'):
-                    next_message = result.get('next_message', '')
-                    if next_message:
-                        try:
-                            from scenarios.models import Step
-                            next_step = Step.objects.filter(
-                                pk=result['next_step_id'],
-                                branch__scenario_id=result['scenario_id'],
-                            ).first()
-                            buttons = _extract_buttons_from_message_json(
-                                next_step.message_json if next_step else None
-                            )
-                            client = MAXClient()
-                            client.send_message(chat_id=chat_id, text=next_message, buttons=buttons)
-                            logger.info(f'Webhook: next step sent to user {user_id}')
-                        except MAXAPIError as e:
-                            logger.error(f'Webhook: ошибка отправки следующего шага: {e}')
             except Exception as e:
                 logger.error(f'Webhook: ошибка обработки callback: {e}')
         else:

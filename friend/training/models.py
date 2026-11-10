@@ -3,18 +3,49 @@ from django.conf import settings
 from django.utils import timezone
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
+import logging
 
 from accounts.models import Department
+
+
+logger = logging.getLogger(__name__)
+
+
+class TrainingCategory(models.Model):
+    """Категория типа обучения (например: информационная безопасность, пожарная безопасность и т.д.)"""
+
+    name = models.CharField('Название', max_length=255, db_index=True)
+    description = models.TextField('Описание', blank=True)
+    is_active = models.BooleanField('Активен', default=True)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Категория обучения'
+        verbose_name_plural = 'Категории обучения'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def training_types_count(self):
+        """Количество типов обучения в этой категории."""
+        return self.training_types.filter(is_active=True).count()
 
 
 class TrainingType(models.Model):
     """Тип обучения (например: «Охрана труда», «Пожарная безопасность» и т.д.)"""
 
+    category = models.ForeignKey(
+        TrainingCategory, on_delete=models.SET_NULL, related_name='training_types',
+        verbose_name='Категория', null=True, blank=True,
+    )
     name = models.CharField('Название', max_length=255, db_index=True)
     description = models.TextField('Описание', blank=True)
-    skillspace_course_id = models.IntegerField(
-        'ID курса на Skillspace', blank=True, null=True,
-        help_text='ID курса на платформе skillspace.ru',
+    skillspace_course_id = models.CharField(
+        'UUID курса на Skillspace', max_length=100, blank=True, default='',
+        help_text='UUID курса на платформе skillspace.ru',
     )
     is_active = models.BooleanField('Активен', default=True)
     created_at = models.DateTimeField('Создан', auto_now_add=True)
@@ -84,6 +115,10 @@ class Training(models.Model):
     updated_at = models.DateTimeField('Обновлён', auto_now=True)
     last_sync_at = models.DateTimeField('Последняя синхронизация', blank=True, null=True)
     is_active = models.BooleanField('Активен', default=True)
+    group = models.ForeignKey(
+        'SkillspaceGroup', on_delete=models.SET_NULL, blank=True, null=True,
+        related_name='trainings', verbose_name='Группа на Skillspace',
+    )
 
     class Meta:
         verbose_name = 'Обучение'
@@ -134,16 +169,22 @@ class Training(models.Model):
                 continue
 
             email = user.corporate_email or user.personal_email
+            group_id = enrollment.group.skillspace_id if enrollment.group else ''
             try:
-                client.add_student_to_course(
-                    self.training_type.skillspace_course_id,
-                    email,
-                    user.first_name,
-                    user.last_name,
+                client.invite_student(
+                    email=email,
+                    course_id=self.training_type.skillspace_course_id,
+                    first_name=user.first_name,
+                    last_name=user.last_name,
+                    patronymic=user.patronymic,
+                    comment=f"Табельный номер: {user.tab_number}" if user.tab_number else '',
+                    disable_notification=True,
+                    group_id=group_id,
                 )
                 enrollment.status = 'in_progress'
+                enrollment.display_status = TrainingEnrollment.DisplayStatus.COURSE_STARTED
                 enrollment.skillspace_student_id = f'{user.id}'
-                enrollment.save(update_fields=['status', 'skillspace_student_id'])
+                enrollment.save(update_fields=['status', 'display_status', 'skillspace_student_id'])
                 added.append(user.get_full_name())
             except SkillspaceAPIError as e:
                 errors.append(f'{user.get_full_name()}: {str(e)}')
@@ -185,6 +226,7 @@ class Training(models.Model):
 
                 if is_completed:
                     enrollment.status = 'completed'
+                    enrollment.display_status = TrainingEnrollment.DisplayStatus.COMPLETED_SUCCESS
                     enrollment.score = score
                     if completed_at:
                         enrollment.completed_at = timezone.make_aware(
@@ -192,11 +234,13 @@ class Training(models.Model):
                         )
                 elif is_failed:
                     enrollment.status = 'failed'
+                    enrollment.display_status = TrainingEnrollment.DisplayStatus.FAILED_STATUS
                     enrollment.score = score
                 else:
                     enrollment.status = 'in_progress'
+                    enrollment.display_status = TrainingEnrollment.DisplayStatus.COURSE_STARTED
 
-                enrollment.save(update_fields=['status', 'score', 'completed_at'])
+                enrollment.save(update_fields=['status', 'display_status', 'score', 'completed_at'])
                 updated.append(user.get_full_name())
             except SkillspaceAPIError as e:
                 errors.append(f'{user.get_full_name()}: {str(e)}')
@@ -219,6 +263,75 @@ class Training(models.Model):
         ).select_related('user', 'user__department')
 
 
+class SkillspaceGroup(models.Model):
+    """Группа на платформе Skillspace."""
+
+    course = models.ForeignKey(
+        TrainingType, on_delete=models.CASCADE, related_name='skillspace_groups',
+        verbose_name='Курс',
+    )
+    skillspace_id = models.CharField(
+        'ID на Skillspace', max_length=100, db_index=True,
+    )
+    name = models.CharField('Название', max_length=255)
+    students_count = models.PositiveIntegerField('Кол-во студентов', default=0)
+    last_synced = models.DateTimeField('Последняя синхронизация', blank=True, null=True)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Группа Skillspace'
+        verbose_name_plural = 'Группы Skillspace'
+        unique_together = ['course', 'skillspace_id']
+        ordering = ['name']
+
+    def __str__(self):
+        return f'{self.course.name} — {self.name}'
+
+    @classmethod
+    def sync_from_api(cls, course_id):
+        """Sync groups from Skillspace API for a specific course."""
+        from training.services.skillspace_api import SkillspaceClient, SkillspaceAPIError
+        
+        try:
+            client = SkillspaceClient()
+            groups_data = client.get_groups_by_course(course_id)
+            
+            # Find the TrainingType by course_id
+            training_type = TrainingType.objects.filter(
+                skillspace_course_id=course_id
+            ).first()
+            
+            if not training_type:
+                logger.warning(f'TrainingType not found for course_id {course_id}')
+                return 0
+            
+            synced = 0
+            for g in groups_data:
+                cls.objects.update_or_create(
+                    course=training_type,
+                    skillspace_id=g['id'],
+                    defaults={
+                        'name': g.get('name', ''),
+                        'students_count': g.get('studentsCount', 0),
+                        'last_synced': timezone.now(),
+                    }
+                )
+                synced += 1
+            
+            return synced
+        except SkillspaceAPIError as e:
+            logger.error(f'Failed to sync groups for course {course_id}: {e}')
+            return 0
+
+    @classmethod
+    def sync_all_courses(cls):
+        """Sync groups for all courses."""
+        total = 0
+        for tt in TrainingType.objects.filter(skillspace_course_id__isnull=False):
+            total += cls.sync_from_api(tt.skillspace_course_id)
+        return total
+
+
 class TrainingEnrollment(models.Model):
     """Назначение конкретного сотрудника на конкретное обучение."""
 
@@ -227,6 +340,13 @@ class TrainingEnrollment(models.Model):
         IN_PROGRESS = 'in_progress', 'В процессе'
         COMPLETED = 'completed', 'Пройдено'
         FAILED = 'failed', 'Не пройдено'
+
+    class DisplayStatus(models.TextChoices):
+        IN_LIST = 'in_list', 'В списке'
+        ASSIGNED = 'assigned', 'Назначено'
+        COURSE_STARTED = 'course_started', 'Начато'
+        COMPLETED_SUCCESS = 'completed_success', 'Успешно завершено'
+        FAILED_STATUS = 'failed_status', 'Не пройдено'
 
     training = models.ForeignKey(
         Training, on_delete=models.CASCADE, related_name='enrollments',
@@ -240,9 +360,17 @@ class TrainingEnrollment(models.Model):
         'Статус', max_length=20, choices=Status.choices, default=Status.NOT_STARTED,
         db_index=True,
     )
+    display_status = models.CharField(
+        'Отображаемый статус', max_length=20, choices=DisplayStatus.choices,
+        default=DisplayStatus.IN_LIST, db_index=True,
+    )
     score = models.FloatField('Оценка/балл', blank=True, null=True, help_text='Результат тестирования')
     skillspace_student_id = models.CharField(
         'ID студента на Skillspace', max_length=100, blank=True,
+    )
+    group = models.ForeignKey(
+        'SkillspaceGroup', on_delete=models.SET_NULL, blank=True, null=True,
+        related_name='enrollments', verbose_name='Группа на Skillspace',
     )
     enrolled_at = models.DateTimeField('Дата назначения', auto_now_add=True)
     completed_at = models.DateTimeField('Дата прохождения', blank=True, null=True)
@@ -261,3 +389,22 @@ class TrainingEnrollment(models.Model):
     @property
     def status_label(self):
         return dict(self.Status.choices).get(self.status, self.status)
+
+    @property
+    def display_status_label(self):
+        return dict(self.DisplayStatus.choices).get(self.display_status, self.display_status)
+
+    def save(self, *args, **kwargs):
+        # Sync display_status based on status and skillspace data
+        if self.status == 'completed':
+            self.display_status = self.DisplayStatus.COMPLETED_SUCCESS
+        elif self.status == 'failed':
+            self.display_status = self.DisplayStatus.FAILED_STATUS
+        elif self.status == 'in_progress':
+            if self.skillspace_student_id:
+                self.display_status = self.DisplayStatus.COURSE_STARTED
+            else:
+                self.display_status = self.DisplayStatus.ASSIGNED
+        else:
+            self.display_status = self.DisplayStatus.IN_LIST
+        super().save(*args, **kwargs)

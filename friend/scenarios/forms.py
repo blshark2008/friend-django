@@ -145,12 +145,19 @@ class StepForm(forms.ModelForm):
         cleaned_data = super().clean()
 
         # JSON-поля: пустая строка → пустой объект/список
+        # НО: если это редактирование существующего шага и поле не менялось — сохраняем старое значение
         json_fields_dict = ['message_json', 'mailing_list_json', 'exclusion_list_json',
                             'db_write_json', 'escalate_to_json']
         json_fields_list = ['mailing_list_json', 'exclusion_list_json']
         for field in json_fields_dict:
             value = cleaned_data.get(field)
+            # Если поле пустое и это редактирование — оставляем старое значение из БД
             if value is None or value == '':
+                if self.instance and self.instance.pk:
+                    old_value = getattr(self.instance, field)
+                    if old_value is not None and old_value != {}:
+                        cleaned_data[field] = old_value
+                        continue
                 if field in json_fields_list:
                     cleaned_data[field] = []
                 else:

@@ -109,11 +109,19 @@ class User(AbstractUser):
 
     # ===== Настройки каналов связи для сообщений =====
     max_id = models.CharField('ID в MAX', max_length=100, blank=True, default='', help_text='ID пользователя в системе MAX')
+    max_chat_id = models.BigIntegerField('Chat ID в MAX', null=True, blank=True,
+                                         help_text='ID чата/диалога для отправки ответов через MAX')
     telegram_id = models.CharField('ID в Telegram', max_length=100, blank=True, default='', help_text='ID пользователя в Telegram')
     notify_max = models.BooleanField('Уведомления через MAX', default=False, help_text='Разрешить отправку сообщений через MAX')
     notify_telegram = models.BooleanField('Уведомления через Telegram', default=False, help_text='Разрешить отправку сообщений через Telegram')
     notify_corporate_email = models.BooleanField('Уведомления на корп. почту', default=False, help_text='Разрешить отправку на корпоративный email')
     notify_personal_email = models.BooleanField('Уведомления на лич. почту', default=False, help_text='Разрешить отправку на личный email')
+
+    # ===== Интеграция с Skillspace =====
+    uuid_skillspace = models.CharField(
+        'UUID студента на Skillspace', max_length=100, blank=True, default='',
+        help_text='UUID студента на платформе Skillspace',
+    )
 
     class Meta:
         verbose_name = 'Пользователь'

@@ -3,6 +3,10 @@
 
 {% block title %}Обучение — {{ action }}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'training/css/training.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-8">

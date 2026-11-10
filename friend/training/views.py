@@ -1,19 +1,101 @@
+import json
 import logging
+from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Count, Avg
+from django.db.models import Q, Count
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
 
 from accounts.models import User, Department
-from .models import TrainingType, Training, TrainingEnrollment
-from .forms import TrainingTypeForm, TrainingForm, TrainingUserSelectionForm
-from .services.skillspace_api import SkillspaceClient, parse_skillspace_webhook
+from .models import TrainingType, Training, TrainingEnrollment, TrainingCategory, SkillspaceGroup
+from .forms import TrainingTypeForm, TrainingForm, TrainingUserSelectionForm, TrainingCategoryForm
+from .services.skillspace_api import (
+    SkillspaceClient, SkillspaceAPIError,
+    invite_student_to_training, sync_training_to_skillspace,
+)
 
 logger = logging.getLogger(__name__)
 
-logger = logging.getLogger(__name__)
+
+# ============================================================================
+# Training Categories
+# ============================================================================
+
+@login_required
+def training_category_list(request):
+    """Список категорий обучения."""
+    query = request.GET.get('q', '').strip()
+    
+    categories = TrainingCategory.objects.all()
+    if query:
+        categories = categories.filter(
+            Q(name__icontains=query) |
+            Q(description__icontains=query)
+        )
+    
+    categories = categories.order_by('name')
+    
+    return render(request, 'training/category_list.html', {
+        'categories': categories,
+        'query': query,
+    })
+
+
+@login_required
+def training_category_create(request):
+    """Создание категории обучения."""
+    if request.method == 'POST':
+        form = TrainingCategoryForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Категория создана')
+            return redirect('training:category_list')
+    else:
+        form = TrainingCategoryForm()
+    
+    return render(request, 'training/category_form.html', {
+        'form': form,
+        'action': 'Создание',
+    })
+
+
+@login_required
+def training_category_edit(request, pk):
+    """Редактирование категории обучения."""
+    category = get_object_or_404(TrainingCategory, pk=pk)
+    
+    if request.method == 'POST':
+        form = TrainingCategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Категория обновлена')
+            return redirect('training:category_list')
+    else:
+        form = TrainingCategoryForm(instance=category)
+    
+    return render(request, 'training/category_form.html', {
+        'form': form,
+        'category': category,
+        'action': 'Редактирование',
+    })
+
+
+@login_required
+def training_category_delete(request, pk):
+    """Удаление категории обучения."""
+    category = get_object_or_404(TrainingCategory, pk=pk)
+    
+    if request.method == 'POST':
+        category.delete()
+        messages.success(request, 'Категория удалена')
+        return redirect('training:category_list')
+    
+    return render(request, 'training/category_confirm_delete.html', {
+        'obj': category,
+    })
 
 
 # ============================================================================
@@ -23,20 +105,95 @@ logger = logging.getLogger(__name__)
 @login_required
 def training_type_list(request):
     """Список типов обучения."""
-    types = TrainingType.objects.annotate(
-        active_trainings=Count('trainings', filter=Q(trainings__is_active=True)),
-        total_enrollments=Count('trainings__enrollments'),
-    ).order_by('-is_active', 'name')
-
-    context = {
+    query = request.GET.get('q', '').strip()
+    category_id = request.GET.get('category', '')
+    
+    types = TrainingType.objects.all()
+    
+    # Filter by category
+    if category_id:
+        types = types.filter(category_id=category_id)
+    
+    if query:
+        types = types.filter(
+            Q(name__icontains=query) |
+            Q(description__icontains=query)
+        )
+    
+    types = types.order_by('-created_at')
+    
+    # Get all categories for filter
+    categories = TrainingCategory.objects.filter(is_active=True).order_by('name')
+    
+    return render(request, 'training/type_list.html', {
         'types': types,
-    }
-    return render(request, 'training/type_list.html', context)
+        'categories': categories,
+        'query': query,
+        'selected_category': category_id,
+    })
+
+
+@login_required
+def training_course_list(request):
+    """Справочник курсов Skillspace."""
+    # Fetch courses from Skillspace API
+    courses = []
+    last_updated = None
+    try:
+        client = SkillspaceClient()
+        courses = client.get_course_list()
+        last_updated = timezone.now().strftime('%d.%m.%Y %H:%M:%S')
+    except SkillspaceAPIError as e:
+        messages.error(request, f'Ошибка загрузки курсов: {e}')
+        logger.error(f'Failed to fetch course list: {e}')
+
+    # Build a map of skillspace_course_id -> TrainingType pk for active check
+    training_types = TrainingType.objects.filter(is_active=True)
+    course_active_map = {}
+    for tt in training_types:
+        if tt.skillspace_course_id is not None:
+            course_active_map[tt.skillspace_course_id] = tt.pk
+
+    return render(request, 'training/course_list.html', {
+        'courses': courses,
+        'last_updated': last_updated,
+        'course_active_map': course_active_map,
+    })
+
+
+@login_required
+def training_course_toggle(request, course_id):
+    """Переключение видимости курса (is_active TrainingType)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    course_id_str = str(course_id).strip()
+
+    training_type = TrainingType.objects.filter(
+        skillspace_course_id=course_id_str
+    ).first()
+
+    if not training_type:
+        return JsonResponse({
+            'error': 'Training type not found',
+            'created': True,
+        })
+
+    training_type.is_active = not training_type.is_active
+    training_type.save(update_fields=['is_active'])
+
+    return JsonResponse({
+        'status': 'ok',
+        'is_active': training_type.is_active,
+        'training_type_id': training_type.pk,
+    })
 
 
 @login_required
 def training_type_create(request):
     """Создание типа обучения."""
+    course_uuid = request.GET.get('course_uuid', '')
+    
     if request.method == 'POST':
         form = TrainingTypeForm(request.POST)
         if form.is_valid():
@@ -45,91 +202,49 @@ def training_type_create(request):
             return redirect('training:type_list')
     else:
         form = TrainingTypeForm()
-
-    return render(request, 'training/type_form.html', {'form': form, 'action': 'Создание'})
+        if course_uuid:
+            form.fields['skillspace_course'].initial = course_uuid
+    
+    return render(request, 'training/training_type_form.html', {
+        'form': form,
+        'action': 'Создание',
+    })
 
 
 @login_required
 def training_type_edit(request, pk):
     """Редактирование типа обучения."""
-    obj = get_object_or_404(TrainingType, pk=pk)
+    training_type = get_object_or_404(TrainingType, pk=pk)
+    
     if request.method == 'POST':
-        form = TrainingTypeForm(request.POST, instance=obj)
+        form = TrainingTypeForm(request.POST, instance=training_type)
         if form.is_valid():
             form.save()
             messages.success(request, 'Тип обучения обновлён')
             return redirect('training:type_list')
     else:
-        form = TrainingTypeForm(instance=obj)
-
-    return render(request, 'training/type_form.html', {'form': form, 'action': 'Редактирование'})
+        form = TrainingTypeForm(instance=training_type)
+    
+    return render(request, 'training/training_type_form.html', {
+        'form': form,
+        'training_type': training_type,
+        'action': 'Редактирование',
+    })
 
 
 @login_required
 def training_type_delete(request, pk):
     """Удаление типа обучения."""
-    obj = get_object_or_404(TrainingType, pk=pk)
+    training_type = get_object_or_404(TrainingType, pk=pk)
+    
     if request.method == 'POST':
-        obj.delete()
+        training_type.is_active = False
+        training_type.save()
         messages.success(request, 'Тип обучения удалён')
         return redirect('training:type_list')
-
-    return render(request, 'training/type_confirm_delete.html', {'obj': obj})
-
-
-# ============================================================================
-# Trainings (Instances)
-# ============================================================================
-
-@login_required
-def training_list_by_type(request, type_pk):
-    """Список назначений обучения для типа."""
-    training_type = get_object_or_404(TrainingType, pk=type_pk)
-    trainings = Training.objects.filter(
-        training_type=training_type,
-        is_active=True,
-    ).select_related('training_type').annotate(
-        total_enrollments=Count('enrollments'),
-        completed_count=Count('enrollments', filter=Q(enrollments__status='completed')),
-    ).order_by('-created_at')
-
-    context = {
-        'training_type': training_type,
-        'trainings': trainings,
-    }
-    return render(request, 'training/training_list.html', context)
-
-
-@login_required
-def training_create(request, type_pk):
-    """Создание назначения обучения."""
-    training_type = get_object_or_404(TrainingType, pk=type_pk)
-
-    if request.method == 'POST':
-        form = TrainingForm(request.POST, training_type=training_type)
-        if form.is_valid():
-            training = form.save()
-            training.training_type = training_type
-            training.save()
-
-            # Add selected users
-            users = form.cleaned_data['users']
-            for user in users:
-                TrainingEnrollment.objects.get_or_create(
-                    training=training,
-                    user=user,
-                    defaults={'status': TrainingEnrollment.Status.NOT_STARTED},
-                )
-
-            messages.success(request, f'Обучение "{training.title}" создано')
-            return redirect('training:type_trainings', type_pk=type_pk)
-    else:
-        form = TrainingForm(training_type=training_type)
-
-    return render(request, 'training/training_form.html', {
-        'form': form,
-        'training_type': training_type,
-        'action': 'Создание',
+    
+    return render(request, 'training/training_type_confirm_delete.html', {
+        'obj': training_type,
     })
 
 
@@ -151,11 +266,25 @@ def training_detail(request, pk):
 
     enrollments = enrollments.select_related('user', 'user__department').order_by('user__last_name')
 
+    # Calculate stats
+    total = training.enrollments.count()
+    not_started = training.enrollments.filter(status='not_started').count()
+    in_progress = training.enrollments.filter(status='in_progress').count()
+    completed = training.enrollments.filter(status='completed').count()
+    failed = training.enrollments.filter(status='failed').count()
+
     context = {
         'training': training,
         'enrollments': enrollments,
         'status_filter': status_filter,
         'status_choices': TrainingEnrollment.Status.choices,
+        'stats': {
+            'total': total,
+            'not_started': not_started,
+            'in_progress': in_progress,
+            'completed': completed,
+            'failed': failed,
+        },
     }
     return render(request, 'training/training_detail.html', context)
 
@@ -165,18 +294,26 @@ def training_edit(request, pk):
     """Редактирование назначения обучения."""
     training = get_object_or_404(Training, pk=pk)
 
+    # Sync groups from API before showing form
+    if training.training_type.skillspace_course_id:
+        SkillspaceGroup.sync_from_api(training.training_type.skillspace_course_id)
+
     if request.method == 'POST':
         form = TrainingForm(request.POST, instance=training)
         if form.is_valid():
             form.save()
             messages.success(request, 'Обучение обновлено')
             return redirect('training:training_detail', pk=training.pk)
+        else:
+            # Debug: log form errors
+            logger.error(f'Form validation errors: {form.errors}')
     else:
         form = TrainingForm(instance=training)
 
     return render(request, 'training/training_form.html', {
         'form': form,
         'training': training,
+        'training_type': training.training_type,
         'action': 'Редактирование',
     })
 
@@ -197,17 +334,41 @@ def training_delete(request, pk):
 
 @login_required
 def training_sync(request, pk):
-    """Синхронизация обучения с Skillspace."""
+    """Синхронизация обучения с Skillspace — массовая запись студентов."""
     training = get_object_or_404(Training, pk=pk)
 
     try:
-        # First sync from Skillspace (get latest data)
-        from_result = training.sync_from_skillspace()
-
-        # Then sync to Skillspace (add new students)
-        to_result = training.sync_to_skillspace()
-
-        messages.success(request, f'Синхронизация завершена: обновлено {len(from_result["updated"])} записей, добавлено {len(to_result["added"])} студентов')
+        result = sync_training_to_skillspace(training)
+        
+        if 'error' in result:
+            messages.error(request, f'Ошибка синхронизации: {result["error"]}')
+        else:
+            added_count = len(result.get('added', []))
+            already_count = len(result.get('already_enrolled', []))
+            error_count = len(result.get('errors', []))
+            
+            msg = f'Синхронизация завершена'
+            if added_count:
+                msg += f': добавлено {added_count}'
+            if already_count:
+                msg += f', уже записано {already_count}'
+            if error_count:
+                msg += f', ошибок {error_count}'
+            
+            messages.success(request, msg)
+            
+            if error_count:
+                for err in result.get('errors', []):
+                    messages.warning(request, f'{err["user"]}: {err["error"]}')
+            
+            # Store sync result in session for display on detail page
+            request.session[f'sync_result_{pk}'] = {
+                'added': result.get('added', []),
+                'already_enrolled': result.get('already_enrolled', []),
+                'errors': result.get('errors', []),
+                'synced_at': timezone.now().strftime('%d.%m.%Y %H:%M'),
+            }
+                    
     except Exception as e:
         logger.error(f'Sync error for training {pk}: {e}')
         messages.error(request, f'Ошибка синхронизации: {str(e)}')
@@ -216,60 +377,667 @@ def training_sync(request, pk):
 
 
 @login_required
-def training_webhook(request, pk):
+def training_sync_status(request, pk):
+    """AJAX: Получить детальный статус синхронизации обучения."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    training = get_object_or_404(Training, pk=pk)
+    
+    # Get sync result from session (just performed)
+    session_key = f'sync_result_{pk}'
+    recent_result = request.session.pop(session_key, None)
+    
+    # Get enrollment breakdown
+    total = training.enrollments.count()
+    not_started = training.enrollments.filter(status='not_started').count()
+    in_progress = training.enrollments.filter(status='in_progress').count()
+    completed = training.enrollments.filter(status='completed').count()
+    failed = training.enrollments.filter(status='failed').count()
+    
+    # Count added/enrolled from recent sync
+    added = recent_result.get('added', []) if recent_result else []
+    already_enrolled = recent_result.get('already_enrolled', []) if recent_result else []
+    errors = recent_result.get('errors', []) if recent_result else []
+    
+    return JsonResponse({
+        'status': 'ok',
+        'total': total,
+        'not_started': not_started,
+        'in_progress': in_progress,
+        'completed': completed,
+        'failed': failed,
+        'last_sync_at': training.last_sync_at.strftime('%d.%m.%Y %H:%M') if training.last_sync_at else None,
+        'recent_sync': {
+            'added': added,
+            'already_enrolled': already_enrolled,
+            'errors': errors,
+            'synced_at': recent_result.get('synced_at') if recent_result else None,
+        } if recent_result else None,
+    })
+
+
+@login_required
+def search_users(request):
+    """AJAX: Поиск сотрудников по ФИО и табельному номеру."""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Only GET allowed'}, status=405)
+    
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'users': []})
+    
+    # Search by full name or tab_number
+    users = User.objects.filter(
+        Q(last_name__icontains=query) |
+        Q(first_name__icontains=query) |
+        Q(patronymic__icontains=query) |
+        Q(tab_number__icontains=query) |
+        Q(employee_code_1c__icontains=query)
+    ).exclude(
+        is_fired=True
+    ).select_related('department').order_by('last_name', 'first_name')[:20]
+    
+    users_data = []
+    for user in users:
+        users_data.append({
+            'id': user.id,
+            'full_name': user.get_full_name(),
+            'last_name': user.last_name,
+            'first_name': user.first_name,
+            'patronymic': user.patronymic,
+            'tab_number': user.tab_number or '—',
+            'employee_code': user.employee_code_1c or '—',
+            'department': user.department.name if user.department else '—',
+            'email': user.corporate_email or user.personal_email or '—',
+        })
+    
+    return JsonResponse({'users': users_data})
+
+
+@login_required
+def search_departments(request):
+    """AJAX: Поиск подразделений по названию или получение пользователей по ID отделов."""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Only GET allowed'}, status=405)
+    
+    try:
+        # Если переданы dept_ids — возвращаем пользователей для превью
+        dept_ids = request.GET.getlist('dept_ids[]') or request.GET.getlist('dept_ids')
+        if dept_ids:
+            try:
+                dept_ids = [int(d) for d in dept_ids]
+            except (ValueError, TypeError):
+                return JsonResponse({'users': []})
+            
+            users = User.objects.filter(
+                department_id__in=dept_ids,
+                is_active=True,
+                is_fired=False,
+            ).select_related('department').order_by('last_name', 'first_name')[:100]
+            
+            users_data = []
+            for user in users:
+                users_data.append({
+                    'id': user.id,
+                    'full_name': user.get_full_name(),
+                    'last_name': user.last_name,
+                    'first_name': user.first_name,
+                    'patronymic': user.patronymic,
+                    'tab_number': user.tab_number or '—',
+                    'employee_code': user.employee_code_1c or '—',
+                    'department': user.department.name if user.department else '—',
+                    'email': user.corporate_email or user.personal_email or '—',
+                })
+            
+            return JsonResponse({'users': users_data})
+        
+        # Обычный поиск подразделений
+        query = request.GET.get('q', '').strip()
+        logger.info(f'search_departments query: {query!r}')
+        
+        if not query:
+            return JsonResponse({'departments': []})
+        
+        departments = Department.objects.filter(
+            name__icontains=query,
+            is_active=True,
+        ).annotate(
+            users_count=Count('employees', filter=~Q(employees__is_fired=True))
+        ).order_by('name')[:20]
+        
+        logger.info(f'search_departments found: {len(departments)}')
+        
+        departments_data = []
+        for dept in departments:
+            departments_data.append({
+                'id': dept.id,
+                'name': dept.name,
+                'code_1c': dept.code_1c or '—',
+                'users_count': dept.users_count,
+            })
+        
+        return JsonResponse({'departments': departments_data})
+    except Exception as e:
+        logger.error(f'search_departments error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def training_add_users_by_departments(request, pk):
+    """AJAX: Добавить сотрудников выбранных подразделений в обучение."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    training = get_object_or_404(Training, pk=pk)
+    department_ids = request.POST.getlist('department_ids[]') or request.POST.getlist('department_ids', [])
+    
+    if not department_ids:
+        return JsonResponse({'error': 'No departments selected'}, status=400)
+    
+    # Get existing user IDs in this training
+    existing_user_ids = set(training.enrollments.values_list('user_id', flat=True))
+    
+    # Get users from selected departments
+    departments = Department.objects.filter(
+        id__in=department_ids,
+        is_active=True,
+    )
+    
+    users_to_add = User.objects.filter(
+        department__in=departments,
+        is_active=True,
+        is_fired=False,
+    ).exclude(
+        id__in=existing_user_ids
+    ).order_by('last_name', 'first_name')
+    
+    added = []
+    already_enrolled = []
+    errors = []
+    
+    for user in users_to_add:
+        try:
+            enrollment = TrainingEnrollment.objects.create(
+                user=user,
+                training=training,
+                status=TrainingEnrollment.Status.NOT_STARTED,
+                group=training.group,
+            )
+            added.append({
+                'id': user.id,
+                'name': user.get_full_name(),
+                'department': user.department.name if user.department else '—',
+                'tab_number': user.tab_number or '—',
+                'enrollment_id': enrollment.pk,
+            })
+        except Exception as e:
+            logger.error(f'Error adding user {user.get_full_name()}: {e}')
+            errors.append({
+                'user': user.get_full_name(),
+                'error': str(e),
+            })
+    
+    # Get users that were already enrolled
+    for dept in departments:
+        dept_users = User.objects.filter(
+            department=dept,
+            is_active=True,
+            is_fired=False,
+        ).filter(
+            id__in=existing_user_ids
+        )
+        for user in dept_users:
+            already_enrolled.append({
+                'id': user.id,
+                'name': user.get_full_name(),
+                'department': dept.name,
+            })
+    
+    return JsonResponse({
+        'status': 'ok',
+        'added': added,
+        'already_enrolled': already_enrolled,
+        'errors': errors,
+        'added_count': len(added),
+        'already_count': len(already_enrolled),
+        'error_count': len(errors),
+    })
+
+
+@login_required
+def training_add_user(request, pk):
+    """AJAX: Добавить пользователя в обучение и назначить на курс Skillspace."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    training = get_object_or_404(Training, pk=pk)
+    user_id = request.POST.get('user_id')
+    
+    if not user_id:
+        return JsonResponse({'error': 'user_id required'}, status=400)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    
+    # Check if already enrolled
+    existing = training.enrollments.filter(user=user).first()
+    if existing:
+        return JsonResponse({
+            'error': 'User already enrolled',
+            'already_enrolled': True,
+        })
+    
+    # Create enrollment
+    enrollment = TrainingEnrollment.objects.create(
+        user=user,
+        training=training,
+        status=TrainingEnrollment.Status.NOT_STARTED,
+        group=training.group,
+    )
+    
+    return JsonResponse({
+        'status': 'ok',
+        'user_name': user.get_full_name(),
+        'tab_number': user.tab_number or '—',
+        'department': user.department.name if user.department else '—',
+        'email': user.corporate_email or user.personal_email or '—',
+        'enrollment_id': enrollment.pk,
+    })
+
+
+@login_required
+def training_assign_course(request, pk, user_id):
+    """AJAX: Назначить сотрудника на курс Skillspace."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    training = get_object_or_404(Training, pk=pk)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    
+    # Check if enrollment exists
+    enrollment = training.enrollments.filter(user=user).first()
+    if not enrollment:
+        return JsonResponse({
+            'error': 'User not enrolled in training',
+            'not_enrolled': True,
+        })
+    
+    # Check if course ID is configured
+    if not training.training_type.skillspace_course_id:
+        return JsonResponse({
+            'error': 'Не указан ID курса на Skillspace',
+            'no_course_id': True,
+        })
+    
+    email = user.corporate_email or user.personal_email
+    if not email:
+        return JsonResponse({
+            'error': 'Нет email у сотрудника',
+            'no_email': True,
+        })
+    
+    try:
+        # Use group_id from training (not enrollment)
+        group_id = training.group.skillspace_id if training.group else ''
+        client = SkillspaceClient()
+        result = client.invite_student(
+            email=email,
+            course_id=training.training_type.skillspace_course_id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            patronymic=user.patronymic,
+            comment=f'Табельный номер: {user.tab_number}' if user.tab_number else '',
+            disable_notification=True,
+            group_id=group_id,
+        )
+        
+        # Empty response = user already enrolled in course on platform (reenrolled)
+        if result == {}:
+            logger.info(f'User {user.get_full_name()} re-enrolled in course on platform')
+            enrollment.status = TrainingEnrollment.Status.IN_PROGRESS
+            enrollment.display_status = TrainingEnrollment.DisplayStatus.COURSE_STARTED
+            enrollment.save(update_fields=['status', 'display_status'])
+            return JsonResponse({
+                'status': 'ok',
+                'reenrolled': True,
+                'user_name': user.get_full_name(),
+            })
+        
+        logger.info(f'Successfully assigned {user.get_full_name()} to course')
+        enrollment.status = TrainingEnrollment.Status.IN_PROGRESS
+        enrollment.display_status = TrainingEnrollment.DisplayStatus.COURSE_STARTED
+        enrollment.save(update_fields=['status', 'display_status'])
+        
+        return JsonResponse({
+            'status': 'ok',
+            'user_name': user.get_full_name(),
+        })
+        
+    except SkillspaceAPIError as e:
+        logger.error(f'Failed to assign {user.get_full_name()} to Skillspace: {e}')
+        return JsonResponse({
+            'error': str(e),
+        }, status=500)
+
+
+@login_required
+def training_remove_user(request, pk, user_id):
+    """AJAX: Удалить пользователя из обучения."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    training = get_object_or_404(Training, pk=pk)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    
+    enrollment = training.enrollments.filter(user=user).first()
+    if enrollment:
+        enrollment.delete()
+        return JsonResponse({'status': 'ok'})
+    
+    return JsonResponse({'error': 'Enrollment not found'}, status=404)
+
+
+@login_required
+def training_bulk_remove(request, pk):
+    """AJAX: Массовое удаление пользователей из обучения."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    training = get_object_or_404(Training, pk=pk)
+    user_ids = request.POST.getlist('user_ids[]') or request.POST.getlist('user_ids', [])
+    
+    if not user_ids:
+        return JsonResponse({'error': 'No users selected'}, status=400)
+    
+    removed_count = 0
+    not_found_count = 0
+    
+    # Удаление из базы данных
+    for user_id in user_ids:
+        try:
+            user = User.objects.get(id=user_id)
+            enrollment = training.enrollments.filter(user=user).first()
+            if enrollment:
+                enrollment.delete()
+                removed_count += 1
+            else:
+                not_found_count += 1
+        except User.DoesNotExist:
+            not_found_count += 1
+    
+    return JsonResponse({
+        'status': 'ok',
+        'removed_count': removed_count,
+        'not_found_count': not_found_count,
+    })
+
+
+@login_required
+def training_check_progress(request, pk):
+    """AJAX: Проверить прогресс обучения (синхронизировать с Skillspace)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    training = get_object_or_404(Training, pk=pk)
+    
+    # For now, just return current stats
+    # In future, this could call Skillspace API to get latest progress
+    total = training.enrollments.count()
+    completed = training.enrollments.filter(status='completed').count()
+    in_progress = training.enrollments.filter(status='in_progress').count()
+    not_started = training.enrollments.filter(status='not_started').count()
+    failed = training.enrollments.filter(status='failed').count()
+    
+    return JsonResponse({
+        'status': 'ok',
+        'total': total,
+        'completed': completed,
+        'in_progress': in_progress,
+        'not_started': not_started,
+        'failed': failed,
+        'completion_rate': training.completion_rate,
+    })
+
+
+@login_required
+def training_invite_link(request, pk):
+    """Получить ссылку для приглашения на обучение."""
+    training = get_object_or_404(Training, pk=pk)
+    
+    if not training.training_type.skillspace_course_id:
+        return JsonResponse({'error': 'Не указан ID курса на Skillspace'}, status=400)
+    
+    course_id = training.training_type.skillspace_course_id
+    api_key = settings.SKILLSPACE_API_KEY
+    
+    # Generate invite link
+    invite_url = (
+        f'https://{settings.SKILLSPACE_SCHOOL_DOMAIN}/api/rest/open/v1/'
+        f'course/student-invite?token={api_key}&courses[{course_id}]=247759'
+    )
+    
+    return JsonResponse({
+        'status': 'ok',
+        'invite_url': invite_url,
+        'course_id': course_id,
+    })
+
+
+@csrf_exempt
+def training_webhook(request):
     """
     Webhook endpoint for receiving events from Skillspace.
     
-    This endpoint receives webhook callbacks from Skillspace platform
-    when students complete courses, pass tests, etc.
+    Receives webhook callbacks when students complete courses, pass tests, etc.
+    URL: /training/webhooks/
+    
+    Skillspace sends:
+    {
+      "name": "course-begin",
+      "student": {"email": "user@example.com"},
+      "course": {"uuid": "xxx-xxx-xxx"}
+    }
     """
-    training = get_object_or_404(Training, pk=pk)
-
+    # ===== DETAIL LOGGING =====
+    webhook_log = logging.getLogger('webhook')
+    webhook_log.info('=' * 80)
+    webhook_log.info(f'INCOMING | {request.method} {request.get_full_path()}')
+    webhook_log.info(f'IP: {request.META.get("REMOTE_ADDR")}')
+    webhook_log.info(f'Headers: {dict(request.headers)}')
+    raw_body = request.body.decode('utf-8', errors='replace')
+    webhook_log.info(f'Body: {raw_body}')
+    
     if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        resp = JsonResponse({'error': 'Method not allowed'}, status=405)
+        webhook_log.info(f'RESPONSE | {resp.status_code} | {resp.content.decode()}')
+        webhook_log.info('=' * 80)
+        return resp
 
     try:
-        import json
-        payload = json.loads(request.body)
-    except (json.JSONDecodeError, ValueError):
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        payload = json.loads(raw_body)
+        webhook_log.info(f'Payload: {json.dumps(payload, ensure_ascii=False, indent=2)}')
+    except (json.JSONDecodeError, ValueError) as e:
+        webhook_log.error(f'JSON Error: {e}')
+        resp = JsonResponse({'error': 'Invalid JSON'}, status=400)
+        webhook_log.info(f'RESPONSE | {resp.status_code} | {resp.content.decode()}')
+        webhook_log.info('=' * 80)
+        return resp
 
-    parsed = parse_skillspace_webhook(payload)
-    event_type = parsed['event_type']
-    student_email = parsed['student_email']
+    # Extract data from payload
+    event_name = payload.get('name', '')
+    student_email = payload.get('student', {}).get('email', '')
+    student_uuid = payload.get('student', {}).get('uuid', '')
+    course_uuid = payload.get('course', {}).get('uuid', '')
+    
+    webhook_log.info(f'Extracted: event={event_name}, email={student_email}, uuid={student_uuid}, course={course_uuid}')
 
-    # Find enrollment by email
-    enrollment = TrainingEnrollment.objects.filter(
-        training=training,
-        user__corporate_email=student_email,
+    # Save UUID for "course-begin" event (Пользователь начал курс)
+    if event_name == 'course-begin' and student_uuid and student_email:
+        user = User.objects.filter(
+            Q(corporate_email=student_email) |
+            Q(personal_email=student_email)
+        ).first()
+        if user:
+            webhook_log.info(f'User found: {user.get_full_name()} (pk={user.pk}, uuid_skillspace={user.uuid_skillspace})')
+            if not user.uuid_skillspace:
+                user.uuid_skillspace = student_uuid
+                user.save(update_fields=['uuid_skillspace'])
+                webhook_log.info(f'Saved UUID for {user.get_full_name()}: {student_uuid}')
+            elif user.uuid_skillspace != student_uuid:
+                user.uuid_skillspace = student_uuid
+                user.save(update_fields=['uuid_skillspace'])
+                webhook_log.info(f'Updated UUID for {user.get_full_name()}: {student_uuid}')
+        else:
+            webhook_log.warning(f'User not found for email {student_email} (UUID: {student_uuid})')
+
+    # Find training by course UUID
+    training = Training.objects.filter(
+        training_type__skillspace_course_id=course_uuid
     ).first()
 
-    if not enrollment:
+    if not training:
+        webhook_log.warning(f'Training not found for course UUID {course_uuid}')
+        resp = JsonResponse({'status': 'not_found', 'message': 'Training not found'}, status=200)
+        webhook_log.info(f'RESPONSE | {resp.status_code} | {resp.content.decode()}')
+        webhook_log.info('=' * 80)
+        return resp
+
+    webhook_log.info(f'Training found: {training.pk} - {training.title}')
+
+    # Find enrollment - first by uuid, then by email
+    enrollment = None
+    user = None
+    
+    if student_uuid:
+        # Try to find user by uuid_skillspace
+        user = User.objects.filter(uuid_skillspace=student_uuid).first()
+        if user:
+            webhook_log.info(f'User by uuid_skillspace: {user.get_full_name()} (pk={user.pk})')
+            enrollment = TrainingEnrollment.objects.filter(
+                training=training,
+                user=user,
+            ).first()
+    
+    # If not found by uuid, try by email
+    if not enrollment and student_email:
+        enrollment = TrainingEnrollment.objects.filter(
+            training=training,
+            user__corporate_email=student_email,
+        ).first()
+    
+    if not enrollment and student_email:
         enrollment = TrainingEnrollment.objects.filter(
             training=training,
             user__personal_email=student_email,
         ).first()
 
     if not enrollment:
-        logger.warning(f'Enrollment not found for email {student_email} in training {pk}')
-        return JsonResponse({'status': 'not_found'}, status=200)
+        webhook_log.warning(f'Enrollment not found for email {student_email} in training {training.pk}')
+        resp = JsonResponse({'status': 'not_found'}, status=200)
+        webhook_log.info(f'RESPONSE | {resp.status_code} | {resp.content.decode()}')
+        webhook_log.info('=' * 80)
+        return resp
+
+    webhook_log.info(f'Enrollment: {enrollment.pk} | User: {enrollment.user.get_full_name()} | Status: {enrollment.status} -> {event_name}')
 
     # Update enrollment based on event
-    if event_type in ('student_completed', 'student_test_passed'):
+    if event_name in ('course-end-test',):
+        # Course completed
+        if student_uuid and enrollment.user and not enrollment.user.uuid_skillspace:
+            enrollment.user.uuid_skillspace = student_uuid
+            enrollment.user.save(update_fields=['uuid_skillspace'])
+            webhook_log.info(f'Saved UUID for {enrollment.user.get_full_name()}: {student_uuid}')
+        
+        old_status = enrollment.status
         enrollment.status = TrainingEnrollment.Status.COMPLETED
-        enrollment.score = payload.get('score', 0)
-        enrollment.completed_at = timezone.now()
-    elif event_type == 'student_failed':
-        enrollment.status = TrainingEnrollment.Status.FAILED
-        enrollment.score = payload.get('score', 0)
-    elif event_type == 'student_started':
-        enrollment.status = TrainingEnrollment.Status.IN_PROGRESS
+        enrollment.display_status = TrainingEnrollment.DisplayStatus.COMPLETED_SUCCESS
+        lesson = payload.get('lesson', {})
+        if lesson and 'score' in lesson:
+            enrollment.score = lesson['score']
+        event_date = payload.get('date')
+        if event_date:
+            try:
+                enrollment.completed_at = timezone.make_aware(
+                    timezone.datetime.fromisoformat(event_date.replace('Z', '+00:00'))
+                )
+            except (ValueError, TypeError):
+                pass
+        enrollment.save(update_fields=['status', 'display_status', 'score', 'completed_at'])
+        webhook_log.info(f'Course completed for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
 
-    enrollment.save(update_fields=['status', 'score', 'completed_at'])
+    elif event_name in ('test-end',):
+        # Test completed - check if passed
+        test_result = payload.get('testResult', {})
+        is_passed = test_result.get('success', False)
+        lesson = payload.get('lesson', {})
+        score = lesson.get('score', 0)
+        
+        old_status = enrollment.status
+        if is_passed:
+            enrollment.status = TrainingEnrollment.Status.COMPLETED
+            enrollment.display_status = TrainingEnrollment.DisplayStatus.COMPLETED_SUCCESS
+            enrollment.score = score
+            event_date = payload.get('date')
+            if event_date:
+                try:
+                    enrollment.completed_at = timezone.make_aware(
+                        timezone.datetime.fromisoformat(event_date.replace('Z', '+00:00'))
+                    )
+                except (ValueError, TypeError):
+                    pass
+        else:
+            enrollment.status = TrainingEnrollment.Status.FAILED
+            enrollment.display_status = TrainingEnrollment.DisplayStatus.FAILED_STATUS
+            enrollment.score = score
+        
+        enrollment.save(update_fields=['status', 'display_status', 'score', 'completed_at'])
+        webhook_log.info(f'Test {"passed" if is_passed else "failed"} for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
 
-    logger.info(f'Webhook processed: {event_type} for {enrollment.user.get_full_name()}')
+    elif event_name in ('course-begin', 'student-homework-begin', 'student-test-begin', 
+                        'student-session-begin', 'homework-begin-test', 'test-begin-test',
+                        'session-begin-test'):
+        # Student started course/test/homework/session
+        old_status = enrollment.status
+        if enrollment.status == TrainingEnrollment.Status.NOT_STARTED:
+            enrollment.status = TrainingEnrollment.Status.IN_PROGRESS
+            enrollment.display_status = TrainingEnrollment.DisplayStatus.COURSE_STARTED
+            enrollment.save(update_fields=['status', 'display_status'])
+            webhook_log.info(f'Student started for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
+        else:
+            webhook_log.info(f'Student already started for {enrollment.user.get_full_name()} | Current: {enrollment.status}')
 
-    return JsonResponse({'status': 'ok'})
+    elif event_name in ('student-homework-end', 'homework-end-test'):
+        # Homework completed
+        homework = payload.get('homework', {})
+        auto_accept = homework.get('autoAccept', False)
+        
+        old_status = enrollment.status
+        if auto_accept:
+            enrollment.status = TrainingEnrollment.Status.COMPLETED
+            enrollment.display_status = TrainingEnrollment.DisplayStatus.COMPLETED_SUCCESS
+            enrollment.save(update_fields=['status', 'display_status'])
+            webhook_log.info(f'Homework auto-accepted for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
+        else:
+            webhook_log.info(f'Homework pending review for {enrollment.user.get_full_name()} | autoAccept={auto_accept}')
+
+    else:
+        webhook_log.info(f'Unhandled event: {event_name} for {enrollment.user.get_full_name()}')
+
+    resp = JsonResponse({'status': 'ok'})
+    webhook_log.info(f'RESPONSE | {resp.status_code} | {resp.content.decode()}')
+    webhook_log.info('=' * 80)
+    return resp
 
 
 @login_required
@@ -278,10 +1046,13 @@ def sync_all_trainings(request):
     synced = 0
     errors = 0
 
-    for training in Training.objects.filter(is_active=True, status=Training.Status.ACTIVE):
+    for training in Training.objects.filter(is_active=True, status=Training.Status.PENDING):
         try:
-            training.sync_from_skillspace()
-            synced += 1
+            result = sync_training_to_skillspace(training)
+            if 'error' not in result:
+                synced += 1
+            else:
+                errors += 1
         except Exception as e:
             logger.error(f'Sync error for training {training.pk}: {e}')
             errors += 1
@@ -390,3 +1161,56 @@ def training_report(request):
 def training_list(request):
     """Главная страница — перенаправление на типы обучения."""
     return redirect('training:type_list')
+
+
+@login_required
+def training_list_by_type(request, type_pk):
+    """Список обучений для типа."""
+    training_type = get_object_or_404(TrainingType, pk=type_pk)
+    trainings = Training.objects.filter(
+        training_type=training_type,
+        is_active=True
+    ).order_by('-created_at')
+    
+    # Fetch groups from Skillspace API if course is configured
+    groups = []
+    if training_type.skillspace_course_id:
+        try:
+            client = SkillspaceClient()
+            groups = client.get_groups_by_course(training_type.skillspace_course_id)
+        except SkillspaceAPIError as e:
+            logger.error(f'Failed to load groups for course {training_type.skillspace_course_id}: {e}')
+    
+    return render(request, 'training/training_list.html', {
+        'training_type': training_type,
+        'trainings': trainings,
+        'groups': groups,
+    })
+
+
+@login_required
+def training_create(request, type_pk):
+    """Создание назначения обучения."""
+    training_type = get_object_or_404(TrainingType, pk=type_pk)
+    
+    # Sync groups from API before showing form
+    if training_type.skillspace_course_id:
+        SkillspaceGroup.sync_from_api(training_type.skillspace_course_id)
+    
+    if request.method == 'POST':
+        form = TrainingForm(request.POST)
+        if form.is_valid():
+            training = form.save(commit=False)
+            training.training_type = training_type
+            training.save()
+            
+            messages.success(request, f'Обучение "{training.title}" создано')
+            return redirect('training:type_trainings', type_pk=type_pk)
+    else:
+        form = TrainingForm(initial={'training_type': training_type.pk})
+    
+    return render(request, 'training/training_form.html', {
+        'form': form,
+        'training_type': training_type,
+        'action': 'Создание',
+    })

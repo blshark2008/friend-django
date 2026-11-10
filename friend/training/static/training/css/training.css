@@ -1,0 +1,16 @@
+/* Training app styles */
+
+/* Progress bar in table cells */
+td .progress {
+    min-width: 150px;
+}
+
+/* Table cell for department breakdown */
+td.dept-progress {
+    min-width: 150px;
+}
+
+/* Table cell for type breakdown */
+td.type-progress {
+    min-width: 150px;
+}

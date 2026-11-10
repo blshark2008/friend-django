@@ -7,6 +7,7 @@ from django.db.models import Q, Count
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils.decorators import method_decorator
+from django.core.cache import cache
 
 from .models import Message, MessageRecipient, MailGroup
 from .forms import MessageForm, MessageFilterForm
@@ -418,7 +419,7 @@ class MessageStatsView(LoginRequiredMixin, DetailView):
 
 
 # ============================================================================
-# MAX Bot Webhook
+# MAX Bot Webhook — надёжный handler с хранением chat_id в БД
 # ============================================================================
 
 import json
@@ -429,25 +430,236 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.conf import settings
 
-from messaging.bots.max_bot import handle_command, handle_message
+from messaging.bots.max_bot import handle_command, handle_message, session_store, BotState
 from messaging.services.max_api import MAXClient, MAXAPIError
+from messaging.services.bot_api_client import bot_api_client
 
 logger = logging.getLogger(__name__)
 
 
-@csrf_exempt
-@require_POST
+def _get_django_user(user_id):
+    """Найти Django-пользователя по MAX user_id."""
+    from accounts.models import User as AccountUser
+    return AccountUser.objects.filter(max_id=str(user_id)).first()
+
+
+def _get_user_chat_id(user_id, django_user=None):
+    """
+    Получить chat_id пользователя.
+    
+    Приоритет:
+    1. chat_id из БД (user.max_chat_id) — сохраняется между перезапусками
+    2. chat_id из session_store (in-memory fallback) — для быстрых ответов
+    3. None — если не найден нигде
+    
+    Args:
+        user_id: MAX user_id (int/str)
+        django_user: уже загруженный Django User (опционально)
+    
+    Returns:
+        int/None: chat_id или None
+    """
+    # Сначала пробуем из БД
+    if django_user and django_user.max_chat_id:
+        return django_user.max_chat_id
+    
+    # Если пользователь не загружен — загружаем
+    if not django_user:
+        django_user = _get_django_user(user_id)
+    
+    if django_user and django_user.max_chat_id:
+        return django_user.max_chat_id
+    
+    # Fallback: из session store (in-memory)
+    session = session_store.get(user_id) or {}
+    return session.get('chat_id')
+
+
+def _save_user_chat_id(django_user, chat_id):
+    """
+    Сохранить chat_id пользователя в БД.
+    
+    Вызывается при bot_started и при получении любого события от пользователя.
+    """
+    if chat_id and django_user:
+        try:
+            # Обновляем только это поле (efficient)
+            User = type(django_user)
+            User.objects.filter(pk=django_user.pk).update(max_chat_id=chat_id)
+            django_user.max_chat_id = chat_id
+            logger.info(f'Saved chat_id={chat_id} for user max_id={django_user.max_id} (pk={django_user.pk})')
+        except Exception as e:
+            logger.error(f'Error saving chat_id for user {django_user.max_id}: {e}')
+
+
+def _find_active_steprun(django_user):
+    """Найти активный StepRun для пользователя по текущему запуску."""
+    from scenarios.models import StepRun, UserCurrentRun
+    current_run = UserCurrentRun.objects.filter(user=django_user).first()
+    if not current_run or not current_run.run:
+        logger.info(f'_find_active_steprun: no current run for user {django_user.pk}')
+        return None
+    
+    logger.info(f'_find_active_steprun: current run_id={current_run.run.id}')
+    return StepRun.objects.filter(
+        recipient_id=django_user.pk,
+        status=StepRun.STATUS_SENT,
+        run=current_run.run,
+    ).order_by('-step__step_order').first()
+
+
+def _find_active_steprun_for_button(django_user, button_code):
+    """Найти активный StepRun, содержащий кнопку с данным result_code."""
+    from scenarios.models import StepRun, UserCurrentRun
+    current_run = UserCurrentRun.objects.filter(user=django_user).first()
+    if not current_run or not current_run.run:
+        logger.info(f'_find_active_steprun_for_button: no current run for user {django_user.pk}')
+        return None
+    
+    step_runs = StepRun.objects.filter(
+        recipient_id=django_user.pk,
+        status=StepRun.STATUS_SENT,
+        run=current_run.run,
+    ).order_by('-step__step_order')
+    
+    for sr in step_runs:
+        message_json = sr.step.message_json
+        if isinstance(message_json, dict):
+            options = message_json.get('options', [])
+            for opt in options:
+                if opt.get('result_code') == button_code:
+                    logger.info(f'_find_active_steprun_for_button: found step_run_id={sr.pk}, step_id={sr.step.id}, button_code={button_code}')
+                    return sr
+    logger.info(f'_find_active_steprun_for_button: no matching step_run for button_code={button_code}')
+    return None
+
+
+def _find_active_steprun_for_text(django_user):
+    """Найти активный StepRun, содержащий number/text_pattern тип."""
+    from scenarios.models import StepRun, UserCurrentRun
+    current_run = UserCurrentRun.objects.filter(user=django_user).first()
+    if not current_run or not current_run.run:
+        logger.info(f'_find_active_steprun_for_text: no current run for user {django_user.pk}')
+        return None
+    
+    step_runs = StepRun.objects.filter(
+        recipient_id=django_user.pk,
+        status=StepRun.STATUS_SENT,
+        run=current_run.run,
+    ).order_by('-step__step_order')
+    
+    for sr in step_runs:
+        message_json = sr.step.message_json
+        if isinstance(message_json, dict):
+            msg_type = message_json.get('type', '')
+            if msg_type in ('number', 'text_pattern'):
+                logger.info(f'_find_active_steprun_for_text: found step_run_id={sr.pk}, step_id={sr.step.id}, type={msg_type}')
+                return sr
+    logger.info(f'_find_active_steprun_for_text: no matching step_run found')
+    return None
+
+
+def _send_message_to_user(user_id, django_user, text, buttons=None, format='html'):
+    """
+    Отправить сообщение пользователю с fallback логикой.
+    
+    Приоритет:
+    1. chat_id из БД (надёжно, сохраняется между перезапусками)
+    2. user_id (работает в диалоге с ботом)
+    """
+    chat_id = _get_user_chat_id(user_id, django_user)
+    
+    # Если пользователь не найден в БД, отправляем только по user_id
+    if not django_user:
+        try:
+            bot_api_client.send_message(
+                user_id=user_id,
+                chat_id=chat_id,
+                text=text,
+                format=format,
+                buttons=buttons,
+            )
+            logger.info(f'Message sent to unregistered user {user_id} (chat_id={chat_id})')
+        except Exception as e:
+            logger.error(f'Failed to send to unregistered user {user_id}: {e}')
+        return
+    
+    try:
+        bot_api_client.send_message(
+            user_id=user_id,
+            chat_id=chat_id,
+            text=text,
+            format=format,
+            buttons=buttons,
+        )
+        logger.info(f'Message sent to user {user_id} (chat_id={chat_id}, max_id={django_user.max_id})')
+    except Exception as e:
+        # Fallback: пробуем отправить только по user_id
+        if chat_id:
+            logger.warning(f'Failed to send with chat_id={chat_id}, retrying with user_id only: {e}')
+            try:
+                bot_api_client.send_message(
+                    user_id=user_id,
+                    chat_id=None,
+                    text=text,
+                    format=format,
+                    buttons=buttons,
+                )
+                logger.info(f'Message sent via fallback (user_id only) to {user_id}')
+            except Exception as e2:
+                logger.error(f'Fallback send also failed for user {user_id}: {e2}')
+        else:
+            logger.error(f'Failed to send message to user {user_id}: {e}')
+
+
+def _process_button_result(django_user, result_code, callback_id=None, chat_id=None):
+    """Обработать результат нажатия кнопки и отправить следующий шаг."""
+    from scenarios.services.executor import ScenarioExecutor
+
+    # Ищем StepRun, содержащий кнопку с данным result_code
+    step_run = _find_active_steprun_for_button(django_user, result_code)
+    if not step_run:
+        logger.info(f'No matching StepRun for result_code={result_code}, user_id={django_user.pk}')
+        return
+
+    logger.info(f'_process_button_result: user_id={django_user.pk}, result_code={result_code}, step_run_id={step_run.pk}, step_id={step_run.step.id}')
+
+    # Обрабатываем ответ в сценарии
+    # executor.process_answer() сам отправляет следующий шаг через _send_next_step()
+    run = step_run.run
+    executor = ScenarioExecutor(run)
+    try:
+        result = executor.process_answer(
+            user_id=django_user.pk,
+            message_text='',
+            button_result_code=result_code,
+            step_run=step_run,
+        )
+        logger.info(f'Button processed: {result}')
+
+        # Ответ на callback только после успешной валидации
+        # MAX API позволяет ответить на callback в течение ~40 секунд
+        if result.get('success') and callback_id:
+            try:
+                client = MAXClient()
+                client.answer_callback_simple(callback_id=callback_id)
+                logger.info(f'Answered callback: {callback_id}')
+            except MAXAPIError as e:
+                logger.error(f'answer_callback error (callback expired): {e}')
+    except Exception as e:
+        logger.error(f'process_answer error: {e}')
+
 
 @csrf_exempt
 @require_POST
 def max_webhook(request):
-    """
-    Webhook для приёма событий от MAX.
-    
-    MAX отправляет:
-    - message_created — когда пользователь отправляет текстовое сообщение
-    - message_callback — когда пользователь нажимает кнопку (ОБЯЗАТЕЛЬНО нужно ответить через /answers)
-    """
+    '''Webhook для приёма событий от MAX.
+
+    Структура событий согласно документации MAX API:
+    - message_callback: {update_type, callback: {callback_id, payload, user: {user_id}, message}}
+    - message_created:  {update_type, message: {sender: {user_id, is_bot}, body: {text}}}
+    - bot_started:      {update_type, chat_id, user: {user_id}, payload}
+    '''
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, ValueError) as e:
@@ -455,144 +667,216 @@ def max_webhook(request):
         return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
 
     update_type = data.get('update_type', '')
-    message_data = data.get('message', {})
-    sender_data = message_data.get('sender', {})
-    recipient_data = message_data.get('recipient', {})
-    body_data = message_data.get('body', {})
-
-    user_id = sender_data.get('user_id')
-    chat_id = recipient_data.get('chat_id')
-    message_text = body_data.get('text', '').strip()
+    logger.info(f'Webhook received: update_type={update_type}, data keys={list(data.keys())}')
 
     # ========================================================================
     # ОБРАБОТКА CALLBACK ОТ КНОПКИ (message_callback)
     # ========================================================================
     if update_type == 'message_callback':
-        logger.info(f'Webhook CALLBACK: user_id={user_id}, chat_id={chat_id}, body={body_data}')
-        
-        # Извлекаем callback_id и result_code из обновления
-        callback_id = data.get('callback_id') or body_data.get('callback_id')
-        result_code = body_data.get('result_code')
-        branch_code = body_data.get('branch_code')
-        
-        logger.info(f'Webhook CALLBACK: callback_id={callback_id}, result_code={result_code}, branch_code={branch_code}')
-        
+        callback_data = data.get('callback', {})
+        callback_id = callback_data.get('callback_id')
+        payload = callback_data.get('payload', '')
+        user_data = callback_data.get('user', {})
+        user_id = user_data.get('user_id')
+
+        logger.info(f'message_callback: callback_id={callback_id}, payload={payload}, user_id={user_id}')
+
         if not user_id:
-            logger.warning('Webhook CALLBACK: отсутствует user_id')
             return JsonResponse({'status': 'ok'})
-        
-        # Маппинг MAX user_id -> Django user_id
-        from accounts.models import User as AccountUser
-        django_user = AccountUser.objects.filter(max_id=str(user_id)).first()
-        if not django_user:
-            logger.warning(f'Webhook CALLBACK: пользователь с MAX user_id={user_id} не найден')
-            return JsonResponse({'status': 'ok'})
-        
-        # Ищем активный step_run
-        from scenarios.models import StepRun
-        step_run = StepRun.objects.filter(
-            recipient_id=django_user.pk,
-            status=StepRun.STATUS_SENT,
-        ).order_by('-step__step_order').first()
-        
-        if not step_run:
-            logger.warning(f'Webhook CALLBACK: нет активного step_run для user {django_user.pk}')
-            return JsonResponse({'status': 'ok'})
-        
-        # Отвечаем MAX через /answers (ОБЯЗАТЕЛЬНО по спецификации MAX API)
-        from messaging.services.max_api import MAXClient as MAXClient2, MAXAPIError as MAXAPIError2
-        try:
-            client = MAXClient2()
+
+        # Защита от дублирования callback-событий (MAX может отправить одно событие дважды)
+        # Защита 1: по callback_id (если MAX отправляет один callback_id дважды)
+        if callback_id:
+            cache_key = f'callback_id:{callback_id}'
+            if cache.get(cache_key):
+                logger.info(f'Duplicate callback (by ID) ignored: {callback_id}')
+                try:
+                    from messaging.services.max_api import MAXClient
+                    client = MAXClient()
+                    client.answer_callback_simple(callback_id=callback_id)
+                except Exception:
+                    pass
+                return JsonResponse({'status': 'ok'})
+            cache.set(cache_key, '1', timeout=60)
+
+        # Защита 2: по user_id + payload (если MAX отправляет разные callback_id с одинаковым payload)
+        dedup_key = f'payload:{user_id}:{payload}'
+        if cache.get(dedup_key):
+            logger.info(f'Duplicate callback (by payload) ignored: user={user_id}, payload={payload}')
+            # Отвечаем на callback, чтобы MAX убрал индикатор загрузки
             if callback_id:
-                client.answer_callback_simple(callback_id=callback_id)
-                logger.info(f'Webhook CALLBACK: answered callback {callback_id}')
-        except MAXAPIError2 as e:
-            logger.error(f'Webhook CALLBACK: ошибка answer_callback: {e}')
-        
-        # Обрабатываем в сценарии
-        from scenarios.services.executor import ScenarioExecutor
-        from scenarios.models import Run
-        
-        run = step_run.run
-        executor = ScenarioExecutor(run)
-        
-        # result_code из body_data — это код кнопки (WYG2X6GE и т.д.)
-        button_result_code = result_code
-        
-        try:
-            result = executor.process_answer(
-                user_id=django_user.pk,
-                message_text='',
-                button_result_code=button_result_code,
-            )
-            logger.info(f'Webhook CALLBACK: answer processed: {result}')
+                try:
+                    from messaging.services.max_api import MAXClient
+                    client = MAXClient()
+                    client.answer_callback_simple(callback_id=callback_id)
+                except Exception:
+                    pass
+            return JsonResponse({'status': 'ok'})
+        cache.set(dedup_key, '1', timeout=30)  # 30 секунд на обработку
+
+        django_user = _get_django_user(user_id)
+        if not django_user:
+            logger.warning(f'User {user_id} not found in Django')
+            return JsonResponse({'status': 'ok'})
+
+        # Получаем chat_id из БД или сессии
+        chat_id = _get_user_chat_id(user_id, django_user)
+        _process_button_result(django_user, result_code=payload, callback_id=callback_id, chat_id=chat_id)
+        return JsonResponse({'status': 'ok'})
+
+    # ========================================================================
+    # ОБРАБОТКА СООБЩЕНИЯ (message_created)
+    # ========================================================================
+    if update_type == 'message_created':
+        message_data = data.get('message', {})
+        sender_data = message_data.get('sender', {})
+        body_data = message_data.get('body', {})
+
+        user_id = sender_data.get('user_id')
+        is_bot = sender_data.get('is_bot', False)
+        message_text = body_data.get('text', '').strip()
+
+        logger.info(f'message_created: user_id={user_id}, is_bot={is_bot}, text={message_text[:100]}')
+
+        if not user_id or is_bot:
+            return JsonResponse({'status': 'ok'})
+        if not message_text:
+            return JsonResponse({'status': 'ok'})
+
+        # Проверяем, ожидает ли пользователь ответ на кнопку
+        django_user = _get_django_user(user_id)
+        if django_user:
+            # Сохраняем chat_id в БД при первом сообщении
+            chat_id = _get_user_chat_id(user_id, django_user)
+            if not chat_id:
+                # Пробуем получить из message_data
+                recipient_data = message_data.get('recipient', {})
+                chat_id = recipient_data.get('chat_id')
+                if chat_id:
+                    _save_user_chat_id(django_user, chat_id)
             
-            # Если есть следующий шаг — отправляем сообщение
-            if result.get('success') and result.get('next_step_id'):
-                next_message = result.get('next_message', '')
-                if next_message:
-                    try:
-                        from messaging.services.bot_api_client import bot_api_client
-                        from scenarios.models import Step
-                        next_step = Step.objects.filter(
-                            pk=result['next_step_id'],
-                            branch__scenario_id=result['scenario_id'],
-                        ).first()
-                        buttons = _extract_buttons_from_message_json(
-                            next_step.message_json if next_step else None
-                        )
-                        bot_api_client.send_message(
-                            user_id=django_user.max_id,
-                            text=next_message,
-                            format='html',
-                            buttons=buttons,
-                        )
-                        logger.info(f'Webhook CALLBACK: next step sent to user {django_user.pk}')
-                    except Exception as e:
-                        logger.error(f'Webhook CALLBACK: ошибка отправки следующего шага: {e}')
-        except Exception as e:
-            logger.error(f'Webhook CALLBACK: ошибка process_answer: {e}')
-        
-        return JsonResponse({'status': 'ok'})
-    
-    # ========================================================================
-    # ОБРАБОТКА ТЕКСТОВОГО СООБЩЕНИЯ (message_created)
-    # ========================================================================
-    if update_type != 'message_created':
-        logger.info(f'Webhook: игнорируем update_type={update_type}')
-        return JsonResponse({'status': 'ok'})
-    
-    if not user_id:
-        logger.warning('Webhook: отсутствует sender.user_id')
-        return JsonResponse({'status': 'ok'})
-    
-    if sender_data.get('is_bot'):
-        return JsonResponse({'status': 'ok'})
-    
-    logger.info(f'Webhook TEXT: user_id={user_id}, chat_id={chat_id}, text={message_text[:100]}')
-    
-    if not message_text:
-        return JsonResponse({'status': 'ok'})
-    
-    response_text = None
-    if message_text.startswith('/'):
-        parts = message_text.split(' ', 1)
-        command = parts[0]
-        args = parts[1] if len(parts) > 1 else ''
-        response_text = handle_command(user_id, command, args)
-    else:
-        response_text = handle_message(user_id, message_text)
-    
-    if response_text:
-        try:
-            from messaging.services.bot_api_client import bot_api_client
-            bot_api_client.send_message(
+            # Сначала проверяем, совпадает ли текст с любой кнопкой среди активных step_run'ов
+            from scenarios.models import StepRun, UserCurrentRun
+            current_run = UserCurrentRun.objects.filter(user=django_user).first()
+            if not current_run or not current_run.run:
+                logger.info(f'message_created: no current run for user {django_user.pk}')
+                return JsonResponse({'status': 'ok'})
+            
+            logger.info(f'message_created: current run_id={current_run.run.id}')
+            step_runs = StepRun.objects.filter(
+                recipient_id=django_user.pk,
+                status=StepRun.STATUS_SENT,
+                run=current_run.run,
+            ).order_by('-step__step_order')
+            
+            logger.info(f'message_created: checking {step_runs.count()} step_runs for button match')
+            
+            # Собираем все step_run'ы с кнопками
+            button_step_runs = []
+            for sr in step_runs:
+                message_json = sr.step.message_json
+                if isinstance(message_json, dict):
+                    msg_type = message_json.get('type', '')
+                    logger.info(f'message_created: step_run_id={sr.pk}, step_id={sr.step.id}, step_order={sr.step.step_order}, msg_type={msg_type}')
+                    if msg_type in ('buttons', 'buttons_with_number'):
+                        button_step_runs.append(sr)
+            
+            # Проверяем совпадение текста с кнопкой (начиная с последнего step_run)
+            for sr in button_step_runs:
+                options = sr.step.message_json.get('options', [])
+                for opt in options:
+                    btn_text = opt.get('text', '').strip()
+                    if btn_text and (
+                        btn_text.lower() == message_text.lower() or
+                        message_text.lower().startswith(btn_text.lower()) or
+                        btn_text.lower().startswith(message_text.lower())
+                    ):
+                        result_code = opt.get('result_code', '')
+                        logger.info(f'Matched button text "{message_text}" -> rc={result_code} (step_run_id={sr.pk})')
+                        _process_button_result(django_user, result_code=result_code, chat_id=chat_id)
+                        return JsonResponse({'status': 'ok'})
+            
+            # Затем ищем StepRun с number/text_pattern (текстовый ответ)
+            step_run = _find_active_steprun_for_text(django_user)
+            if step_run:
+                logger.info(f'message_created: found text step_run_id={step_run.pk}, step_id={step_run.step.id}')
+                step = step_run.step
+                message_json = step.message_json
+                msg_type = message_json.get('type', '')
+                
+                from scenarios.services.executor import ScenarioExecutor
+                run = step_run.run
+                executor = ScenarioExecutor(run)
+                result = executor.process_answer(django_user.pk, message_text, step_run=step_run)
+                logger.info(f'Text answer processed: {result}')
+                return JsonResponse({'status': 'ok'})
+
+        # Обычный текст — команды и сообщения
+        response_text = None
+        if message_text.startswith('/'):
+            parts = message_text.split(' ', 1)
+            command = parts[0]
+            args = parts[1] if len(parts) > 1 else ''
+            response_text = handle_command(user_id, command, args)
+        else:
+            response_text = handle_message(user_id, message_text)
+
+        if response_text:
+            _send_message_to_user(
                 user_id=user_id,
+                django_user=django_user,
                 text=response_text,
-                format='html',
             )
-            logger.info(f'Webhook: ответ отправлен пользователю {user_id}')
-        except Exception as e:
-            logger.error(f'Webhook: ошибка отправки ответа: {e}')
-    
+        return JsonResponse({'status': 'ok'})
+
+    # ========================================================================
+    # ОБРАБОТКА ЗАПУСКА БОТА (bot_started)
+    # ========================================================================
+    if update_type == 'bot_started':
+        user_data = data.get('user', {})
+        user_id = user_data.get('user_id')
+        chat_id = data.get('chat_id')
+        payload = data.get('payload')
+        logger.info(f'bot_started: user_id={user_id}, chat_id={chat_id}, payload={payload}')
+
+        if user_id:
+            # Находим пользователя
+            django_user = _get_django_user(user_id)
+            
+            # Сохраняем chat_id в БД для отправки ответов
+            if django_user:
+                _save_user_chat_id(django_user, chat_id)
+            else:
+                # Если пользователь не найден, сохраняем в сессию как fallback
+                session = session_store.get(user_id) or {}
+                session['chat_id'] = chat_id
+                session_store.set(user_id, session)
+
+            response = handle_command(user_id, 'start', payload or '')
+            if response:
+                _send_message_to_user(
+                    user_id=user_id,
+                    django_user=django_user,
+                    text=str(response),
+                )
+        return JsonResponse({'status': 'ok'})
+
+    # ========================================================================
+    # ОБРАБОТКА ДОБАВЛЕНИЯ БОТА (bot_added)
+    # ========================================================================
+    if update_type == 'bot_added':
+        user_data = data.get('user', {})
+        chat_id = data.get('chat_id')
+        logger.info(f'bot_added: chat_id={chat_id}, user={user_data}')
+        return JsonResponse({'status': 'ok'})
+
+    # Неизвестный тип — игнорируем
+    logger.info(f'Unknown update_type: {update_type}')
     return JsonResponse({'status': 'ok'})
+
+
+@csrf_exempt
+@require_POST
+def api_max_webhook(request):
+    '''API webhook - алиас.'''
+    return max_webhook(request)

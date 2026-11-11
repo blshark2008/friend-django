@@ -1,0 +1,257 @@
+/* ============================================================================
+   Utilities — утилитарные классы (font-size, width, display, text, gap)
+   ============================================================================ */
+
+/* --- Font Size --- */
+.fs-xs { font-size: var(--font-size-xs) !important; }
+.fs-sm { font-size: var(--font-size-sm) !important; }
+.fs-base { font-size: var(--font-size-base) !important; }
+.fs-md { font-size: var(--font-size-md) !important; }
+.fs-lg { font-size: var(--font-size-lg) !important; }
+.fs-xl { font-size: var(--font-size-xl) !important; }
+.fs-2xl { font-size: var(--font-size-2xl) !important; }
+.fs-3xl { font-size: var(--font-size-3xl) !important; }
+
+.text-small {
+    font-size: var(--font-size-base) !important;
+}
+
+/* --- Width --- */
+.w-32 { width: 32px !important; }
+.w-40 { width: 40px !important; }
+.w-50 { width: 50px !important; }
+.w-80 { width: 80px !important; }
+.w-100 { width: 100px !important; }
+.w-120 { width: 120px !important; }
+.w-140 { width: 140px !important; }
+.w-150 { width: 150px !important; }
+.w-180 { width: 180px !important; }
+.w-200 { width: 200px !important; }
+
+.max-w-100 { max-width: 100px !important; }
+.max-w-120 { max-width: 120px !important; }
+.max-w-150 { max-width: 150px !important; }
+.max-w-300 { max-width: 300px !important; }
+.max-w-600 { max-width: 600px !important; }
+
+.h-20 { height: 20px !important; }
+
+.col-half {
+    width: 40% !important;
+}
+
+/* --- Display --- */
+.d-none { display: none !important; }
+.d-inline { display: inline !important; }
+.d-block { display: block !important; }
+.d-flex { display: flex !important; }
+
+/* --- Text --- */
+.text-ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.text-pre-wrap {
+    white-space: pre-wrap !important;
+}
+
+/* --- Gap & Flex --- */
+.gap-2 {
+    gap: 0.5rem !important;
+}
+
+.flex-wrap {
+    flex-wrap: wrap !important;
+}
+
+/* --- Overflow --- */
+.overflow-y-auto {
+    overflow-y: auto !important;
+}
+
+/* --- Opacity --- */
+.opacity-40 { opacity: 0.4 !important; }
+
+/* --- Search Results --- */
+.search-results {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.search-results-lg {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.min-h-40 {
+    min-height: 40px !important;
+}
+
+/* --- JSON Editor --- */
+.message-json-editor,
+.mailing-list-editor {
+    background: #f8f9fa;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.message-json-editor .json-editor-toolbar,
+.mailing-list-editor .ml-editor-toolbar {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.message-json-editor table th,
+.mailing-list-editor table th {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.message-json-editor table td,
+.mailing-list-editor table td {
+    vertical-align: middle;
+    font-size: var(--font-size-md);
+}
+
+.message-json-editor pre,
+.mailing-list-editor pre {
+    background: #f1f3f5 !important;
+    color: #495057;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.message-json-editor .empty-state,
+.mailing-list-editor .empty-state {
+    color: #6c757d;
+}
+
+.message-json-editor .empty-state i,
+.mailing-list-editor .empty-state i {
+    opacity: 0.3;
+}
+
+/* --- Scenario Table --- */
+.scenario-table {
+    font-size: var(--font-size-md);
+}
+
+.scenario-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.scenario-table td {
+    vertical-align: top;
+    padding: 0.75rem 0.5rem;
+}
+
+.scenario-table tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* --- Step Text --- */
+.step-text {
+    font-size: var(--font-size-base);
+    line-height: 1.4;
+    color: #495057;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.step-text a {
+    color: inherit;
+}
+
+.step-text a:hover {
+    color: var(--primary-color) !important;
+    text-decoration: underline !important;
+}
+
+/* --- Equipment Row --- */
+.equipment-row {
+    transition: background 0.15s;
+}
+
+.equipment-row:hover {
+    background: #f8f9fa;
+}
+
+/* --- Location Tree --- */
+.location-tree .city-card {
+    border-left: 5px solid #e74c3c;
+    margin-bottom: 1.5rem;
+}
+
+.location-tree .building-card {
+    border-left: 4px solid var(--dark-active);
+    margin-bottom: 1rem;
+}
+
+.location-tree .room-badge {
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.location-tree .room-badge:hover {
+    transform: scale(1.05);
+}
+
+.location-tree .floor-rooms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+}
+
+.location-tree .room-count-badge {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+}
+
+/* --- Training --- */
+td .progress {
+    min-width: 150px;
+}
+
+td.dept-progress {
+    min-width: 150px;
+}
+
+td.type-progress {
+    min-width: 150px;
+}
+
+/* --- Delivery Status --- */
+.delivery-status-delivered { color: var(--success-color); }
+.delivery-status-failed { color: var(--danger-color); }
+.delivery-status-pending { color: var(--warning-color); }
+.delivery-status-read { color: var(--primary-color); }
+
+/* --- Status Colors --- */
+.status-online { color: #28a745; }
+.status-offline { color: var(--danger-color); }
+
+/* --- Severity --- */
+.severity-badge,
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+}
+
+.count-badge {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+}

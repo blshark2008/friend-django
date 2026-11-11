@@ -111,12 +111,11 @@
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-4" style="width: 50px;">№</th>
-                                    <th>Текст</th>
-                                    <th style="width: 150px;">Тип ответа</th>
-                                    <th style="width: 120px;">Сумма значений</th>
-                                    <th style="width: 200px;">Группировка ответов</th>
-                                    <th style="width: 100px;">Всего ответов</th>
+                                <th class="ps-4 w-50">№</th>
+                                <th class="w-150">Тип ответа</th>
+                                <th class="w-120">Сумма значений</th>
+                                <th class="w-200">Группировка ответов</th>
+                                <th class="w-100">Всего ответов</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -160,7 +159,7 @@
             {% else %}
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center py-5">
-                    <i class="bi bi-table text-muted" style="font-size: 3rem;"></i>
+                    <i class="bi bi-table text-muted fs-3xl"></i>
                     <p class="text-muted mt-3">Сводные данные не настроены</p>
                     <p class="text-muted small mb-3">
                         Перейдите к <a href="{% url 'scenarios:answer_config' run.scenario.pk %}">настройке обработки ответов</a> сценария
@@ -196,14 +195,14 @@
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive">
-                                    <table class="table table-hover table-sm mb-0" style="font-size: 0.875rem;">
+                                    <table class="table table-hover table-sm mb-0 fs-base">
                                         <thead class="table-light">
                                             <tr>
-                                                <th class="ps-3" style="width: 50px;">№</th>
+                                                <th class="ps-3 w-50">№</th>
                                                 <th>Сотрудник</th>
-                                                <th style="width: 100px;">Сумма</th>
+                                                <th class="w-100">Сумма</th>
                                                 <th>Группировка ответов</th>
-                                                <th style="width: 80px;" class="text-end">Кол-во</th>
+                                                <th class="w-80 text-end">Кол-во</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -382,11 +381,11 @@
             <div class="card-body p-0">
                 {% if logs %}
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0" style="font-size:0.85rem;">
+                    <table class="table table-sm table-hover mb-0 fs-base">
                         <thead>
                             <tr>
-                                <th class="ps-3" style="width:140px;">Время</th>
-                                <th style="width:120px;">Событие</th>
+                                <th class="ps-3 w-140">Время</th>
+                                <th class="w-120">Событие</th>
                                 <th>Детали</th>
                             </tr>
                         </thead>
@@ -413,7 +412,7 @@
                                 </td>
                                 <td>
                                     {% if log.payload_json %}
-                                        <pre class="mb-0" style="white-space:pre-wrap;max-width:600px;">{{ log.payload_json|truncatewords:10 }}</pre>
+                                        <pre class="mb-0 text-pre-wrap max-w-600">{{ log.payload_json|truncatewords:10 }}</pre>
                                     {% else %}
                                         <span class="text-muted">—</span>
                                     {% endif %}
@@ -462,7 +461,7 @@ function renderSummaryData(data) {
         container.innerHTML = `
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center py-5">
-                    <i class="bi bi-table text-muted" style="font-size: 3rem;"></i>
+                    <i class="bi bi-table text-muted fs-3xl"></i>
                     <p class="text-muted mt-3">Сводные данные не настроены</p>
                     <p class="text-muted small mb-3">
                         Перейдите к <a href="/scenarios/${runId}/answer-config/">настройке обработки ответов</a> сценария
@@ -486,12 +485,12 @@ function renderSummaryData(data) {
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-4" style="width: 50px;">№</th>
+                                <th class="ps-4 w-50">№</th>
                                 <th>Текст</th>
-                                <th style="width: 150px;">Тип ответа</th>
-                                <th style="width: 120px;">Сумма значений</th>
-                                <th style="width: 200px;">Группировка ответов</th>
-                                <th style="width: 100px;">Всего ответов</th>
+                                <th class="w-150">Тип ответа</th>
+                                <th class="w-120">Сумма значений</th>
+                                <th class="w-200">Группировка ответов</th>
+                                <th class="w-100">Всего ответов</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -562,14 +561,14 @@ function renderSummaryData(data) {
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
-                                <table class="table table-hover table-sm mb-0" style="font-size: 0.875rem;">
+                                <table class="table table-hover table-sm mb-0 fs-base">
                                     <thead class="table-light">
                                         <tr>
-                                            <th class="ps-3" style="width: 50px;">№</th>
+                                            <th class="ps-3 w-50">№</th>
                                             <th>Сотрудник</th>
-                                            <th style="width: 100px;">Сумма</th>
+                                            <th class="w-100">Сумма</th>
                                             <th>Группировка ответов</th>
-                                            <th style="width: 80px;" class="text-end">Кол-во</th>
+                                            <th class="w-80 text-end">Кол-во</th>
                                         </tr>
                                     </thead>
                                     <tbody>

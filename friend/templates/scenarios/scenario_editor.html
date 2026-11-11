@@ -71,7 +71,7 @@
                     <table class="table table-hover mb-0 scenario-table">
                         <thead>
                             <tr>
-                                <th class="ps-3" style="width: 50px;">№</th>
+                                <th class="ps-3 w-50">№</th>
                                 <th>Код результата</th>
                                 <th>Коды результата действия</th>
                                 <th>Код запуска</th>
@@ -79,7 +79,7 @@
                                 <th>JSON сбора</th>
                                 <th>Рассылка</th>
                                 <th>Дедлайн</th>
-                                <th class="text-end" style="width: 100px;">Действия</th>
+                                <th class="text-end w-100">Действия</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -174,7 +174,7 @@
     {% empty %}
     <div class="card border-0 shadow-sm">
         <div class="card-body text-center py-5">
-            <i class="bi bi-diagram-3 text-muted" style="font-size: 3rem;"></i>
+            <i class="bi bi-diagram-3 text-muted fs-3xl"></i>
             <p class="text-muted mt-3">Веток не найдено</p>
             <a href="{% url 'scenarios:branch_create' %}?scenario={{ scenario.pk }}" class="btn btn-primary">
                 <i class="bi bi-plus-lg me-1"></i>Создать первую ветку
@@ -183,16 +183,6 @@
     </div>
     {% endfor %}
 </div>
-
-<style>
-.step-text a:hover {
-    color: #0d6efd !important;
-    text-decoration: underline !important;
-}
-.step-text a {
-    color: inherit;
-}
-</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

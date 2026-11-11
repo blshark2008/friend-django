@@ -29,7 +29,7 @@
             div.innerHTML =
                 '<span class="small">' + label + '</span>' +
                 '<button type="button" class="btn btn-sm btn-success p-0 px-2 add-role-btn" data-id="' + item.pk + '"' +
-                    (alreadyAssigned ? ' disabled style="opacity:0.4"' : '') + ' title="Привязать"><i class="bi bi-plus-lg"></i></button>';
+                    (alreadyAssigned ? ' disabled class="opacity-40"' : '') + ' title="Привязать"><i class="bi bi-plus-lg"></i></button>';
             container.appendChild(div);
         });
     }
@@ -41,7 +41,8 @@
             return full.includes(q);
         });
         renderSearchResults('userSearchResults', filtered);
-        document.getElementById('userSearchResults').style.display = 'block';
+        const resultsDiv = document.getElementById('userSearchResults');
+        resultsDiv.classList.remove('d-none');
     });
 
     document.addEventListener('click', function (e) {
@@ -143,7 +144,7 @@
                     <span class="input-group-text"><i class="bi bi-search"></i></span>
                     <input type="text" class="form-control" id="searchUsers" placeholder="Поиск сотрудника для привязки...">
                 </div>
-                <div id="userSearchResults" class="border rounded p-2 mt-1" style="max-height:150px;overflow-y:auto;display:none;"></div>
+                <div id="userSearchResults" class="border rounded p-2 mt-1 search-results d-none"></div>
             </div>
         </div>
 

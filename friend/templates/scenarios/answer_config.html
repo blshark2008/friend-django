@@ -30,13 +30,13 @@
     <div class="card-body p-0">
         {% if branches %}
         <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0" style="font-size: 0.875rem;">
+            <table class="table table-hover table-sm mb-0 fs-base">
                 <thead class="table-light">
                     <tr>
-                        <th class="ps-3" style="width: 50px;">№</th>
-                        <th style="width: 150px;">Ветка</th>
+                        <th class="ps-3 w-50">№</th>
+                        <th class="w-150">Ветка</th>
                         <th>Текст шага</th>
-                        <th style="width: 120px;">Код ответа</th>
+                        <th class="w-120">Код ответа</th>
                         <th>Тип ответа</th>
                     </tr>
                 </thead>
@@ -49,7 +49,7 @@
                             <span class="badge bg-info">{{ branch.code }}</span>
                             <small class="d-block text-muted">{{ branch.name }}</small>
                         </td>
-                        <td style="max-width: 300px;">{{ step.message_text|truncatewords:10 }}</td>
+                        <td class="max-w-300">{{ step.message_text|truncatewords:10 }}</td>
                         <td>
                             {% with msg_type=step.message_json.type %}
                                 {% if msg_type == "buttons" or msg_type == "buttons_with_number" %}
@@ -140,14 +140,14 @@
     <div class="card-body p-0">
         {% if configs %}
         <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0" style="font-size: 0.875rem;">
+            <table class="table table-hover table-sm mb-0 fs-base">
                 <thead class="table-light">
                     <tr>
-                        <th class="ps-3" style="width: 50px;">№</th>
+                        <th class="ps-3 w-50">№</th>
                         <th>Текст</th>
-                        <th style="width: 150px;">Код результата</th>
-                        <th style="width: 80px;" class="text-center">Числ.</th>
-                        <th class="text-end" style="width: 120px;">Действия</th>
+                        <th class="w-150">Код результата</th>
+                        <th class="w-80 text-center">Числ.</th>
+                        <th class="text-end w-120">Действия</th>
                     </tr>
                 </thead>
                     <tbody>
@@ -156,13 +156,13 @@
                         <td class="ps-3 fw-bold">{{ forloop.counter }}</td>
                         <td>
                             <span class="edit-display-text">{{ config.display_text }}</span>
-                            <input type="text" class="form-control form-control-sm edit-display-text-input" 
-                                   value="{{ config.display_text }}" style="display:none;">
+                            <input type="text" class="form-control form-control-sm edit-display-text-input d-none" 
+                                   value="{{ config.display_text }}">
                         </td>
                         <td>
                             <span class="edit-result-code"><span class="badge bg-secondary">{{ config.result_code }}</span></span>
-                            <input type="text" class="form-control form-control-sm edit-result-code-input" 
-                                   value="{{ config.result_code }}" style="display:none;">
+                            <input type="text" class="form-control form-control-sm edit-result-code-input d-none" 
+                                   value="{{ config.result_code }}">
                         </td>
                         <td>
                             <div class="form-check form-switch">
@@ -180,15 +180,13 @@
                                     onclick="toggleEdit(this)">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-success save-config-btn"
+                            <button type="button" class="btn btn-sm btn-outline-success save-config-btn d-none"
                                     data-config-id="{{ config.pk }}"
-                                    style="display:none;"
                                     onclick="saveConfig(this)">
                                 <i class="bi bi-check-lg"></i>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary cancel-config-btn"
+                            <button type="button" class="btn btn-sm btn-outline-secondary cancel-config-btn d-none"
                                     data-config-id="{{ config.pk }}"
-                                    style="display:none;"
                                     onclick="cancelEdit(this)">
                                 <i class="bi bi-x-lg"></i>
                             </button>
@@ -271,17 +269,17 @@ function toggleEdit(btn) {
     const aggregateCheckbox = row.querySelector('.edit-aggregate-checkbox');
     
     // Показать инпуты, скрыть текст
-    displayTextSpan.style.display = 'none';
-    displayTextInput.style.display = 'block';
+    displayTextSpan.classList.add('d-none');
+    displayTextInput.classList.remove('d-none');
     displayTextInput.focus();
     
-    resultCodeSpan.style.display = 'none';
-    resultCodeInput.style.display = 'block';
+    resultCodeSpan.classList.add('d-none');
+    resultCodeInput.classList.remove('d-none');
     
     // Показать кнопки сохранить/отмена, скрыть кнопку редактирования
-    btn.style.display = 'none';
-    row.querySelector('.save-config-btn').style.display = 'inline-block';
-    row.querySelector('.cancel-config-btn').style.display = 'inline-block';
+    btn.classList.add('d-none');
+    row.querySelector('.save-config-btn').classList.remove('d-none');
+    row.querySelector('.cancel-config-btn').classList.remove('d-none');
     
     // Сохраняем оригинальные значения (извлекаем из badge)
     row.dataset.originalDisplayText = displayTextSpan.textContent.trim();
@@ -306,16 +304,16 @@ function cancelEdit(btn) {
     resultCodeInput.value = row.dataset.originalResultCode;
     
     // Показать текст, скрыть инпуты
-    displayTextSpan.style.display = 'inline';
-    displayTextInput.style.display = 'none';
+    displayTextSpan.classList.remove('d-none');
+    displayTextInput.classList.add('d-none');
     
-    resultCodeSpan.style.display = 'inline';
-    resultCodeInput.style.display = 'none';
+    resultCodeSpan.classList.remove('d-none');
+    resultCodeInput.classList.add('d-none');
     
     // Показать кнопку редактирования, скрыть кнопки сохранить/отмена
-    row.querySelector('.edit-config-btn').style.display = 'inline-block';
-    row.querySelector('.save-config-btn').style.display = 'none';
-    row.querySelector('.cancel-config-btn').style.display = 'none';
+    row.querySelector('.edit-config-btn').classList.remove('d-none');
+    row.querySelector('.save-config-btn').classList.add('d-none');
+    row.querySelector('.cancel-config-btn').classList.add('d-none');
 }
 
 // Сохранение конфигурации

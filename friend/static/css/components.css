@@ -1,0 +1,454 @@
+/* ============================================================================
+   Components — карточки, таблицы, бейджи, формы, прогресс
+   ============================================================================ */
+
+/* --- Stat Cards --- */
+.stat-card {
+    border: none;
+    border-radius: var(--border-radius-2xl);
+    box-shadow: var(--card-shadow);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.stat-card .card-body {
+    padding: var(--spacing-2xl);
+}
+
+.stat-card .icon-box {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--border-radius-2xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-2xl);
+}
+
+.stat-card .icon-box.icon-sm {
+    width: 48px;
+    height: 48px;
+    font-size: var(--font-size-xl);
+}
+
+/* --- Table Cards --- */
+.table-card {
+    border: none;
+    border-radius: var(--border-radius-2xl);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.table-card .card-header {
+    background: #fff;
+    border-bottom: 1px solid var(--border-light);
+    padding: var(--spacing-xl) var(--spacing-2xl);
+}
+
+/* --- Cards --- */
+.card {
+    border-radius: var(--border-radius-xl);
+    overflow: hidden;
+}
+
+.card-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: var(--spacing-lg) var(--spacing-xl);
+}
+
+.card-body {
+    padding: var(--spacing-xl);
+}
+
+/* --- Tables --- */
+.table thead th {
+    background: #f8f9fa;
+    border-bottom: 2px solid var(--border-color);
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+}
+
+.table tbody tr {
+    transition: background 0.15s;
+}
+
+.table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.table-danger td {
+    background-color: rgba(220, 53, 69, 0.05);
+}
+
+.table-danger:hover td {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* --- Badges --- */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+}
+
+.badge-status {
+    font-size: var(--font-size-base);
+    padding: 0.4em 0.8em;
+}
+
+.badge-emergency {
+    background-color: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+}
+
+.badge-evacuation {
+    background-color: rgba(255, 193, 7, 0.15);
+    color: #ffc107;
+}
+
+.badge-shelter {
+    background-color: rgba(13, 202, 240, 0.15);
+    color: #0aaaf3;
+}
+
+.badge-all-clear {
+    background-color: rgba(25, 135, 84, 0.15);
+    color: #198754;
+}
+
+.badge-drill {
+    background-color: rgba(108, 117, 125, 0.15);
+    color: #6c757d;
+}
+
+.badge-channel-max {
+    background-color: rgba(13, 202, 240, 0.15);
+    color: #0aaaf3;
+}
+
+.badge-channel-telegram {
+    background-color: rgba(13, 110, 253, 0.15);
+    color: #0d6efd;
+}
+
+.badge-channel-email {
+    background-color: rgba(108, 117, 125, 0.15);
+    color: #6c757d;
+}
+
+/* --- Forms --- */
+.form-select-sm {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+.form-select-sm option {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.form-select-sm:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+/* --- Buttons --- */
+.btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-outline-danger:hover {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.btn-danger {
+    background-color: var(--danger-color);
+    border-color: var(--danger-color);
+}
+
+.btn-danger:hover {
+    background-color: var(--danger-hover);
+    border-color: #bd2130;
+}
+
+.btn-danger:focus,
+.btn-danger.focus {
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.5);
+}
+
+/* --- Progress --- */
+.progress {
+    height: 6px;
+    border-radius: 3px;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    transition: width 0.5s ease;
+}
+
+.send-progress {
+    height: 6px;
+    border-radius: 3px;
+}
+
+.send-progress .progress-bar {
+    transition: width 0.5s ease;
+}
+
+/* --- Message Content --- */
+.message-content {
+    font-size: var(--font-size-lg);
+    line-height: 1.7;
+    color: #212529;
+    padding: var(--spacing-lg);
+    background: #f8f9fa;
+    border-radius: var(--border-radius-lg);
+    min-height: 100px;
+}
+
+/* --- Recipients --- */
+.recipient-select {
+    min-height: 200px;
+}
+
+.recipient-select option {
+    padding: 0.5rem;
+}
+
+.recipient-select optgroup {
+    font-weight: 600;
+}
+
+/* --- Tabs --- */
+.tab-nav .btn {
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-size: var(--font-size-base);
+    transition: all var(--transition-fast);
+}
+
+.tab-nav .btn:hover {
+    transform: translateY(-1px);
+}
+
+.tab-nav .btn.active {
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
+}
+
+.nav-tabs .nav-link {
+    color: #495057;
+    font-weight: 500;
+    padding: 0.75rem 1.25rem;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.nav-tabs .nav-link:hover:not(.active) {
+    color: var(--primary-color);
+    border-bottom-color: var(--border-color);
+}
+
+/* --- Accordion --- */
+.accordion-button:not(.collapsed) {
+    background: rgba(52, 152, 219, 0.1);
+    color: #2c3e50;
+}
+
+.accordion-button {
+    font-weight: 600;
+}
+
+/* --- Empty State --- */
+.text-center.py-5 i {
+    opacity: 0.3;
+}
+
+/* --- Category & Filter --- */
+.category-card {
+    border-left: 4px solid var(--dark-active);
+    margin-bottom: 1rem;
+}
+
+.category-card.archived {
+    border-left-color: #95a5a6;
+    opacity: 0.7;
+}
+
+.subcategory-badge {
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.subcategory-badge:hover {
+    transform: scale(1.05);
+}
+
+.filter-btn.active {
+    background: var(--dark-active);
+    color: #fff;
+    border-color: var(--dark-active);
+}
+
+.sub-filter-btn.active {
+    background: var(--dark-active);
+    color: #fff;
+    border-color: var(--dark-active);
+}
+
+/* --- Filter Card --- */
+.filter-card {
+    border: none;
+    border-radius: var(--border-radius-2xl);
+    box-shadow: var(--card-shadow);
+}
+
+.filter-card .card-header {
+    background: #fff;
+    border-bottom: 1px solid var(--border-light);
+    padding: var(--spacing-lg) var(--spacing-xl);
+}
+
+.filter-group {
+    margin-bottom: 0.75rem;
+}
+
+.filter-group:last-child {
+    margin-bottom: 0;
+}
+
+.filter-group label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+    margin-bottom: 0.35rem;
+}
+
+.filter-group .form-control,
+.filter-group .form-select {
+    font-size: var(--font-size-md);
+}
+
+/* --- Widget --- */
+.widget-card {
+    border: none;
+    border-radius: var(--border-radius-2xl);
+    box-shadow: var(--card-shadow);
+    transition: box-shadow var(--transition-fast);
+}
+
+.widget-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.widget-card .card-header {
+    border-radius: var(--border-radius-2xl) var(--border-radius-2xl) 0 0 !important;
+    padding: 0.75rem 1rem;
+}
+
+.widget-card .card-header h6 {
+    margin: 0;
+    font-weight: 600;
+}
+
+.widget-value {
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.widget-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+}
+
+/* --- Emergency --- */
+.emergency-card .icon-box {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: var(--danger-color);
+}
+
+.emergency-alert-card {
+    border: 2px solid var(--danger-color) !important;
+}
+
+.emergency-alert-card .card-header {
+    background: linear-gradient(135deg, var(--danger-color) 0%, #c82333 100%);
+}
+
+@keyframes pulse-emergency {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.02); }
+}
+
+.emergency-pulse {
+    animation: pulse-emergency 2s infinite;
+}
+
+/* --- Messaging --- */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.sending-indicator {
+    animation: pulse 1.5s infinite;
+}
+
+/* --- Login Page --- */
+body.login-page {
+    background: linear-gradient(135deg, var(--dark-bg-start) 0%, var(--dark-active) 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-card {
+    max-width: 400px;
+    width: 100%;
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.login-card .card-body {
+    padding: 2.5rem;
+}
+
+.login-brand {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.login-brand i {
+    font-size: var(--font-size-3xl);
+    color: var(--primary-color);
+}
+
+.login-brand h4 {
+    margin-top: 0.5rem;
+    font-weight: 700;
+}

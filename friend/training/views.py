@@ -122,11 +122,22 @@ def training_type_list(request):
     
     types = types.order_by('-created_at')
     
+    # Count active for stats
+    active_types = TrainingType.objects.filter(is_active=True)
+    if category_id:
+        active_types = active_types.filter(category_id=category_id)
+    if query:
+        active_types = active_types.filter(
+            Q(name__icontains=query) |
+            Q(description__icontains=query)
+        )
+    
     # Get all categories for filter
     categories = TrainingCategory.objects.filter(is_active=True).order_by('name')
     
     return render(request, 'training/type_list.html', {
         'types': types,
+        'active_types_count': active_types.count(),
         'categories': categories,
         'query': query,
         'selected_category': category_id,
@@ -198,7 +209,7 @@ def training_type_create(request):
         form = TrainingTypeForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Тип обучения создан')
+            messages.success(request, 'Обучающий курс создан')
             return redirect('training:type_list')
     else:
         form = TrainingTypeForm()
@@ -213,14 +224,14 @@ def training_type_create(request):
 
 @login_required
 def training_type_edit(request, pk):
-    """Редактирование типа обучения."""
+    """Редактирование обучающего курса."""
     training_type = get_object_or_404(TrainingType, pk=pk)
     
     if request.method == 'POST':
         form = TrainingTypeForm(request.POST, instance=training_type)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Тип обучения обновлён')
+            messages.success(request, 'Обучающий курс обновлён')
             return redirect('training:type_list')
     else:
         form = TrainingTypeForm(instance=training_type)
@@ -240,7 +251,7 @@ def training_type_delete(request, pk):
     if request.method == 'POST':
         training_type.is_active = False
         training_type.save()
-        messages.success(request, 'Тип обучения удалён')
+        messages.success(request, 'Обучающий курс удалён')
         return redirect('training:type_list')
     
     return render(request, 'training/training_type_confirm_delete.html', {
@@ -894,10 +905,8 @@ def training_webhook(request):
                 user.uuid_skillspace = student_uuid
                 user.save(update_fields=['uuid_skillspace'])
                 webhook_log.info(f'Saved UUID for {user.get_full_name()}: {student_uuid}')
-            elif user.uuid_skillspace != student_uuid:
-                user.uuid_skillspace = student_uuid
-                user.save(update_fields=['uuid_skillspace'])
-                webhook_log.info(f'Updated UUID for {user.get_full_name()}: {student_uuid}')
+            else:
+                webhook_log.info(f'UUID already set for {user.get_full_name()}: {user.uuid_skillspace}')
         else:
             webhook_log.warning(f'User not found for email {student_email} (UUID: {student_uuid})')
 
@@ -905,6 +914,19 @@ def training_webhook(request):
     training = Training.objects.filter(
         training_type__skillspace_course_id=course_uuid
     ).first()
+
+    if not training and student_uuid:
+        # Fallback: find training by user's enrollments and skillspace_course_id
+        user = User.objects.filter(uuid_skillspace=student_uuid).first()
+        if user:
+            enrollments = TrainingEnrollment.objects.filter(user=user).select_related('training')
+            for enr in enrollments:
+                tt = enr.training.training_type
+                if tt.skillspace_course_id:
+                    training = enr.training
+                    course_uuid = tt.skillspace_course_id
+                    webhook_log.info(f'Fallback: found training {training.pk} via user {user.pk} enrollment')
+                    break
 
     if not training:
         webhook_log.warning(f'Training not found for course UUID {course_uuid}')
@@ -952,84 +974,73 @@ def training_webhook(request):
     webhook_log.info(f'Enrollment: {enrollment.pk} | User: {enrollment.user.get_full_name()} | Status: {enrollment.status} -> {event_name}')
 
     # Update enrollment based on event
-    if event_name in ('course-end-test',):
+    if event_name == 'course-end':
         # Course completed
+        # Save UUID to user if not present
         if student_uuid and enrollment.user and not enrollment.user.uuid_skillspace:
             enrollment.user.uuid_skillspace = student_uuid
             enrollment.user.save(update_fields=['uuid_skillspace'])
             webhook_log.info(f'Saved UUID for {enrollment.user.get_full_name()}: {student_uuid}')
-        
+        elif student_uuid and enrollment.user:
+            webhook_log.info(f'User UUID already set: {enrollment.user.uuid_skillspace}')
+
         old_status = enrollment.status
         enrollment.status = TrainingEnrollment.Status.COMPLETED
         enrollment.display_status = TrainingEnrollment.DisplayStatus.COMPLETED_SUCCESS
+        
         lesson = payload.get('lesson', {})
         if lesson and 'score' in lesson:
             enrollment.score = lesson['score']
+        
+        # Try to parse date from payload
         event_date = payload.get('date')
         if event_date:
             try:
-                enrollment.completed_at = timezone.make_aware(
-                    timezone.datetime.fromisoformat(event_date.replace('Z', '+00:00'))
-                )
-            except (ValueError, TypeError):
-                pass
-        enrollment.save(update_fields=['status', 'display_status', 'score', 'completed_at'])
-        webhook_log.info(f'Course completed for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
-
-    elif event_name in ('test-end',):
-        # Test completed - check if passed
-        test_result = payload.get('testResult', {})
-        is_passed = test_result.get('success', False)
-        lesson = payload.get('lesson', {})
-        score = lesson.get('score', 0)
-        
-        old_status = enrollment.status
-        if is_passed:
-            enrollment.status = TrainingEnrollment.Status.COMPLETED
-            enrollment.display_status = TrainingEnrollment.DisplayStatus.COMPLETED_SUCCESS
-            enrollment.score = score
-            event_date = payload.get('date')
-            if event_date:
-                try:
-                    enrollment.completed_at = timezone.make_aware(
-                        timezone.datetime.fromisoformat(event_date.replace('Z', '+00:00'))
-                    )
-                except (ValueError, TypeError):
-                    pass
+                dt = timezone.datetime.fromisoformat(event_date.replace('Z', '+00:00'))
+                # fromisoformat returns aware datetime when timezone info is present
+                if dt.tzinfo is None:
+                    dt = timezone.make_aware(dt)
+                enrollment.completed_at = dt
+                webhook_log.info(f'Parsed event date: {event_date}')
+            except (ValueError, TypeError) as e:
+                webhook_log.warning(f'Failed to parse date "{event_date}": {e}')
+                enrollment.completed_at = timezone.now()
         else:
-            enrollment.status = TrainingEnrollment.Status.FAILED
-            enrollment.display_status = TrainingEnrollment.DisplayStatus.FAILED_STATUS
-            enrollment.score = score
+            enrollment.completed_at = timezone.now()
+            webhook_log.info('No date in payload, using now')
         
         enrollment.save(update_fields=['status', 'display_status', 'score', 'completed_at'])
-        webhook_log.info(f'Test {"passed" if is_passed else "failed"} for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
+        webhook_log.info(f'Course completed for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status} | Completed at: {enrollment.completed_at}')
 
-    elif event_name in ('course-begin', 'student-homework-begin', 'student-test-begin', 
-                        'student-session-begin', 'homework-begin-test', 'test-begin-test',
-                        'session-begin-test'):
-        # Student started course/test/homework/session
+    elif event_name == 'session-begin':
+        # Session started
+        if student_uuid and enrollment.user:
+            if not enrollment.user.uuid_skillspace:
+                enrollment.user.uuid_skillspace = student_uuid
+                enrollment.user.save(update_fields=['uuid_skillspace'])
+                webhook_log.info(f'Saved UUID for {enrollment.user.get_full_name()}: {student_uuid}')
+            else:
+                webhook_log.info(f'UUID already set for {enrollment.user.get_full_name()}: {enrollment.user.uuid_skillspace}')
+        
         old_status = enrollment.status
         if enrollment.status == TrainingEnrollment.Status.NOT_STARTED:
             enrollment.status = TrainingEnrollment.Status.IN_PROGRESS
             enrollment.display_status = TrainingEnrollment.DisplayStatus.COURSE_STARTED
             enrollment.save(update_fields=['status', 'display_status'])
-            webhook_log.info(f'Student started for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
+            webhook_log.info(f'Session started for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
         else:
-            webhook_log.info(f'Student already started for {enrollment.user.get_full_name()} | Current: {enrollment.status}')
+            webhook_log.info(f'Session already started for {enrollment.user.get_full_name()} | Current: {enrollment.status}')
 
-    elif event_name in ('student-homework-end', 'homework-end-test'):
-        # Homework completed
-        homework = payload.get('homework', {})
-        auto_accept = homework.get('autoAccept', False)
-        
+    elif event_name == 'course-begin':
+        # Course started
         old_status = enrollment.status
-        if auto_accept:
-            enrollment.status = TrainingEnrollment.Status.COMPLETED
-            enrollment.display_status = TrainingEnrollment.DisplayStatus.COMPLETED_SUCCESS
+        if enrollment.status == TrainingEnrollment.Status.NOT_STARTED:
+            enrollment.status = TrainingEnrollment.Status.IN_PROGRESS
+            enrollment.display_status = TrainingEnrollment.DisplayStatus.COURSE_STARTED
             enrollment.save(update_fields=['status', 'display_status'])
-            webhook_log.info(f'Homework auto-accepted for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
+            webhook_log.info(f'Course started for {enrollment.user.get_full_name()} | Status: {old_status} -> {enrollment.status}')
         else:
-            webhook_log.info(f'Homework pending review for {enrollment.user.get_full_name()} | autoAccept={auto_accept}')
+            webhook_log.info(f'Course already started for {enrollment.user.get_full_name()} | Current: {enrollment.status}')
 
     else:
         webhook_log.info(f'Unhandled event: {event_name} for {enrollment.user.get_full_name()}')

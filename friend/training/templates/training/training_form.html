@@ -34,7 +34,7 @@
                     {% if training_type %}
                     <div class="alert alert-info">
                         <i class="bi bi-info-circle me-2"></i>
-                        Тип обучения: <strong>{{ training_type.name }}</strong>
+                        Обучающий курс: <strong>{{ training_type.name }}</strong>
                         {% if training_type.skillspace_course_id %}
                         | ID курса Skillspace: <code>{{ training_type.skillspace_course_id }}</code>
                         {% endif %}
@@ -68,8 +68,12 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i>Сохранить
                         </button>
-                        {% if training_type %}
+                        {% if training %}
                         <a href="{% url 'training:training_detail' training.pk %}" class="btn btn-secondary">
+                            <i class="bi bi-x-lg me-1"></i>Отмена
+                        </a>
+                        {% elif training_type %}
+                        <a href="{% url 'training:type_trainings' type_pk=training_type.pk %}" class="btn btn-secondary">
                             <i class="bi bi-x-lg me-1"></i>Отмена
                         </a>
                         {% else %}

@@ -12,7 +12,7 @@
     <div>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb mb-1">
-                <li class="breadcrumb-item"><a href="{% url 'training:type_list' %}">Типы обучения</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'training:type_list' %}">Обучающие курсы</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'training:type_trainings' training.training_type.pk %}">{{ training.training_type.name }}</a></li>
                 <li class="breadcrumb-item active">{{ training.title }}</li>
             </ol>
@@ -106,7 +106,7 @@
             <div class="card-body">
                 <table class="table table-sm mb-0">
                     <tr>
-                        <td class="text-muted" style="min-width: 150px;">Тип обучения:</td>
+                        <td class="text-muted" style="min-width: 150px;">Обучающий курс:</td>
                         <td>{{ training.training_type.name }}</td>
                     </tr>
                     <tr>
@@ -215,7 +215,7 @@
                                 {{ enrollment.user.get_full_name }}
                             </a>
                         </td>
-                        <td><code>{{ enrollment.user.uuid|default:"—" }}</code></td>
+                        <td><code>{{ enrollment.user.uuid_skillspace|default:"—" }}</code></td>
                         <td>{{ enrollment.user.department.name|default:"—" }}</td>
                         <td>{{ enrollment.user.corporate_email|default:enrollment.user.personal_email|default:"—" }}</td>
                         <td>

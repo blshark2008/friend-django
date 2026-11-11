@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-!84x3a%!7qt#m_vid1-o*ucy_uvb2@!rs^9p^#h#dk5elf)(qa
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '84.54.59.213', '[::1]', 'projectgame.ru', 'www.projectgame.ru']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '84.54.59.213', '[::1]', 'projectgame.ru', 'www.projectgame.ru', 'datalens.projectgame.ru']
 
 
 # Application definition
@@ -182,65 +182,32 @@ LOGGING = {
             'filename': '/tmp/django_max_bot.log',
             'formatter': 'verbose',
         },
-    },
-    'loggers': {
-        'messaging': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'scenarios': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'webhook': {
-            'handlers': ['console', 'webhook_file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'django': {
-            'handlers': ['console'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-    },
-    'loggers': {
-        'messaging': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'scenarios': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'webhook': {
-            'handlers': ['console', 'webhook_file'],
-            'level': 'INFO',
-            'propagate': False,
-        },
-        'django': {
-            'handlers': ['console'],
-            'level': 'WARNING',
-            'propagate': False,
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': '/tmp/django_max_bot.log',
-            'formatter': 'verbose',
-        },
         'webhook_file': {
             'class': 'logging.FileHandler',
             'filename': '/tmp/webhook.log',
             'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'messaging': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'scenarios': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'webhook': {
+            'handlers': ['console', 'webhook_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
         },
     },
 }

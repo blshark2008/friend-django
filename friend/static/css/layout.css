@@ -1,0 +1,101 @@
+/* ============================================================================
+   Layout — sidebar, navbar, content area
+   ============================================================================ */
+
+/* --- Body --- */
+body {
+    overflow-x: hidden;
+    background-color: var(--content-bg);
+}
+
+/* --- Sidebar --- */
+#sidebar {
+    min-width: var(--sidebar-width);
+    max-width: var(--sidebar-width);
+    min-height: 100vh;
+    transition: margin-left var(--transition-speed) ease, max-width var(--transition-speed) ease;
+    z-index: 1000;
+}
+
+#sidebar.collapsed {
+    margin-left: calc(-1 * var(--sidebar-width));
+}
+
+/* --- Content --- */
+#content {
+    width: 100%;
+    transition: margin-left var(--transition-speed) ease;
+}
+
+#content.expanded {
+    margin-left: 0;
+}
+
+/* --- Sidebar Links --- */
+.sidebar-link {
+    text-decoration: none;
+    color: #212529;
+    display: block;
+    padding: 0.4rem 1rem;
+    border-radius: var(--border-radius);
+    transition: background-color var(--transition-fast);
+}
+
+.sidebar-link:hover {
+    background-color: #e9ecef;
+}
+
+.sidebar-link.active {
+    background-color: var(--primary-color);
+    color: #fff;
+}
+
+/* --- User Avatar --- */
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--border-radius-full);
+    background-color: var(--primary-color);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: var(--font-size-base);
+    flex-shrink: 0;
+}
+
+/* --- Scrollable Sidebar --- */
+.scrollable-sidebar {
+    overflow-y: auto;
+    max-height: calc(100vh - 140px);
+}
+
+/* --- List Group Action --- */
+.list-group-item-action {
+    transition: background-color var(--transition-fast);
+}
+
+/* --- Sidebar Toggle --- */
+#sidebarToggle {
+    transition: background-color var(--transition-fast);
+}
+
+#sidebarToggle:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* --- Responsive --- */
+@media (max-width: 991.98px) {
+    #sidebar {
+        margin-left: calc(-1 * var(--sidebar-width));
+    }
+
+    #sidebar.show {
+        margin-left: 0;
+    }
+
+    #content {
+        width: 100%;
+    }
+}

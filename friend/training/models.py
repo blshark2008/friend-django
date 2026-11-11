@@ -30,12 +30,12 @@ class TrainingCategory(models.Model):
 
     @property
     def training_types_count(self):
-        """Количество типов обучения в этой категории."""
+        """Количество обучающих курсов в этой категории."""
         return self.training_types.filter(is_active=True).count()
 
 
 class TrainingType(models.Model):
-    """Тип обучения (например: «Охрана труда», «Пожарная безопасность» и т.д.)"""
+    """Обучающий курс (например: «Охрана труда», «Пожарная безопасность» и т.д.)"""
 
     category = models.ForeignKey(
         TrainingCategory, on_delete=models.SET_NULL, related_name='training_types',
@@ -52,8 +52,8 @@ class TrainingType(models.Model):
     updated_at = models.DateTimeField('Обновлён', auto_now=True)
 
     class Meta:
-        verbose_name = 'Тип обучения'
-        verbose_name_plural = 'Типы обучения'
+        verbose_name = 'Обучающий курс'
+        verbose_name_plural = 'Обучающие курсы'
         ordering = ['name']
 
     def __str__(self):
@@ -97,7 +97,7 @@ class Training(models.Model):
 
     training_type = models.ForeignKey(
         TrainingType, on_delete=models.CASCADE, related_name='trainings',
-        verbose_name='Тип обучения',
+        verbose_name='Обучающий курс',
     )
     title = models.CharField('Название', max_length=255)
     description = models.TextField('Описание', blank=True)

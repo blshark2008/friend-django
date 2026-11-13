@@ -4,6 +4,7 @@ from django.db import models
 from django.db.models import Q
 from .models import (
     Resource, AccessGroup, AccessGrant, AccessRequest, Role, RoleGroup,
+    GroupContainer, RoleGroupContainer, GroupContainerGroup,
     NetworkResourceDetail, SoftwareResourceDetail, RemoteAccessDetail,
     ServerResourceDetail, DatabaseResourceDetail, ApplicationResourceDetail,
     StorageResourceDetail, CloudResourceDetail, HardwareResourceDetail,
@@ -229,24 +230,23 @@ class AccessGroupForm(forms.ModelForm):
 
 
 class AccessGrantForm(forms.ModelForm):
-    """Форма для гранта доступа."""
+    """Форма для гранта доступа (только для пользователей)."""
 
     class Meta:
         model = AccessGrant
-        fields = ['grant_type', 'user', 'group', 'level', 'expires_at', 'justification']
+        fields = ['user', 'group', 'expires_at', 'justification']
         widgets = {
-            'grant_type': forms.Select(attrs={'class': 'form-select'}),
             'user': forms.Select(attrs={'class': 'form-select'}),
             'group': forms.Select(attrs={'class': 'form-select'}),
-            'level': forms.Select(attrs={'class': 'form-select'}),
             'expires_at': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'justification': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['user'].required = False
-        self.fields['group'].required = False
+        from django.utils import timezone
+        from datetime import timedelta
+        self.initial['expires_at'] = timezone.now().date() + timedelta(days=365)
 
 
 class AccessRequestForm(forms.ModelForm):
@@ -290,6 +290,59 @@ class RoleGroupForm(forms.ModelForm):
         if role:
             # Показываем все группы, исключая уже добавленные в эту роль
             existing_ids = role.groups.values_list('access_group_id', flat=True)
+            self.fields['access_group'].queryset = AccessGroup.objects.filter(
+                ~models.Q(pk__in=existing_ids)
+            )
+
+
+class GroupContainerForm(forms.ModelForm):
+    """Форма для контейнера групп доступа."""
+
+    class Meta:
+        model = GroupContainer
+        fields = ['name', 'description', 'is_active']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class RoleGroupContainerForm(forms.ModelForm):
+    """Форма для добавления контейнера групп в роль."""
+    class Meta:
+        model = RoleGroupContainer
+        fields = ['group_container']
+        widgets = {
+            'group_container': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        role = kwargs.pop('role', None)
+        super().__init__(*args, **kwargs)
+        if role:
+            # Показываем все контейнеры, исключая уже добавленные в эту роль
+            existing_ids = role.group_containers.values_list('group_container_id', flat=True)
+            self.fields['group_container'].queryset = GroupContainer.objects.filter(
+                ~models.Q(pk__in=existing_ids)
+            )
+
+
+class GroupContainerGroupForm(forms.ModelForm):
+    """Форма для добавления группы в контейнер."""
+    class Meta:
+        model = GroupContainerGroup
+        fields = ['access_group']
+        widgets = {
+            'access_group': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        container = kwargs.pop('container', None)
+        super().__init__(*args, **kwargs)
+        if container:
+            # Показываем все группы, исключая уже добавленные в этот контейнер
+            existing_ids = container.groups.values_list('access_group_id', flat=True)
             self.fields['access_group'].queryset = AccessGroup.objects.filter(
                 ~models.Q(pk__in=existing_ids)
             )

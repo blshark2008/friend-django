@@ -9,17 +9,18 @@ from django.views.generic import (
 from django.db import models
 from django import forms
 
-from accounts.models import Department
+from accounts.models import Department, User
 
 from .models import (
     Resource, AccessGroup, AccessGrant, AccessRequest, Role, RoleGroup,
+    GroupContainer, RoleGroupContainer, GroupContainerGroup,
     NetworkResourceDetail, SoftwareResourceDetail, RemoteAccessDetail,
     ServerResourceDetail, DatabaseResourceDetail, ApplicationResourceDetail,
     StorageResourceDetail, CloudResourceDetail, HardwareResourceDetail,
 )
 from .forms import (
     ResourceForm, AccessGroupForm, AccessGrantForm, AccessRequestForm,
-    RoleForm, RoleGroupForm,
+    RoleForm, RoleGroupForm, GroupContainerForm, RoleGroupContainerForm, GroupContainerGroupForm,
     NetworkDetailForm, SoftwareDetailForm, RemoteAccessDetailForm,
     ServerDetailForm, DatabaseDetailForm, ApplicationDetailForm,
     StorageDetailForm, CloudDetailForm, HardwareDetailForm,
@@ -29,17 +30,15 @@ from .forms import (
 def api_search_groups(request):
     """API endpoint для поиска/списка групп доступа.
     
-    Без параметра q — возвращает все не привязанные к ресурсу группы.
-    С параметром q — фильтрует по наименованию/описанию.
+    Возвращает активные группы, фильтруя по наименованию/описанию если передан q.
     """
     if request.headers.get('x-requested-with') != 'XMLHttpRequest':
         return JsonResponse({'error': 'XHR required'}, status=400)
     
     q = request.GET.get('q', '').strip()
     
-    # Базовый запрос: только не привязанные к ресурсу активные группы
+    # Базовый запрос: только активные группы
     qs = AccessGroup.objects.filter(
-        resource__isnull=True,
         is_active=True
     ).select_related('resource')
     
@@ -49,7 +48,7 @@ def api_search_groups(request):
             models.Q(name__icontains=q) | models.Q(description__icontains=q)
         )
     
-    groups = qs[:50]
+    groups = qs[:20]
     
     groups_data = []
     for group in groups:
@@ -99,6 +98,67 @@ def api_search_groups_for_role(request, role_pk):
         })
     
     return JsonResponse({'groups': groups_data})
+
+
+def api_search_containers(request):
+    """API endpoint для поиска контейнеров групп доступа."""
+    if request.headers.get('x-requested-with') != 'XMLHttpRequest':
+        return JsonResponse({'error': 'XHR required'}, status=400)
+    
+    q = request.GET.get('q', '').strip()
+    
+    qs = GroupContainer.objects.filter(is_active=True)
+    
+    if q and len(q) >= 2:
+        qs = qs.filter(
+            models.Q(name__icontains=q) | models.Q(description__icontains=q)
+        )
+    
+    containers = qs[:50]
+    
+    containers_data = []
+    for container in containers:
+        containers_data.append({
+            'id': container.pk,
+            'name': container.name,
+            'description': container.description[:100] if container.description else '',
+            'groups_count': container.groups_count,
+        })
+    
+    return JsonResponse({'containers': containers_data})
+
+
+def api_search_users(request):
+    """API endpoint для поиска пользователей."""
+    if request.headers.get('x-requested-with') != 'XMLHttpRequest':
+        return JsonResponse({'error': 'XHR required'}, status=400)
+    
+    q = request.GET.get('q', '').strip()
+    
+    qs = User.objects.filter(is_active=True)
+    
+    if q and len(q) >= 2:
+        qs = qs.filter(
+            models.Q(last_name__icontains=q)
+            | models.Q(first_name__icontains=q)
+            | models.Q(patronymic__icontains=q)
+            | models.Q(tab_number__icontains=q)
+            | models.Q(username__icontains=q),
+        )
+    
+    users = qs[:20]
+    
+    users_data = []
+    for user in users:
+        users_data.append({
+            'id': user.pk,
+            'full_name': user.get_full_name(),
+            'username': user.username,
+            'tab_number': user.tab_number or '—',
+            'department': user.department.name if user.department else '—',
+        })
+    
+    return JsonResponse({'users': users_data})
 
 
 # ============================================================================
@@ -527,48 +587,75 @@ class GrantListView(LoginRequiredMixin, ListView):
     paginate_by = 50
 
     def get_queryset(self):
-        qs = AccessGrant.objects.select_related('resource', 'user', 'group', 'granted_by').all()
+        qs = AccessGrant.objects.select_related('resource', 'user', 'group', 'granted_by').filter(grant_type='user')
         q = self.request.GET.get('q', '').strip()
-        level_filter = self.request.GET.get('level', '').strip()
-        grant_type_filter = self.request.GET.get('grant_type', '').strip()
         show_archived = self.request.GET.get('show_archived', '0') == '1'
 
         if not show_archived:
             qs = qs.filter(is_active=True)
 
-        if level_filter:
-            qs = qs.filter(level=level_filter)
-
-        if grant_type_filter:
-            qs = qs.filter(grant_type=grant_type_filter)
-
         if q:
             qs = qs.filter(
                 models.Q(resource__name__icontains=q)
                 | models.Q(user__last_name__icontains=q)
-                | models.Q(user__first_name__icontains=q)
-                | models.Q(group__name__icontains=q),
+                | models.Q(user__first_name__icontains=q),
             ).distinct()
 
         return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['grant_levels'] = AccessGrant.Level.choices
-        context['current_level'] = self.request.GET.get('level', '')
-        context['current_grant_type'] = self.request.GET.get('grant_type', '')
-        context['grants_count'] = AccessGrant.objects.filter(is_active=True).count()
+        context['grants_count'] = AccessGrant.objects.filter(grant_type='user', is_active=True).count()
         return context
 
 
 class GrantCreateView(LoginRequiredMixin, CreateView):
-    """Создание гранта доступа."""
+    """Создание гранта доступа (только для пользователей)."""
     model = AccessGrant
     form_class = AccessGrantForm
     template_name = 'access/grant_form.html'
     success_url = reverse_lazy('access:grant_list')
 
     def form_valid(self, form):
+        form.instance.grant_type = 'user'
+        group = form.cleaned_data.get('group')
+        justification = form.cleaned_data.get('justification', '')
+        
+        # Если выбрана группа — создаём гранты для всех ресурсов группы
+        if group:
+            # Находим все ресурсы, связанные с группой
+            resources = AccessGroup.objects.filter(
+                name=group.name, is_active=True
+            ).values_list('resource_id', flat=True).distinct()
+            
+            created_count = 0
+            for resource_id in resources:
+                resource = get_object_or_404(Resource, pk=resource_id)
+                # Проверяем, нет ли уже гранта для этого пользователя и ресурса
+                if not AccessGrant.objects.filter(
+                    user=form.instance.user,
+                    resource=resource,
+                    group__isnull=True,
+                ).exists():
+                    AccessGrant.objects.create(
+                        grant_type='user',
+                        user=form.instance.user,
+                        resource=resource,
+                        expires_at=form.instance.expires_at,
+                        justification=justification,
+                        granted_by=self.request.user,
+                    )
+                    created_count += 1
+            
+            if created_count:
+                messages.success(
+                    self.request,
+                    f'Грант доступа создан. Выдано доступов: {created_count}.'
+                )
+            else:
+                messages.info(self.request, 'Все доступы уже выданы.')
+            return redirect(self.success_url)
+        
         messages.success(self.request, 'Грант доступа создан.')
         return super().form_valid(form)
 
@@ -713,6 +800,31 @@ class RoleDetailView(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         return Role.objects.all()
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        role = self.get_object()
+        
+        # Прямые группы роли (через RoleGroup)
+        direct_group_ids = set(
+            role.groups.values_list('access_group_id', flat=True)
+        )
+        
+        # Группы из контейнеров роли
+        container_group_ids = set()
+        for rgc in role.group_containers.select_related('group_container'):
+            for group in rgc.group_container.groups.filter(is_active=True):
+                container_group_ids.add(group.pk)
+        
+        # Все группы роли
+        all_group_ids = direct_group_ids | container_group_ids
+        context['user_groups'] = AccessGroup.objects.filter(
+            pk__in=all_group_ids
+        ).select_related('resource').order_by('name')
+        context['direct_groups_count'] = len(direct_group_ids)
+        context['container_groups_count'] = len(container_group_ids)
+        context['total_groups_count'] = len(all_group_ids)
+        return context
+
 
 class RoleCreateView(LoginRequiredMixin, CreateView):
     """Создание роли."""
@@ -795,3 +907,169 @@ class RoleGroupDeleteView(LoginRequiredMixin, View):
             messages.success(request, 'Группа удалена из роли.')
         
         return redirect('access:role_detail', pk=role.pk)
+
+
+# ============================================================================
+# Контейнеры групп доступа
+# ============================================================================
+
+class GroupContainerListView(LoginRequiredMixin, ListView):
+    """Список контейнеров групп доступа."""
+    model = GroupContainer
+    template_name = 'access/groupcontainer_list.html'
+    context_object_name = 'containers'
+    paginate_by = 50
+
+    def get_queryset(self):
+        qs = GroupContainer.objects.all()
+        q = self.request.GET.get('q', '').strip()
+        show_archived = self.request.GET.get('show_archived', '0') == '1'
+
+        if not show_archived:
+            qs = qs.filter(is_active=True)
+
+        if q:
+            qs = qs.filter(
+                models.Q(name__icontains=q)
+                | models.Q(description__icontains=q),
+            ).distinct()
+
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['containers_count'] = GroupContainer.objects.filter(is_active=True).count()
+        return context
+
+
+class GroupContainerDetailView(LoginRequiredMixin, DetailView):
+    """Детальная страница контейнера групп доступа."""
+    model = GroupContainer
+    template_name = 'access/groupcontainer_detail.html'
+    context_object_name = 'container'
+
+    def get_queryset(self):
+        return GroupContainer.objects.all()
+
+
+class GroupContainerCreateView(LoginRequiredMixin, CreateView):
+    """Создание контейнера групп доступа."""
+    model = GroupContainer
+    form_class = GroupContainerForm
+    template_name = 'access/groupcontainer_form.html'
+    success_url = reverse_lazy('access:container_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Контейнер групп создан.')
+        return super().form_valid(form)
+
+
+class GroupContainerUpdateView(LoginRequiredMixin, UpdateView):
+    """Редактирование контейнера групп доступа."""
+    model = GroupContainer
+    form_class = GroupContainerForm
+    template_name = 'access/groupcontainer_form.html'
+    success_url = reverse_lazy('access:container_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Контейнер групп обновлён.')
+        return super().form_valid(form)
+
+
+class GroupContainerDeleteView(LoginRequiredMixin, DeleteView):
+    """Архивирование контейнера групп (soft delete)."""
+    model = GroupContainer
+    success_url = reverse_lazy('access:container_list')
+    template_name = 'access/groupcontainer_confirm_delete.html'
+
+    def delete(self, request, *args, **kwargs):
+        obj = self.get_object()
+        obj.is_active = False
+        obj.save()
+        messages.success(request, 'Контейнер групп архивирован.')
+        return redirect(self.success_url)
+
+
+class GroupContainerRestoreView(LoginRequiredMixin, View):
+    """Восстановление контейнера из архива."""
+
+    def post(self, request, *args, **kwargs):
+        obj = get_object_or_404(GroupContainer, pk=kwargs['pk'])
+        obj.is_active = True
+        obj.save()
+        messages.success(request, 'Контейнер групп восстановлен.')
+        return redirect('access:container_list')
+
+
+# ============================================================================
+# Управление контейнерами в ролях
+# ============================================================================
+
+class RoleGroupContainerAddView(LoginRequiredMixin, View):
+    """Добавление контейнера групп в роль."""
+
+    def post(self, request, *args, **kwargs):
+        role = get_object_or_404(Role, pk=kwargs['pk'])
+        container_id = request.POST.get('group_container')
+        
+        if container_id:
+            container = get_object_or_404(GroupContainer, pk=container_id)
+            # Проверяем, что контейнер ещё не добавлен
+            if not RoleGroupContainer.objects.filter(role=role, group_container=container).exists():
+                RoleGroupContainer.objects.create(role=role, group_container=container, added_by=request.user)
+                messages.success(request, 'Контейнер групп добавлен в роль.')
+            else:
+                messages.warning(request, 'Контейнер групп уже добавлен в роль.')
+        
+        return redirect('access:role_detail', pk=role.pk)
+
+
+class RoleGroupContainerDeleteView(LoginRequiredMixin, View):
+    """Удаление контейнера групп из роли."""
+
+    def post(self, request, *args, **kwargs):
+        role = get_object_or_404(Role, pk=kwargs['role_pk'])
+        container_id = request.POST.get('container_id')
+        
+        if container_id:
+            RoleGroupContainer.objects.filter(role=role, group_container_id=container_id).delete()
+            messages.success(request, 'Контейнер групп удалён из роли.')
+        
+        return redirect('access:role_detail', pk=role.pk)
+
+
+# ============================================================================
+# Управление группами в контейнерах
+# ============================================================================
+
+class GroupContainerGroupAddView(LoginRequiredMixin, View):
+    """Добавление группы в контейнер."""
+
+    def post(self, request, *args, **kwargs):
+        container = get_object_or_404(GroupContainer, pk=kwargs['pk'])
+        group_id = request.POST.get('access_group')
+        
+        if group_id:
+            group = get_object_or_404(AccessGroup, pk=group_id)
+            # Проверяем, что группа ещё не добавлена
+            if not GroupContainerGroup.objects.filter(group_container=container, access_group=group).exists():
+                GroupContainerGroup.objects.create(group_container=container, access_group=group, added_by=request.user)
+                messages.success(request, 'Группа добавлена в контейнер.')
+            else:
+                messages.warning(request, 'Группа уже добавлена в контейнер.')
+        
+        return redirect('access:container_detail', pk=container.pk)
+
+
+class GroupContainerGroupDeleteView(LoginRequiredMixin, View):
+    """Удаление группы из контейнера."""
+
+    def post(self, request, *args, **kwargs):
+        container = get_object_or_404(GroupContainer, pk=kwargs['container_pk'])
+        group_id = request.POST.get('group_id')
+        
+        if group_id:
+            GroupContainerGroup.objects.filter(group_container=container, access_group_id=group_id).delete()
+            messages.success(request, 'Группа удалена из контейнера.')
+        
+        return redirect('access:container_detail', pk=container.pk)

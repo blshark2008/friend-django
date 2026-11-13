@@ -86,6 +86,10 @@
                href="{% url 'access:role_list' %}" data-tooltip="Роли">
                 <i class="bi bi-person-badge"></i> <span>Роли</span>
             </a>
+            <a class="nav-link {% if request.resolver_match.url_name == 'container_list' %}active{% endif %}"
+               href="{% url 'access:container_list' %}" data-tooltip="Контейнеры групп">
+                <i class="bi bi-folder-symlink"></i> <span>Контейнеры групп</span>
+            </a>
         </div>
 
         <div class="sidebar-section">

@@ -29,23 +29,6 @@
                        placeholder="Поиск..." value="{{ request.GET.q|default:'' }}">
             </div>
             <div class="col-auto">
-                <select name="level" class="form-select form-select-sm">
-                    <option value="">Все уровни</option>
-                    {% for value, label in grant_levels %}
-                    <option value="{{ value }}" {% if current_level == value %}selected{% endif %}>
-                        {{ label }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-auto">
-                <select name="grant_type" class="form-select form-select-sm">
-                    <option value="">Все типы</option>
-                    <option value="user" {% if current_grant_type == 'user' %}selected{% endif %}>Пользователь</option>
-                    <option value="group" {% if current_grant_type == 'group' %}selected{% endif %}>Группа</option>
-                </select>
-            </div>
-            <div class="col-auto">
                 <div class="form-check form-switch">
                     <input type="checkbox" name="show_archived" class="form-check-input" id="showArchived"
                            {% if show_archived %}checked{% endif %}>
@@ -85,7 +68,6 @@
                         <span class="badge bg-info text-dark">{{ grant.resource.get_type_display }}</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-primary">{{ grant.get_level_display }}</span>
                         {% if grant.is_expired %}
                         <span class="badge bg-warning">Просрочен</span>
                         {% endif %}
@@ -128,7 +110,7 @@
     <ul class="pagination">
         {% if page_obj.has_previous %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.level %}&level={{ request.GET.level }}{% endif %}{% if request.GET.grant_type %}&grant_type={{ request.GET.grant_type }}{% endif %}">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
                 <i class="bi bi-chevron-left"></i>
             </a>
         </li>
@@ -138,7 +120,7 @@
         </li>
         {% if page_obj.has_next %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.level %}&level={{ request.GET.level }}{% endif %}{% if request.GET.grant_type %}&grant_type={{ request.GET.grant_type }}{% endif %}">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
                 <i class="bi bi-chevron-right"></i>
             </a>
         </li>

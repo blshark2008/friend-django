@@ -37,16 +37,16 @@ class ModelTests(TestCase):
             grant_type='user',
             user=self.user,
             resource=self.resource,
-            level=AccessGrant.Level.READ,
+            level='read',
         )
-        expected = 'Тестовый Иван → Test Resource (Чтение)'
+        expected = 'Тестовый Иван → Test Resource'
         self.assertEqual(str(grant), expected)
 
     def test_access_request_str(self):
         request = AccessRequest.objects.create(
             requester=self.user,
             resource=self.resource,
-            level=AccessGrant.Level.READ,
+            level='read',
         )
         expected = 'Тестовый Иван → Test Resource (Новая)'
         self.assertEqual(str(request), expected)

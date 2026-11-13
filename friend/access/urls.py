@@ -7,6 +7,8 @@ urlpatterns = [
     # API
     path('api/groups/search/', views.api_search_groups, name='api_search_groups'),
     path('api/roles/<int:role_pk>/groups/search/', views.api_search_groups_for_role, name='api_search_groups_for_role'),
+    path('api/containers/search/', views.api_search_containers, name='api_search_containers'),
+    path('api/users/search/', views.api_search_users, name='api_search_users'),
 
     # Ресурсы
     path('resources/', views.ResourceListView.as_view(), name='resource_list'),
@@ -43,4 +45,16 @@ urlpatterns = [
     path('roles/<int:pk>/restore/', views.RoleRestoreView.as_view(), name='role_restore'),
     path('roles/<int:pk>/groups/add/', views.RoleGroupAddView.as_view(), name='role_group_add'),
     path('roles/<int:role_pk>/groups/<int:group_id>/delete/', views.RoleGroupDeleteView.as_view(), name='role_group_delete'),
+    path('roles/<int:pk>/containers/add/', views.RoleGroupContainerAddView.as_view(), name='role_container_add'),
+    path('roles/<int:role_pk>/containers/<int:container_id>/delete/', views.RoleGroupContainerDeleteView.as_view(), name='role_container_delete'),
+
+    # Контейнеры групп доступа
+    path('containers/', views.GroupContainerListView.as_view(), name='container_list'),
+    path('containers/new/', views.GroupContainerCreateView.as_view(), name='container_create'),
+    path('containers/<int:pk>/', views.GroupContainerDetailView.as_view(), name='container_detail'),
+    path('containers/<int:pk>/edit/', views.GroupContainerUpdateView.as_view(), name='container_edit'),
+    path('containers/<int:pk>/delete/', views.GroupContainerDeleteView.as_view(), name='container_delete'),
+    path('containers/<int:pk>/restore/', views.GroupContainerRestoreView.as_view(), name='container_restore'),
+    path('containers/<int:container_pk>/groups/<int:group_id>/delete/', views.GroupContainerGroupDeleteView.as_view(), name='container_group_delete'),
+    path('containers/<int:pk>/groups/add/', views.GroupContainerGroupAddView.as_view(), name='container_group_add'),
 ]

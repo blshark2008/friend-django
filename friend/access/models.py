@@ -422,10 +422,6 @@ class AccessGroup(models.Model):
 
 class AccessGrant(models.Model):
     """Универсальный грант доступа: пользователь/группа → ресурс."""
-    class Level(models.TextChoices):
-        READ = "read", "Чтение"
-        WRITE = "write", "Запись"
-        ADMIN = "admin", "Администрирование"
 
     grant_type = models.CharField(
         'Тип гранта', max_length=10, choices=[
@@ -444,9 +440,6 @@ class AccessGrant(models.Model):
     resource = models.ForeignKey(
         Resource, on_delete=models.CASCADE, related_name='grants',
     )
-    level = models.CharField(
-        'Уровень доступа', max_length=10, choices=Level.choices,
-    )
     is_active = models.BooleanField('Активен', default=True)
     granted_at = models.DateTimeField('Выдан', auto_now_add=True)
     expires_at = models.DateField('Истекает', null=True, blank=True)
@@ -463,7 +456,7 @@ class AccessGrant(models.Model):
     class Meta:
         verbose_name = 'Грант доступа'
         verbose_name_plural = 'Гранты доступа'
-        unique_together = ['user', 'group', 'resource', 'level']
+        unique_together = ['user', 'group', 'resource']
         ordering = ['resource__name']
         constraints = [
             models.CheckConstraint(
@@ -477,7 +470,7 @@ class AccessGrant(models.Model):
 
     def __str__(self):
         who = self.user.get_full_name() if self.user else (self.group.name if self.group else '?')
-        return f'{who} → {self.resource.name} ({self.get_level_display()})'
+        return f'{who} → {self.resource.name}'
 
     @property
     def is_expired(self):
@@ -503,7 +496,7 @@ class AccessRequest(models.Model):
         User, on_delete=models.CASCADE, related_name='access_requests',
     )
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE)
-    level = models.CharField('Уровень доступа', max_length=10, choices=AccessGrant.Level.choices)
+    level = models.CharField('Уровень доступа', max_length=10)
     justification = models.TextField('Обоснование', blank=True)
     status = models.CharField(
         'Статус', max_length=10, choices=Status.choices, default=Status.NEW,
@@ -582,6 +575,10 @@ class Role(models.Model):
             access_group__is_active=True
         ).count()
 
+    @property
+    def group_containers_count(self):
+        return self.group_containers.count()
+
 
 class RoleGroup(models.Model):
     """Связь роли с группами доступа."""
@@ -605,3 +602,87 @@ class RoleGroup(models.Model):
 
     def __str__(self):
         return f'{self.role.name} → {self.access_group.name}'
+
+
+class GroupContainer(models.Model):
+    """Контейнер групп доступа.
+
+    Контейнер объединяет группы доступа по смыслу для удобства
+    управления и назначения в роли.
+    Удаление переводит контейнер в архив (soft delete).
+    """
+    name = models.CharField('Наименование', max_length=255)
+    description = models.TextField('Описание', blank=True)
+    is_active = models.BooleanField('Активен', default=True)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+
+    # Группы доступа, входящие в контейнер
+    groups = models.ManyToManyField(
+        AccessGroup, through='GroupContainerGroup', blank=True,
+        related_name='group_containers',
+    )
+
+    class Meta:
+        verbose_name = 'Контейнер групп доступа'
+        verbose_name_plural = 'Контейнеры групп доступа'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def groups_count(self):
+        return self.groups.count()
+
+    @property
+    def active_groups_count(self):
+        return self.groups.filter(is_active=True).count()
+
+
+class GroupContainerGroup(models.Model):
+    """Связь контейнера групп с группами доступа."""
+    group_container = models.ForeignKey(
+        GroupContainer, on_delete=models.CASCADE, related_name='container_groups',
+    )
+    access_group = models.ForeignKey(
+        AccessGroup, on_delete=models.CASCADE, related_name='group_container_groups',
+    )
+    added_at = models.DateTimeField('Добавлена', auto_now_add=True)
+    added_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='container_groups_added',
+    )
+
+    class Meta:
+        verbose_name = 'Группа в контейнере'
+        verbose_name_plural = 'Группы в контейнерах'
+        unique_together = ['group_container', 'access_group']
+        ordering = ['access_group__name']
+
+    def __str__(self):
+        return f'{self.group_container.name} → {self.access_group.name}'
+
+
+class RoleGroupContainer(models.Model):
+    """Связь роли с контейнерами групп доступа."""
+    role = models.ForeignKey(
+        Role, on_delete=models.CASCADE, related_name='group_containers',
+    )
+    group_container = models.ForeignKey(
+        GroupContainer, on_delete=models.CASCADE, related_name='role_group_containers',
+    )
+    added_at = models.DateTimeField('Добавлен', auto_now_add=True)
+    added_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='role_group_containers_added',
+    )
+
+    class Meta:
+        verbose_name = 'Контейнер групп в роли'
+        verbose_name_plural = 'Контейнеры групп в ролях'
+        unique_together = ['role', 'group_container']
+        ordering = ['group_container__name']
+
+    def __str__(self):
+        return f'{self.role.name} → {self.group_container.name}'

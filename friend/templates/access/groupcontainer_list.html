@@ -1,0 +1,134 @@
+{% extends "access/base.html" %}
+
+{% block title %}Контейнеры групп — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-folder-symlink me-2"></i>Контейнеры групп доступа</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:container_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Добавить контейнер
+    </a>
+    <a href="{% url 'access:group_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-collection"></i> Группы доступа
+    </a>
+    <a href="{% url 'access:role_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-person-badge"></i> Роли
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <input type="text" name="q" class="form-control form-control-sm"
+                       placeholder="Поиск..." value="{{ request.GET.q|default:'' }}">
+            </div>
+            <div class="col-auto">
+                <div class="form-check form-switch">
+                    <input type="checkbox" name="show_archived" class="form-check-input" id="showArchived"
+                           {% if show_archived %}checked{% endif %}>
+                    <label class="form-check-label" for="showArchived">Показать удалённые</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-search"></i>
+                </button>
+                <a href="{% url 'access:container_list' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Containers list -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if containers %}
+        <div class="list-group list-group-flush">
+            {% for container in containers %}
+            <div class="list-group-item list-group-item-action p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-folder-symlink text-primary"></i>
+                        <span class="fw-semibold">{{ container.name }}</span>
+                        {% if container.is_active %}
+                        <span class="badge bg-success">Активен</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Неактивен</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="text-end" style="min-width: 100px;">
+                            <small class="text-muted d-block">
+                                <i class="bi bi-collection"></i> {{ container.groups_count }} групп
+                            </small>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'access:container_detail' pk=container.pk %}" class="btn btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            {% if container.is_active %}
+                            <a href="{% url 'access:container_edit' pk=container.pk %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'access:container_delete' pk=container.pk %}" class="btn btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                            {% else %}
+                            <form method="post" action="{% url 'access:container_restore' pk=container.pk %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-success" title="Восстановить">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% if container.description %}
+                <small class="text-muted mt-1 d-block">{{ container.description|truncatewords:15 }}</small>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-folder-symlink fs-1 d-block mb-2"></i>
+            Контейнеры групп отсутствуют
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if is_paginated %}
+<div class="d-flex justify-content-center mt-4">
+    <ul class="pagination">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, val in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ val }}{% endif %}{% endfor %}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        <li class="page-item disabled">
+            <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, val in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ val }}{% endif %}{% endfor %}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

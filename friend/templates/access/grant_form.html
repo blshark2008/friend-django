@@ -13,43 +13,42 @@
             {% csrf_token %}
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label for="{{ form.grant_type.id_for_label }}" class="form-label">Тип гранта *</label>
-                    {{ form.grant_type }}
-                    {% if form.grant_type.errors %}
-                    <div class="text-danger small">{{ form.grant_type.errors }}</div>
-                    {% endif %}
-                </div>
-                <div class="col-md-6">
-                    <label for="{{ form.resource.id_for_label }}" class="form-label">Ресурс *</label>
-                    {{ form.resource }}
-                    {% if form.resource.errors %}
-                    <div class="text-danger small">{{ form.resource.errors }}</div>
-                    {% endif %}
-                </div>
-                <div class="col-md-6 user-field">
-                    <label for="{{ form.user.id_for_label }}" class="form-label">Пользователь</label>
-                    {{ form.user }}
+                    <label class="form-label">Пользователь *</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="selectedUserDisplay" placeholder="Поиск пользователя..." readonly>
+                        <input type="hidden" name="user" id="userId">
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#userSearchModal">
+                            <i class="bi bi-search"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="clearUserBtn" style="display:none;" onclick="clearUser()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted" id="userDetails"></small>
                     {% if form.user.errors %}
                     <div class="text-danger small">{{ form.user.errors }}</div>
                     {% endif %}
                 </div>
-                <div class="col-md-6 group-field">
-                    <label for="{{ form.group.id_for_label }}" class="form-label">Группа</label>
-                    {{ form.group }}
+                <div class="col-md-6">
+                    <label class="form-label">Группа доступа *</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="selectedGroupDisplay" placeholder="Поиск группы..." readonly>
+                        <input type="hidden" name="group" id="groupId">
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#groupSearchModal">
+                            <i class="bi bi-search"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="clearGroupBtn" style="display:none;" onclick="clearGroup()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted" id="groupDetails"></small>
                     {% if form.group.errors %}
                     <div class="text-danger small">{{ form.group.errors }}</div>
                     {% endif %}
                 </div>
                 <div class="col-md-6">
-                    <label for="{{ form.level.id_for_label }}" class="form-label">Уровень доступа *</label>
-                    {{ form.level }}
-                    {% if form.level.errors %}
-                    <div class="text-danger small">{{ form.level.errors }}</div>
-                    {% endif %}
-                </div>
-                <div class="col-md-6">
                     <label for="{{ form.expires_at.id_for_label }}" class="form-label">Истекает</label>
-                    <input type="date" name="expires_at" id="{{ form.expires_at.id_for_label }}" class="form-control" value="{{ form.expires_at.value|default:'' }}">
+                    {{ form.expires_at }}
                 </div>
                 <div class="col-12">
                     <label for="{{ form.justification.id_for_label }}" class="form-label">Обоснование</label>
@@ -72,28 +71,222 @@
     </div>
 </div>
 
+<!-- Modal для поиска пользователей -->
+<div class="modal fade" id="userSearchModal" tabindex="-1" aria-labelledby="userSearchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userSearchModalLabel">
+                    <i class="bi bi-people me-2"></i>Выбрать пользователя
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="userSearchInput" placeholder="Поиск по ФИО или табельному номеру...">
+                    </div>
+                    <small class="form-text text-muted">
+                        Ищется по фамилии, имени, отчеству и табельному номеру
+                    </small>
+                </div>
+                <div id="userSearchResults" class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                    <div class="text-center py-3 text-muted">
+                        <small>Введите минимум 2 символа для поиска</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для поиска групп доступа -->
+<div class="modal fade" id="groupSearchModal" tabindex="-1" aria-labelledby="groupSearchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="groupSearchModalLabel">
+                    <i class="bi bi-collection me-2"></i>Выбрать группу доступа
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="groupSearchInput" placeholder="Поиск по наименованию группы...">
+                    </div>
+                    <small class="form-text text-muted">
+                        Ищется по наименованию и описанию группы
+                    </small>
+                </div>
+                <div id="groupSearchResults" class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                    <div class="text-center py-3 text-muted">
+                        <small>Введите минимум 2 символа для поиска</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-// Показывать/скрывать поля в зависимости от типа гранта
-document.addEventListener('DOMContentLoaded', function() {
-    const grantTypeSelect = document.getElementById('{{ form.grant_type.id_for_label }}');
-    const userField = document.querySelector('.user-field');
-    const groupField = document.querySelector('.group-field');
-
-    function toggleFields() {
-        if (!grantTypeSelect) return;
-        if (grantTypeSelect.value === 'user') {
-            userField.style.display = 'block';
-            groupField.style.display = 'none';
-        } else {
-            userField.style.display = 'none';
-            groupField.style.display = 'block';
-        }
+document.addEventListener('DOMContentLoaded', function () {
+    // ===== Поиск пользователей =====
+    const userSearchInput = document.getElementById('userSearchInput');
+    const userSearchResults = document.getElementById('userSearchResults');
+    const selectedUserDisplay = document.getElementById('selectedUserDisplay');
+    const userIdInput = document.getElementById('userId');
+    const userDetails = document.getElementById('userDetails');
+    const clearUserBtn = document.getElementById('clearUserBtn');
+    let foundUsers = [];
+    
+    function searchUsers(query) {
+        const url = `/access/api/users/search/?q=${encodeURIComponent(query)}`;
+        userSearchResults.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Поиск...</div>';
+        
+        fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+            .then(response => response.json())
+            .then(data => {
+                if (data.users && data.users.length > 0) {
+                    foundUsers = data.users;
+                    renderUsers(data.users);
+                } else {
+                    userSearchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Пользователи не найдены</small></div>';
+                    foundUsers = [];
+                }
+            })
+            .catch(error => {
+                userSearchResults.innerHTML = '<div class="text-center py-3 text-danger"><small>Ошибка поиска</small></div>';
+                foundUsers = [];
+            });
     }
-
-    if (grantTypeSelect) {
-        grantTypeSelect.addEventListener('change', toggleFields);
-        toggleFields();
+    
+    function renderUsers(users) {
+        let html = '<div class="px-3 py-2 bg-light border-bottom"><small class="text-muted">Найдено: ' + users.length + '</small></div>';
+        users.forEach(user => {
+            const isSelected = userIdInput.value == user.id;
+            html += '<div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">';
+            html += '<div><strong><i class="bi bi-person me-1"></i>' + user.full_name + '</strong>';
+            html += '<br><small class="text-muted">Таб: ' + user.tab_number + ' | ' + user.department + '</small></div>';
+            html += '<div>';
+            if (isSelected) {
+                html += '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Выбран</span>';
+            } else {
+                html += '<button type="button" class="btn btn-sm btn-primary select-user-btn" data-user-id="' + user.id + '" data-user-name="' + user.full_name + '" data-user-tab="' + user.tab_number + '"><i class="bi bi-check"></i> Выбрать</button>';
+            }
+            html += '</div></div>';
+        });
+        userSearchResults.innerHTML = html;
     }
+    
+    let userTimeout = null;
+    userSearchInput.addEventListener('input', function () {
+        clearTimeout(userTimeout);
+        const query = this.value.trim();
+        if (query.length < 2) { userSearchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Введите минимум 2 символа</small></div>'; foundUsers = []; return; }
+        userTimeout = setTimeout(() => searchUsers(query), 300);
+    });
+    
+    userSearchResults.addEventListener('click', function (e) {
+        const btn = e.target.closest('.select-user-btn');
+        if (!btn) return;
+        userIdInput.value = btn.dataset.userId;
+        selectedUserDisplay.value = btn.dataset.userName + ' (Таб: ' + btn.dataset.userTab + ')';
+        userDetails.textContent = 'Табельный номер: ' + btn.dataset.userTab;
+        clearUserBtn.style.display = 'inline-block';
+        bootstrap.Modal.getInstance(document.getElementById('userSearchModal')).hide();
+        userSearchResults.innerHTML = '<div class="text-center py-3 text-success"><strong><i class="bi bi-check-circle"></i> Пользователь выбран</strong></div>';
+    });
+    
+    window.clearUser = function() {
+        userIdInput.value = ''; selectedUserDisplay.value = ''; userDetails.textContent = ''; clearUserBtn.style.display = 'none';
+    };
+    
+    document.getElementById('userSearchModal').addEventListener('show.bs.modal', function () {
+        userSearchInput.value = ''; userSearchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Введите минимум 2 символа для поиска</small></div>'; foundUsers = [];
+    });
+    
+    // ===== Поиск групп =====
+    const groupSearchInput = document.getElementById('groupSearchInput');
+    const groupSearchResults = document.getElementById('groupSearchResults');
+    const selectedGroupDisplay = document.getElementById('selectedGroupDisplay');
+    const groupIdInput = document.getElementById('groupId');
+    const groupDetails = document.getElementById('groupDetails');
+    const clearGroupBtn = document.getElementById('clearGroupBtn');
+    let foundGroups = [];
+    
+    function searchGroups(query) {
+        const url = `/access/api/groups/search/?q=${encodeURIComponent(query)}`;
+        groupSearchResults.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Поиск...</div>';
+        
+        fetch(url, { headers: {'X-Requested-With': 'XMLHttpRequest'} })
+            .then(response => response.json())
+            .then(data => {
+                if (data.groups && data.groups.length > 0) {
+                    foundGroups = data.groups;
+                    renderGroups(data.groups);
+                } else {
+                    groupSearchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Группы не найдены</small></div>';
+                    foundGroups = [];
+                }
+            })
+            .catch(error => {
+                groupSearchResults.innerHTML = '<div class="text-center py-3 text-danger"><small>Ошибка поиска</small></div>';
+                foundGroups = [];
+            });
+    }
+    
+    function renderGroups(groups) {
+        let html = '<div class="px-3 py-2 bg-light border-bottom"><small class="text-muted">Найдено: ' + groups.length + '</small></div>';
+        groups.forEach(group => {
+            const isSelected = groupIdInput.value == group.id;
+            html += '<div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">';
+            html += '<div><strong><i class="bi bi-collection me-1"></i>' + group.name + '</strong>';
+            if (group.description) html += '<br><small class="text-muted">' + group.description.substring(0, 80) + '</small>';
+            html += '</div><div>';
+            if (isSelected) {
+                html += '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Выбрана</span>';
+            } else {
+                html += '<button type="button" class="btn btn-sm btn-primary select-group-btn" data-group-id="' + group.id + '" data-group-name="' + group.name + '"><i class="bi bi-check"></i> Выбрать</button>';
+            }
+            html += '</div></div>';
+        });
+        groupSearchResults.innerHTML = html;
+    }
+    
+    let groupTimeout = null;
+    groupSearchInput.addEventListener('input', function () {
+        clearTimeout(groupTimeout);
+        const query = this.value.trim();
+        if (query.length < 2) { groupSearchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Введите минимум 2 символа</small></div>'; foundGroups = []; return; }
+        groupTimeout = setTimeout(() => searchGroups(query), 300);
+    });
+    
+    groupSearchResults.addEventListener('click', function (e) {
+        const btn = e.target.closest('.select-group-btn');
+        if (!btn) return;
+        groupIdInput.value = btn.dataset.groupId;
+        selectedGroupDisplay.value = btn.dataset.groupName;
+        clearGroupBtn.style.display = 'inline-block';
+        bootstrap.Modal.getInstance(document.getElementById('groupSearchModal')).hide();
+        groupSearchResults.innerHTML = '<div class="text-center py-3 text-success"><strong><i class="bi bi-check-circle"></i> Группа выбрана</strong></div>';
+    });
+    
+    window.clearGroup = function() {
+        groupIdInput.value = ''; selectedGroupDisplay.value = ''; groupDetails.textContent = ''; clearGroupBtn.style.display = 'none';
+    };
+    
+    document.getElementById('groupSearchModal').addEventListener('show.bs.modal', function () {
+        groupSearchInput.value = ''; groupSearchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Введите минимум 2 символа для поиска</small></div>'; foundGroups = [];
+    });
 });
 </script>
 {% endblock %}

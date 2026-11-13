@@ -1,0 +1,301 @@
+{% extends "access/base.html" %}
+
+{% block title %}{{ container.name }} — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-folder-symlink me-2"></i>{{ container.name }}</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:container_edit' pk=container.pk %}" class="btn btn-outline-secondary">
+        <i class="bi bi-pencil"></i> Редактировать
+    </a>
+    <a href="{% url 'access:container_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад к списку
+    </a>
+</div>
+
+<!-- Container details -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Информация о контейнере</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <strong>Наименование:</strong><br>
+                {{ container.name }}
+            </div>
+            <div class="col-md-6">
+                <strong>Статус:</strong><br>
+                {% if container.is_active %}
+                <span class="badge bg-success">Активен</span>
+                {% else %}
+                <span class="badge bg-secondary">Неактивен</span>
+                {% endif %}
+            </div>
+            {% if container.description %}
+            <div class="col-12">
+                <strong>Описание:</strong><br>
+                {{ container.description }}
+            </div>
+            {% endif %}
+            <div class="col-12">
+                <strong>Создан:</strong> {{ container.created_at|date:"d.m.Y H:i" }}<br>
+                <strong>Обновлён:</strong> {{ container.updated_at|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Groups in container -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-collection me-2"></i>Группы в контейнере ({{ container.groups.count }})</h6>
+        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addGroupModal">
+            <i class="bi bi-plus-lg"></i> Добавить группу
+        </button>
+    </div>
+    <div class="card-body p-0">
+        {% if container.groups.all %}
+        <div class="list-group list-group-flush">
+            {% for group in container.groups.all %}
+            <div class="list-group-item list-group-item-action px-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-collection text-primary"></i>
+                        <strong>{{ group.display_name }}</strong>
+                        {% if group.is_active %}
+                        <span class="badge bg-success ms-2">Активна</span>
+                        {% else %}
+                        <span class="badge bg-secondary ms-2">Неактивна</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <small class="text-muted">
+                            <i class="bi bi-key"></i> {{ group.grants_count }} грантов
+                        </small>
+                        <form method="post" action="{% url 'access:container_group_delete' container_pk=container.pk group_id=group.pk %}" style="display:inline;">
+                            {% csrf_token %}
+                            <input type="hidden" name="group_id" value="{{ group.pk }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить из контейнера">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% if group.description %}
+                <small class="text-muted mt-1 d-block">{{ group.description|truncatewords:10 }}</small>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-3 text-muted">
+            <small>Группы доступа не добавлены</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Roles that use this container -->
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-person-badge me-2"></i>Роли, использующие этот контейнер ({{ container.role_group_containers.count }})</h6>
+    </div>
+    <div class="card-body p-0">
+        {% if container.role_group_containers.all %}
+        <div class="list-group list-group-flush">
+            {% for rgc in container.role_group_containers.all %}
+            <div class="list-group-item list-group-item-action px-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-person-badge text-primary"></i>
+                        <strong>{{ rgc.role.name }}</strong>
+                        {% if rgc.role.is_active %}
+                        <span class="badge bg-success ms-2">Активна</span>
+                        {% else %}
+                        <span class="badge bg-secondary ms-2">Неактивна</span>
+                        {% endif %}
+                    </div>
+                    <small class="text-muted">
+                        <i class="bi bi-collection"></i> {{ rgc.role.groups_count }} групп
+                    </small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-3 text-muted">
+            <small>Контейнер не добавлен ни в одну роль</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal для поиска и добавления групп -->
+<div class="modal fade" id="addGroupModal" tabindex="-1" aria-labelledby="addGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addGroupModalLabel">
+                    <i class="bi bi-collection me-2"></i>Добавить группу в контейнер «{{ container.name }}»
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Поиск -->
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="groupSearchInput" placeholder="Поиск по наименованию группы или ресурса...">
+                    </div>
+                    <small class="form-text text-muted">
+                        Ищется по наименованию группы и описанию
+                    </small>
+                </div>
+                
+                <!-- Результаты поиска -->
+                <div id="groupSearchResults" class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                    <div class="text-center py-3 text-muted">
+                        <small>Введите минимум 2 символа для поиска</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('groupSearchInput');
+    const searchResults = document.getElementById('groupSearchResults');
+    const containerPk = {{ container.pk }};
+    
+    let foundGroups = [];
+    let addedGroupIds = [];
+    
+    function searchGroups(query) {
+        const url = `/access/api/groups/search/?q=${encodeURIComponent(query)}`;
+        searchResults.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Поиск...</div>';
+        
+        fetch(url, {
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.groups && data.groups.length > 0) {
+                    foundGroups = data.groups;
+                    renderGroups(data.groups);
+                } else {
+                    searchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Группы не найдены</small></div>';
+                    foundGroups = [];
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                searchResults.innerHTML = '<div class="text-center py-3 text-danger"><small>Ошибка поиска</small></div>';
+                foundGroups = [];
+            });
+    }
+    
+    function renderGroups(groups) {
+        let html = '<div class="px-3 py-2 bg-light border-bottom"><small class="text-muted">Найдено: ' + groups.length + ' групп</small></div>';
+        
+        groups.forEach(group => {
+            const isAdded = addedGroupIds.includes(group.id);
+            html += '<div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">';
+            html += '<div>';
+            html += '<strong>' + group.name + '</strong>';
+            if (group.description) {
+                html += '<br><small class="text-muted">' + group.description.substring(0, 100) + '</small>';
+            }
+            html += '</div>';
+            html += '<div>';
+            if (isAdded) {
+                html += '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Добавлена</span>';
+            } else {
+                html += '<button type="button" class="btn btn-sm btn-primary add-btn" data-group-id="' + group.id + '" data-group-name="' + group.name + '">';
+                html += '<i class="bi bi-plus-lg"></i> Добавить';
+                html += '</button>';
+            }
+            html += '</div>';
+            html += '</div>';
+        });
+        
+        searchResults.innerHTML = html;
+    }
+    
+    let searchTimeout = null;
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            searchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Введите минимум 2 символа</small></div>';
+            foundGroups = [];
+            return;
+        }
+        
+        searchTimeout = setTimeout(() => {
+            searchGroups(query);
+        }, 300);
+    });
+    
+    searchResults.addEventListener('click', function (e) {
+        const btn = e.target.closest('.add-btn');
+        if (!btn) return;
+        
+        const groupId = parseInt(btn.dataset.groupId);
+        const groupName = btn.dataset.groupName;
+        
+        addedGroupIds.push(groupId);
+        btn.outerHTML = '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Добавлена</span>';
+        
+        addGroupToContainer(groupId, groupName);
+    });
+    
+    function addGroupToContainer(groupId, groupName) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/access/containers/${containerPk}/groups/add/`;
+        
+        const csrfToken = document.createElement('input');
+        csrfToken.name = 'csrfmiddlewaretoken';
+        csrfToken.type = 'hidden';
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') {
+                csrfToken.value = value;
+                break;
+            }
+        }
+        form.appendChild(csrfToken);
+        
+        const groupInput = document.createElement('input');
+        groupInput.name = 'access_group';
+        groupInput.value = groupId;
+        form.appendChild(groupInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+    
+    const addModal = document.getElementById('addGroupModal');
+    if (addModal) {
+        addModal.addEventListener('show.bs.modal', function () {
+            searchInput.value = '';
+            searchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Введите минимум 2 символа для поиска</small></div>';
+            foundGroups = [];
+            addedGroupIds = [];
+        });
+    }
+});
+</script>
+{% endblock %}

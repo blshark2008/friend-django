@@ -85,8 +85,132 @@
     overflow-y: auto;
 }
 
+.search-results-xl {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
 .min-h-40 {
     min-height: 40px !important;
+}
+
+/* --- Avatar Circles --- */
+.avatar-circle {
+    width: 32px;
+    height: 32px;
+}
+
+.avatar-circle-lg {
+    width: 64px;
+    height: 64px;
+}
+
+/* --- Close Button Small --- */
+.btn-close-sm {
+    font-size: 0.5rem !important;
+}
+
+/* --- Width Percent --- */
+.w-40p {
+    width: 40% !important;
+}
+
+/* --- Label Cells in Detail Tables --- */
+.detail-label {
+    width: 40%;
+}
+
+/* --- Cursor --- */
+.cursor-pointer {
+    cursor: pointer !important;
+}
+
+/* --- Modal Backdrop --- */
+.modal-backdrop-show {
+    display: block !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* --- Modal Indent --- */
+.modal-indent-12 {
+    padding-left: 12px !important;
+}
+
+.modal-indent-36 {
+    padding-left: 36px !important;
+}
+
+/* --- Spacer --- */
+.spacer-24 {
+    width: 24px !important;
+}
+
+/* --- Font Size Small --- */
+.fs-sm-text {
+    font-size: 0.85rem !important;
+}
+
+/* --- Progress Height --- */
+.progress-sm {
+    height: 6px !important;
+}
+
+/* --- Select Width --- */
+.select-w-160 {
+    width: 160px !important;
+}
+
+.select-w-200 {
+    width: 200px !important;
+}
+
+/* --- Table Header Width --- */
+.th-w-200 {
+    width: 200px !important;
+}
+
+.th-w-120 {
+    width: 120px !important;
+}
+
+.th-w-100 {
+    width: 100px !important;
+}
+
+.th-w-60 {
+    width: 60px !important;
+}
+
+.th-w-140 {
+    width: 140px !important;
+}
+
+.th-w-150 {
+    width: 150px !important;
+}
+
+.th-min-150 {
+    min-width: 150px !important;
+}
+
+/* --- Auto Width Select --- */
+.select-auto {
+    width: auto !important;
+}
+
+/* --- Tiny Dot --- */
+.tiny-dot {
+    font-size: 6px !important;
+}
+
+/* --- Text Muted Color --- */
+.text-muted-light {
+    color: #dee2e6 !important;
+}
+
+/* --- File Input --- */
+.file-input-sm {
+    max-width: 400px !important;
 }
 
 /* --- JSON Editor --- */

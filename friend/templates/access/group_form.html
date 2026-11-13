@@ -1,0 +1,276 @@
+{% extends "access/base.html" %}
+
+{% block title %}{% if form.instance.pk %}Редактирование{% else %}Создание{% endif %} группы — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0">
+    <i class="bi bi-{% if form.instance.pk %}pencil{% else %}plus-lg{% endif %} me-2"></i>
+    {% if form.instance.pk %}Редактирование группы{% else %}Новая группа{% endif %}
+</h4>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="post" id="accessGroupForm">
+            {% csrf_token %}
+            <div class="row g-3">
+                <!-- Компоненты наименования -->
+                <div class="col-12">
+                    <h6 class="border-bottom pb-2">
+                        <i class="bi bi-hash me-1"></i>Компоненты наименования
+                        <small class="text-muted fw-normal">(формируется автоматически)</small>
+                    </h6>
+                </div>
+
+                <!-- Тип ресурса (префикс) -->
+                <div class="col-md-3">
+                    <label for="{{ form.type_prefix.id_for_label }}" class="form-label">Тип ресурса *</label>
+                    {{ form.type_prefix }}
+                    <small class="form-text text-muted">
+                        Префикс: fs, app, db, srv, ctr, net, hvac, adm, mon, bck, sci, med, prc, hr, prj, edu
+                    </small>
+                    {% if form.type_prefix.errors %}
+                    <div class="text-danger small">{{ form.type_prefix.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Ресурс -->
+                <div class="col-md-3">
+                    <label for="{{ form.resource_name.id_for_label }}" class="form-label">Ресурс</label>
+                    {{ form.resource_name }}
+                    <small class="form-text text-muted">Идентификатор ресурса</small>
+                    {% if form.resource_name.errors %}
+                    <div class="text-danger small">{{ form.resource_name.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Область -->
+                <div class="col-md-3">
+                    <label for="{{ form.area.id_for_label }}" class="form-label">Область</label>
+                    {{ form.area }}
+                    <small class="form-text text-muted">Подразделение / среда</small>
+                    {% if form.area.errors %}
+                    <div class="text-danger small">{{ form.area.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Уровень доступа -->
+                <div class="col-md-3">
+                    <label for="{{ form.access_level.id_for_label }}" class="form-label">Уровень доступа</label>
+                    {{ form.access_level }}
+                    <small class="form-text text-muted" id="levelHelp">
+                        Зависит от типа ресурса
+                    </small>
+                    {% if form.access_level.errors %}
+                    <div class="text-danger small">{{ form.access_level.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Сгенерированное наименование -->
+                <div class="col-md-6">
+                    <label for="id_name_generated" class="form-label">Новое наименование</label>
+                    <input type="text" class="form-control" id="id_name_generated" readonly
+                           value="{% if form.instance.name %}{{ form.instance.name }}{% endif %}"
+                           name="_generated_name">
+                    <small class="form-text text-muted">
+                        Формат: &lt;ТИП&gt;-&lt;РЕСУРС&gt;-&lt;ОБЛАСТЬ&gt;-&lt;УРОВЕНЬ&gt;
+                    </small>
+                </div>
+
+                <!-- Привязка к ресурсу -->
+                <div class="col-md-6">
+                    <label for="{{ form.resource.id_for_label }}" class="form-label">Привязка к ресурсу</label>
+                    {{ form.resource }}
+                    <small class="form-text text-muted">
+                        Группа будет привязана к выбранному ресурсу
+                    </small>
+                    {% if form.resource.errors %}
+                    <div class="text-danger small">{{ form.resource.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Старое наименование -->
+                <div class="col-md-6">
+                    <label for="{{ form.old_name.id_for_label }}" class="form-label">Старое наименование</label>
+                    {{ form.old_name }}
+                    <small class="form-text text-muted">
+                        Прежнее наименование (сохраняется для справки)
+                    </small>
+                    {% if form.old_name.errors %}
+                    <div class="text-danger small">{{ form.old_name.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="col-12">
+                    <hr>
+                </div>
+
+                <!-- Описание -->
+                <div class="col-12">
+                    <label for="{{ form.description.id_for_label }}" class="form-label">Описание</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}
+                    <div class="text-danger small">{{ form.description.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- DN группы AD -->
+                <div class="col-md-6">
+                    <label for="{{ form.ad_group_dn.id_for_label }}" class="form-label">DN группы AD</label>
+                    {{ form.ad_group_dn }}
+                    <small class="form-text text-muted">Distinguished Name группы в Active Directory</small>
+                    {% if form.ad_group_dn.errors %}
+                    <div class="text-danger small">{{ form.ad_group_dn.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Синхронизация с AD -->
+                <div class="col-md-6">
+                    <div class="form-check form-switch mt-4">
+                        {{ form.ad_sync_enabled }}
+                        <label class="form-check-label" for="{{ form.ad_sync_enabled.id_for_label }}">
+                            Синхронизация с AD
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Закреплённое подразделение -->
+                <div class="col-md-6">
+                    <label for="{{ form.pinned_department.id_for_label }}" class="form-label">Закреплённое подразделение</label>
+                    {{ form.pinned_department }}
+                    <small class="form-text text-muted">Подразделение, закреплённое за этой группой доступа</small>
+                    {% if form.pinned_department.errors %}
+                    <div class="text-danger small">{{ form.pinned_department.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Активна -->
+                <div class="col-md-6">
+                    <div class="form-check form-switch mt-4">
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                            Активна
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Аудит -->
+                <div class="col-md-6">
+                    <div class="form-check form-switch mt-4">
+                        {{ form.audited }}
+                        <label class="form-check-label" for="{{ form.audited.id_for_label }}">
+                            Проведён аудит
+                        </label>
+                    </div>
+                    {% if form.instance.pk and form.instance.audited_at %}
+                    <small class="text-muted">
+                        <i class="bi bi-calendar3"></i> Дата аудита: {{ form.instance.audited_at|date:"d.m.Y H:i" }}
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+            <hr>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Сохранить
+                </button>
+                <a href="{% url 'access:group_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var typePrefix = document.getElementById('{{ form.type_prefix.id_for_label }}');
+    var resourceName = document.getElementById('{{ form.resource_name.id_for_label }}');
+    var area = document.getElementById('{{ form.area.id_for_label }}');
+    var accessLevel = document.getElementById('{{ form.access_level.id_for_label }}');
+    var generatedName = document.getElementById('id_name_generated');
+
+    var levelHelp = document.getElementById('levelHelp');
+
+    // Mapping: prefix -> available levels
+    var LEVELS_MAP = {
+        'fs':  ['ro', 'rw', 'adm'],
+        'app': ['view', 'edit', 'admin', 'user', 'approver'],
+        'db':  ['ro', 'rw', 'ddl', 'admin'],
+        'srv': ['user', 'ops', 'sudo', 'root'],
+        'ctr': ['ops', 'build', 'admin'],
+        'net': ['user', 'admin', 'guest'],
+        'hvac':['access', 'admin'],
+        'adm': ['admin', 'auditor'],
+        'mon': ['view', 'ops', 'admin'],
+        'bck': ['ops', 'restore', 'admin'],
+        'sci': ['user', 'queue', 'admin'],
+        'med': ['user', 'operator', 'view', 'admin'],
+        'prc': ['user', 'approver', 'admin'],
+        'hr':  ['user', 'hr', 'admin'],
+        'prj': ['ro', 'rw', 'lead'],
+        'edu': ['student', 'teacher', 'admin'],
+    };
+
+    function updateLevelChoices() {
+        var prefix = typePrefix.value.trim();
+        var levels = LEVELS_MAP[prefix] || [];
+        var currentValue = accessLevel.value;
+
+        // Сохраняем текущий выбор
+        accessLevel.innerHTML = '';
+
+        if (levels.length === 0) {
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '— выберите уровень —';
+            accessLevel.appendChild(opt);
+            if (levelHelp) levelHelp.textContent = 'Сначала выберите тип ресурса';
+        } else {
+            var placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = '— выберите уровень —';
+            accessLevel.appendChild(placeholder);
+
+            levels.forEach(function (level) {
+                var opt = document.createElement('option');
+                opt.value = level;
+                opt.textContent = level;
+                if (level === currentValue) opt.selected = true;
+                accessLevel.appendChild(opt);
+            });
+            if (levelHelp) levelHelp.textContent = 'Допустимые уровни для выбранного типа';
+        }
+    }
+
+    function generateName() {
+        var parts = [];
+        var t = typePrefix.value.trim();
+        var r = resourceName.value.trim();
+        var a = area.value.trim();
+        var l = accessLevel.value.trim();
+
+        if (t) parts.push(t);
+        if (r) parts.push(r);
+        if (a) parts.push(a);
+        if (l) parts.push(l);
+
+        generatedName.value = parts.join('-');
+    }
+
+    // Слушаем изменения компонентов
+    if (typePrefix) typePrefix.addEventListener('change', function () {
+        updateLevelChoices();
+        generateName();
+    });
+    if (resourceName) resourceName.addEventListener('input', generateName);
+    if (area) area.addEventListener('input', generateName);
+    if (accessLevel) accessLevel.addEventListener('change', generateName);
+
+    // Инициализация при загрузке
+    updateLevelChoices();
+    generateName();
+});
+</script>
+{% endblock %}

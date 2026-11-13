@@ -1,0 +1,245 @@
+{% extends "access/base.html" %}
+
+{% block title %}{{ resource.name }} — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-hdd-stack me-2"></i>{{ resource.name }}</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:resource_edit' pk=resource.pk %}" class="btn btn-outline-secondary">
+        <i class="bi bi-pencil"></i> Редактировать
+    </a>
+    <a href="{% url 'access:group_create' %}?resource={{ resource.pk }}" class="btn btn-outline-success">
+        <i class="bi bi-plus-lg"></i> Привязать группу
+    </a>
+    <a href="{% url 'access:request_create' %}?resource={{ resource.pk }}" class="btn btn-outline-info">
+        <i class="bi bi-inbox"></i> Заявка на доступ
+    </a>
+    <a href="{% url 'access:resource_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад к списку
+    </a>
+</div>
+
+<!-- Resource details -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Информация о ресурсе</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <strong>Наименование:</strong><br>
+                {{ resource.name }}
+            </div>
+            <div class="col-md-6">
+                <strong>Тип:</strong><br>
+                <span class="badge bg-info text-dark">{{ resource.get_type_display }}</span>
+            </div>
+            <div class="col-md-4">
+                <strong>Статус:</strong><br>
+                {% if resource.is_active %}
+                <span class="badge bg-success">Активен</span>
+                {% else %}
+                <span class="badge bg-secondary">Неактивен</span>
+                {% endif %}
+            </div>
+            {% if resource.owner %}
+            <div class="col-md-4">
+                <strong>Ответственное подразделение:</strong><br>
+                {{ resource.owner.name }}
+            </div>
+            {% endif %}
+            {% if resource.cost_center %}
+            <div class="col-md-4">
+                <strong>Центр затрат:</strong><br>
+                {{ resource.cost_center }}
+            </div>
+            {% endif %}
+            {% if resource.description %}
+            <div class="col-12">
+                <strong>Описание:</strong><br>
+                {{ resource.description }}
+            </div>
+            {% endif %}
+            <div class="col-12">
+                <strong>Создан:</strong> {{ resource.created_at|date:"d.m.Y H:i" }}<br>
+                <strong>Обновлён:</strong> {{ resource.updated_at|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detail-specific info -->
+{% if resource.detail %}
+<div class="card shadow-sm mb-3">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-gear me-2"></i>Детали ресурса</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% if resource.detail.host %}
+            <div class="col-md-6">
+                <strong>Хост / IP:</strong><br>
+                {{ resource.detail.host }}{% if resource.detail.port %}:{{ resource.detail.port }}{% endif %}
+            </div>
+            {% endif %}
+            {% if resource.detail.vendor %}
+            <div class="col-md-6">
+                <strong>Вендор:</strong><br>
+                {{ resource.detail.vendor }}
+            </div>
+            {% endif %}
+            {% if resource.detail.version %}
+            <div class="col-md-4">
+                <strong>Версия:</strong><br>
+                {{ resource.detail.version }}
+            </div>
+            {% endif %}
+            {% if resource.detail.license_count %}
+            <div class="col-md-4">
+                <strong>Лицензии:</strong><br>
+                {{ resource.detail.license_count }}
+            </div>
+            {% endif %}
+            {% if resource.detail.gateway %}
+            <div class="col-md-6">
+                <strong>Шлюз:</strong><br>
+                {{ resource.detail.protocol }}://{{ resource.detail.gateway }}{% if resource.detail.port %}:{{ resource.detail.port }}{% endif %}
+            </div>
+            {% endif %}
+            {% if resource.detail.hostname %}
+            <div class="col-md-6">
+                <strong>Hostname:</strong><br>
+                {{ resource.detail.hostname }}
+            </div>
+            {% endif %}
+            {% if resource.detail.database_name %}
+            <div class="col-md-6">
+                <strong>База данных:</strong><br>
+                {{ resource.detail.database_name }}@{{ resource.detail.host }}:{{ resource.detail.port }}
+            </div>
+            {% endif %}
+            {% if resource.detail.url %}
+            <div class="col-md-6">
+                <strong>URL:</strong><br>
+                <a href="{{ resource.detail.url }}" target="_blank">{{ resource.detail.url }}</a>
+            </div>
+            {% endif %}
+            {% if resource.detail.capacity_gb %}
+            <div class="col-md-4">
+                <strong>Ёмкость:</strong><br>
+                {{ resource.detail.capacity_gb }} ГБ (использовано: {{ resource.detail.used_gb }} ГБ)
+            </div>
+            {% endif %}
+            {% if resource.detail.provider %}
+            <div class="col-md-4">
+                <strong>Провайдер:</strong><br>
+                {{ resource.detail.provider }}{% if resource.detail.region %} ({{ resource.detail.region }}){% endif %}
+            </div>
+            {% endif %}
+            {% if resource.detail.serial_number %}
+            <div class="col-md-4">
+                <strong>Серийный номер:</strong><br>
+                {{ resource.detail.serial_number }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Attached Groups -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-collection me-2"></i>Привязанные группы доступа ({{ resource.access_groups.count }})</h6>
+    </div>
+    <div class="card-body p-0">
+        {% if resource.access_groups.all %}
+        <div class="list-group list-group-flush">
+            {% for group in resource.access_groups.all %}
+            <div class="list-group-item list-group-item-action px-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-collection text-primary"></i>
+                        <strong>{{ group.display_name }}</strong>
+                        {% if group.audited %}
+                        <span class="badge bg-info ms-2">
+                            <i class="bi bi-check2-circle"></i> Аудит
+                        </span>
+                        {% endif %}
+                        {% if group.is_active %}
+                        <span class="badge bg-success ms-2">Активна</span>
+                        {% else %}
+                        <span class="badge bg-secondary ms-2">Неактивна</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <small class="text-muted">
+                            <i class="bi bi-key"></i> {{ group.grants_count }} грантов
+                        </small>
+                        <a href="{% url 'access:group_edit' pk=group.pk %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </div>
+                </div>
+                {% if group.description %}
+                <small class="text-muted mt-1 d-block">{{ group.description|truncatewords:10 }}</small>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-3 text-muted">
+            <small>Группы доступа не привязаны</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Grants -->
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-key me-2"></i>Гранты доступа ({{ resource.grants.count }})</h6>
+    </div>
+    <div class="card-body p-0">
+        {% if resource.grants.all %}
+        <div class="list-group list-group-flush">
+            {% for grant in resource.grants.all %}
+            <div class="list-group-item list-group-item-action px-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        {% if grant.user %}
+                        <i class="bi bi-person text-primary"></i>
+                        <strong>{{ grant.user.get_full_name|default:grant.user.username }}</strong>
+                        {% else %}
+                        <i class="bi bi-collection text-primary"></i>
+                        <strong>{{ grant.group.name }}</strong>
+                        {% endif %}
+                        {% if grant.granted_by %}
+                        <small class="text-muted ms-2">(через {{ grant.granted_by.get_full_name }})</small>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary">{{ grant.get_level_display }}</span>
+                        {% if grant.is_expired %}
+                        <span class="badge bg-warning">Просрочен</span>
+                        {% endif %}
+                        {% if grant.is_revoked %}
+                        <span class="badge bg-danger">Отозван</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-3 text-muted">
+            <small>Гранты доступа не назначены</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

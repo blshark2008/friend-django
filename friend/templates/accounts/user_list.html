@@ -166,14 +166,14 @@
                         <td class="text-nowrap">
                             {% if not user.is_admin %}
                                 {% if user.archive_status != user.STATUS_ARCHIVED %}
-                                <form method="post" action="{% url 'accounts:archive_user' user.pk %}" style="display:inline;" onsubmit="return confirm('Отправить в архив?')">
+                                <form method="post" action="{% url 'accounts:archive_user' user.pk %}" class="d-inline" onsubmit="return confirm('Отправить в архив?')">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-outline-warning" title="В архив">
                                         <i class="bi bi-archive"></i>
                                     </button>
                                 </form>
                                 {% else %}
-                                <form method="post" action="{% url 'accounts:restore_user' user.pk %}" style="display:inline;" onsubmit="return confirm('Восстановить?')">
+                                <form method="post" action="{% url 'accounts:restore_user' user.pk %}" class="d-inline" onsubmit="return confirm('Восстановить?')">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-outline-success" title="Восстановить">
                                         <i class="bi bi-arrow-counterclockwise"></i>
@@ -270,7 +270,7 @@
 
 <!-- Import Result Modal -->
 {% if import_result %}
-<div class="modal fade show" id="resultModal" tabindex="-1" style="display:block; background: rgba(0,0,0,0.5);">
+<div class="modal fade show" id="resultModal" tabindex="-1" class="modal-backdrop-show" style="background: rgba(0,0,0,0.5);">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">

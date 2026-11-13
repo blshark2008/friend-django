@@ -44,6 +44,8 @@ INSTALLED_APPS = [
     'training',
     'messaging',
     'scenarios',
+    'access',
+    'logging_app',
 ]
 
 MIDDLEWARE = [

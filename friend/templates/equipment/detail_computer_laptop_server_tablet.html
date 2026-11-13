@@ -62,7 +62,7 @@
             <div class="card-header"><h6 class="mb-0">Основная информация</h6></div>
             <div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" style="width:40%">Инв. номер</td><td><strong>{{ instance.inventory_number|default:"—" }}</strong></td></tr>
+                    <tr><td class="text-muted" class="detail-label">Инв. номер</td><td><strong>{{ instance.inventory_number|default:"—" }}</strong></td></tr>
                     <tr><td class="text-muted">Серийный номер</td><td>{{ instance.serial_number|default:"—" }}</td></tr>
                     <tr><td class="text-muted">Название</td><td>{{ instance.name|default:"—" }}</td></tr>
                     <tr><td class="text-muted">Бренд</td><td>{{ instance.brand|default:"—" }}</td></tr>
@@ -78,7 +78,7 @@
             <div class="card-header"><h6 class="mb-0">Аппаратное обеспечение</h6></div>
             <div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" style="width:40%">Процессор</td><td>{{ instance.cpu|default:"—" }}</td></tr>
+                    <tr><td class="text-muted" class="detail-label">Процессор</td><td>{{ instance.cpu|default:"—" }}</td></tr>
                     <tr><td class="text-muted">ОЗУ</td><td>{{ instance.ram_gb|default:"—" }} ГБ</td></tr>
                     <tr><td class="text-muted">Диск</td><td>{{ instance.storage_gb|default:"—" }} ГБ</td></tr>
                     <tr><td class="text-muted">Диагональ экрана</td><td>{{ instance.screen_size|default:"—" }}</td></tr>
@@ -93,7 +93,7 @@
             <div class="card-header"><h6 class="mb-0">Программное обеспечение</h6></div>
             <div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" style="width:40%">ОС</td><td>{{ instance.os|default:"—" }}</td></tr>
+                    <tr><td class="text-muted" class="detail-label">ОС</td><td>{{ instance.os|default:"—" }}</td></tr>
                     <tr><td class="text-muted">Версия ОС</td><td>{{ instance.os_version|default:"—" }}</td></tr>
                     <tr><td class="text-muted">Антивирус</td><td>{{ instance.antivirus_engine|default:"—" }}</td></tr>
                 </table>
@@ -107,7 +107,7 @@
             <div class="card-header"><h6 class="mb-0">Сетевая информация</h6></div>
             <div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" style="width:40%">Имя в сети</td><td><strong>{{ instance.hostname|default:"—" }}</strong></td></tr>
+                    <tr><td class="text-muted" class="detail-label">Имя в сети</td><td><strong>{{ instance.hostname|default:"—" }}</strong></td></tr>
                     <tr><td class="text-muted">IP-адрес</td><td><code>{{ instance.ip_address|default:"—" }}</code></td></tr>
                     <tr><td class="text-muted">MAC-адрес</td><td><code>{{ instance.mac_address|default:"—" }}</code></td></tr>
                 </table>
@@ -121,7 +121,7 @@
             <div class="card-header"><h6 class="mb-0">Расположение</h6></div>
             <div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" style="width:40%">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
+                    <tr><td class="text-muted" class="detail-label">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
                     <tr><td class="text-muted">Место</td><td>{{ instance.place|default:"—" }}</td></tr>
                 </table>
             </div>
@@ -135,7 +135,7 @@
             <div class="card-body">
                 <table class="table table-sm mb-0">
                     <tr>
-                        <td class="text-muted" style="width:40%">Активен</td>
+                        <td class="text-muted" class="detail-label">Активен</td>
                         <td>
                             {% if instance.is_active %}
                             <span class="badge bg-success">Да</span>
@@ -189,7 +189,7 @@
             <div class="card-body">
                 <table class="table table-sm mb-0">
                     <tr>
-                        <td class="text-muted" style="width:40%">ФИО</td>
+                        <td class="text-muted" class="detail-label">ФИО</td>
                         <td>
                             {% if instance.assigned_user %}
                             <strong>{{ instance.assigned_user.last_name }} {{ instance.assigned_user.first_name }} {{ instance.assigned_user.patronymic|default:"—" }}</strong>
@@ -237,7 +237,7 @@
             <div class="card-body">
                 <table class="table table-sm mb-0">
                     <tr>
-                        <td class="text-muted" style="width:40%">ФИО</td>
+                        <td class="text-muted" class="detail-label">ФИО</td>
                         <td>
                             {% if instance.responsible_user %}
                             <strong>{{ instance.responsible_user.last_name }} {{ instance.responsible_user.first_name }} {{ instance.responsible_user.patronymic|default:"—" }}</strong>

@@ -1,0 +1,351 @@
+{% extends "access/base.html" %}
+
+{% block title %}{% if form.instance.pk %}Редактирование{% else %}Создание{% endif %} ресурса — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0">
+    <i class="bi bi-{% if form.instance.pk %}pencil{% else %}plus-lg{% endif %} me-2"></i>
+    {% if form.instance.pk %}Редактирование ресурса{% else %}Новый ресурс{% endif %}
+</h4>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.name.id_for_label }}" class="form-label">Наименование *</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                    <div class="text-danger small">{{ form.name.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.type.id_for_label }}" class="form-label">Тип ресурса *</label>
+                    {{ form.type }}
+                    {% if form.type.errors %}
+                    <div class="text-danger small">{{ form.type.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-12">
+                    <label for="{{ form.description.id_for_label }}" class="form-label">Описание</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}
+                    <div class="text-danger small">{{ form.description.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.owner.id_for_label }}" class="form-label">Ответственное подразделение</label>
+                    {{ form.owner }}
+                    {% if form.owner.errors %}
+                    <div class="text-danger small">{{ form.owner.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.last_audit_date.id_for_label }}" class="form-label">Дата последней актуализации</label>
+                    {{ form.last_audit_date }}
+                    {% if form.last_audit_date.errors %}
+                    <div class="text-danger small">{{ form.last_audit_date.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                            Активен
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Детали ресурса по типу -->
+            <hr>
+            <h6 class="mb-3"><i class="bi bi-gear me-2"></i>Детали ресурса</h6>
+
+            {% for detail_form, type_key, type_label in detail_forms %}
+            <div class="detail-section" data-type="{{ type_key }}" style="display: none;">
+                <h6 class="border-bottom pb-2 mb-3">
+                    <i class="bi bi-link-45deg me-1"></i>{{ type_label }}
+                </h6>
+                <div class="row g-3">
+                    {% for field in detail_form %}
+                    {% if field.name != 'resource' %}
+                    <div class="col-12">
+                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                        {% if field.field.widget.input_type == 'select' %}
+                        <select name="{{ field.name }}" id="{{ field.id_for_label }}" class="form-control form-control-lg">
+                            {% for choice_value, choice_label in field.field.choices %}
+                            <option value="{{ choice_value }}" {% if choice_value == field.value %}selected{% endif %}>
+                                {{ choice_label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% elif field.field.widget.input_type == 'checkbox' %}
+                        <input type="checkbox" name="{{ field.name }}" id="{{ field.id_for_label }}"
+                               class="form-check-input form-check-input-lg"
+                               {% if field.value %}checked{% endif %}>
+                        {% else %}
+                        <input type="{{ field.field.widget.input_type }}" name="{{ field.name }}"
+                               id="{{ field.id_for_label }}" class="form-control form-control-lg"
+                               value="{{ field.value|default:'' }}">
+                        {% endif %}
+                        {% if field.errors %}
+                        <div class="text-danger small">{{ field.errors }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Привязка групп доступа -->
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0"><i class="bi bi-collection me-2"></i>Привязанные группы доступа</h6>
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#attachGroupModal">
+                    <i class="bi bi-plus-lg"></i> Прикрепить группу
+                </button>
+            </div>
+            <div id="attachedGroupsList" class="list-group list-group-flush mb-3">
+                <div class="text-center py-3 text-muted">
+                    <small>Группы доступа не привязаны</small>
+                </div>
+            </div>
+
+            <hr>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Сохранить
+                </button>
+                <a href="{% url 'access:resource_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal для поиска и прикрепления групп -->
+<div class="modal fade" id="attachGroupModal" tabindex="-1" aria-labelledby="attachGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="attachGroupModalLabel">
+                    <i class="bi bi-collection me-2"></i>Прикрепить группу доступа
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="groupSearchInput" placeholder="Поиск по наименованию...">
+                    </div>
+                </div>
+                <div id="groupSearchResults" class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                    <div class="text-center py-3 text-muted">
+                        <small>Введите текст для поиска</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script id="attached_groups_json" type="application/json">
+{{ attached_groups_data|safe }}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // ============ Показ/скрытие деталей по типу ресурса ============
+    const typeSelect = document.getElementById('{{ form.type.id_for_label }}');
+    const detailSections = document.querySelectorAll('.detail-section');
+
+    function showDetailSection(type) {
+        detailSections.forEach(function (section) {
+            const match = section.dataset.type === type && type !== '';
+            section.style.display = match ? 'block' : 'none';
+        });
+    }
+
+    if (typeSelect) {
+        typeSelect.addEventListener('change', function () {
+            showDetailSection(this.value);
+        });
+        // Инициализация — показываем детали если уже выбран тип (редактирование)
+        showDetailSection(typeSelect.value);
+    }
+
+    // ============ Поиск и прикрепление групп ============
+    const searchInput = document.getElementById('groupSearchInput');
+    const searchResults = document.getElementById('groupSearchResults');
+    const attachedList = document.getElementById('attachedGroupsList');
+
+    let attachedGroupIds = [];
+
+    function loadGroups(query) {
+        const url = '/access/api/groups/search/' + (query ? '?q=' + encodeURIComponent(query) : '');
+        searchResults.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Загрузка...</div>';
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (data.groups && data.groups.length > 0) {
+                    renderGroups(data.groups, query);
+                } else {
+                    searchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>' + (query ? 'Группы не найдены' : 'Нет доступных групп') + '</small></div>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                searchResults.innerHTML = '<div class="text-center py-3 text-danger"><small>Ошибка загрузки</small></div>';
+            });
+    }
+
+    function renderGroups(groups, query) {
+        let html = '';
+        groups.forEach(group => {
+            const isAttached = attachedGroupIds.includes(group.id);
+            html += '<div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">';
+            html += '<div>';
+            html += '<strong>' + group.name + '</strong>';
+            if (group.description) {
+                html += '<br><small class="text-muted">' + group.description.substring(0, 100) + '</small>';
+            }
+            html += '</div>';
+            html += '<div>';
+            if (isAttached) {
+                html += '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Прикреплена</span>';
+            } else {
+                html += '<button type="button" class="btn btn-sm btn-primary attach-btn" data-group-id="' + group.id + '" data-group-name="' + group.name + '">';
+                html += '<i class="bi bi-plus-lg"></i> Прикрепить';
+                html += '</button>';
+            }
+            html += '</div>';
+            html += '</div>';
+        });
+
+        if (query) {
+            searchResults.innerHTML = '<div class="px-3 py-2 bg-light border-bottom"><small class="text-muted">Найдено: ' + groups.length + ' групп</small></div>' + html;
+        } else {
+            searchResults.innerHTML = '<div class="px-3 py-2 bg-light border-bottom"><small class="text-muted">Всего свободных групп: ' + groups.length + '</small></div>' + html;
+        }
+    }
+
+    const attachModal = document.getElementById('attachGroupModal');
+    if (attachModal) {
+        attachModal.addEventListener('show.bs.modal', function () {
+            loadGroups('');
+            searchInput.value = '';
+        });
+    }
+
+    let searchTimeout = null;
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+
+        if (query.length < 2) {
+            if (query.length === 0) {
+                loadGroups('');
+            } else {
+                searchResults.innerHTML = '<div class="text-center py-3 text-muted"><small>Введите минимум 2 символа</small></div>';
+            }
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            loadGroups(query);
+        }, 300);
+    });
+
+    searchResults.addEventListener('click', function (e) {
+        const btn = e.target.closest('.attach-btn');
+        if (!btn) return;
+
+        const groupId = parseInt(btn.dataset.groupId);
+        const groupName = btn.dataset.groupName;
+
+        attachedGroupIds.push(groupId);
+        updateAttachedList();
+        btn.outerHTML = '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Прикреплена</span>';
+        addHiddenField(groupId, groupName);
+    });
+
+    function updateAttachedList() {
+        if (attachedGroupIds.length === 0) {
+            attachedList.innerHTML = '<div class="text-center py-3 text-muted"><small>Группы доступа не привязаны</small></div>';
+            return;
+        }
+
+        let html = '';
+        attachedGroupIds.forEach(function (id) {
+            const name = getGroupName(id);
+            html += '<div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">';
+            html += '<div>';
+            html += '<i class="bi bi-collection text-primary me-2"></i>';
+            html += '<strong>' + name + '</strong>';
+            html += '</div>';
+            html += '<button type="button" class="btn btn-sm btn-outline-danger detach-btn" data-group-id="' + id + '">';
+            html += '<i class="bi bi-trash"></i> Открепить';
+            html += '</button>';
+            html += '</div>';
+        });
+        attachedList.innerHTML = html;
+
+        document.querySelectorAll('.detach-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const groupId = parseInt(this.dataset.groupId);
+                attachedGroupIds = attachedGroupIds.filter(function (id) { return id !== groupId; });
+                updateAttachedList();
+                removeHiddenField(groupId);
+
+                const attachBtn = document.querySelector('.attach-btn[data-group-id="' + groupId + '"]');
+                if (attachBtn) {
+                    attachBtn.outerHTML = '<button type="button" class="btn btn-sm btn-primary attach-btn" data-group-id="' + groupId + '" data-group-name="' + getGroupName(groupId) + '"><i class="bi bi-plus-lg"></i> Прикрепить</button>';
+                }
+
+                loadGroups('');
+            });
+        });
+    }
+
+    function getGroupName(id) {
+        for (const g of attachedGroupsData) {
+            if (g.id === id) return g.name;
+        }
+        return 'Группа #' + id;
+    }
+
+    function addHiddenField(groupId, groupName) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'attached_groups';
+        input.value = groupId;
+        input.id = 'attached_group_' + groupId;
+        document.querySelector('form').appendChild(input);
+    }
+
+    function removeHiddenField(groupId) {
+        const input = document.getElementById('attached_group_' + groupId);
+        if (input) {
+            input.remove();
+        }
+    }
+
+    // Данные о прикреплённых группах (если редактирование существующего ресурса)
+    const attachedGroupsData = JSON.parse(document.getElementById('attached_groups_json').textContent || '[]');
+    attachedGroupIds = attachedGroupsData.map(g => g.id);
+    if (attachedGroupIds.length > 0) {
+        updateAttachedList();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "access/base.html" %}
+
+{% block title %}{% if form.instance.pk %}Редактирование{% else %}Создание{% endif %} заявки — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0">
+    <i class="bi bi-{% if form.instance.pk %}pencil{% else %}inbox{% endif %} me-2"></i>
+    {% if form.instance.pk %}Редактирование заявки{% else %}Новая заявка{% endif %}
+</h4>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="{{ form.resource.id_for_label }}" class="form-label">Ресурс *</label>
+                    {{ form.resource }}
+                    {% if form.resource.errors %}
+                    <div class="text-danger small">{{ form.resource.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.level.id_for_label }}" class="form-label">Уровень доступа *</label>
+                    {{ form.level }}
+                    {% if form.level.errors %}
+                    <div class="text-danger small">{{ form.level.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-12">
+                    <label for="{{ form.justification.id_for_label }}" class="form-label">Обоснование *</label>
+                    {{ form.justification }}
+                    <small class="form-text text-muted">Укажите причину запроса доступа</small>
+                    {% if form.justification.errors %}
+                    <div class="text-danger small">{{ form.justification.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <hr>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Отправить заявку
+                </button>
+                <a href="{% url 'access:request_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

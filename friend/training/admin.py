@@ -1,5 +1,19 @@
 from django.contrib import admin
-from .models import TrainingType, Training, TrainingEnrollment
+from .models import TrainingType, Training, TrainingEnrollment, TrainingGoal, GoalTrainingType
+
+
+@admin.register(TrainingGoal)
+class TrainingGoalAdmin(admin.ModelAdmin):
+    list_display = ['name', 'is_active', 'training_types_count', 'created_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['name', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+
+
+class GoalTrainingTypeInline(admin.TabularInline):
+    model = GoalTrainingType
+    extra = 0
+    readonly_fields = ['created_at']
 
 
 @admin.register(TrainingType)

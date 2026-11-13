@@ -1,0 +1,31 @@
+{% extends "access/base.html" %}
+
+{% block title %}Удаление группы — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0">
+    <i class="bi bi-trash me-2"></i>Удаление группы
+</h4>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> Группа «{{ object.display_name }}» будет переведена в архив.
+            <br>Группа перестанет отображаться в списке активных групп, но все данные сохранятся.
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Удалить
+                </button>
+                <a href="{% url 'access:group_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

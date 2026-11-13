@@ -72,7 +72,7 @@
                 </thead>
                 <tbody>
                     {% for s in snapshot_data %}
-                    <tr style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#snapshotModal"
+                    <tr class="cursor-pointer" data-bs-toggle="modal" data-bs-target="#snapshotModal"
                         data-index="{{ forloop.counter0 }}">
                         <td class="text-nowrap">{{ s.collected_at }}</td>
                         <td>

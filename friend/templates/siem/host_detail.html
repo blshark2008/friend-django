@@ -327,21 +327,21 @@
         <div class="card table-card mb-3">
             <div class="card-body py-3">
                 <form method="get" class="d-flex gap-2 flex-wrap align-items-center" id="events-filter-form">
-                    <select name="severity" class="form-select form-select-sm" style="width:160px">
+                    <select name="severity" class="form-select form-select-sm select-w-160">
                         <option value="">Все уровни</option>
                         <option value="critical" {% if filter_severity == 'critical' %}selected{% endif %}>Критично</option>
                         <option value="warning" {% if filter_severity == 'warning' %}selected{% endif %}>Предупреждение</option>
                         <option value="error" {% if filter_severity == 'error' %}selected{% endif %}>Ошибка</option>
                         <option value="info" {% if filter_severity == 'info' %}selected{% endif %}>Инфо</option>
                     </select>
-                    <select name="event_type" class="form-select form-select-sm" style="width:200px">
+                    <select name="event_type" class="form-select form-select-sm select-w-200">
                         <option value="">Все типы</option>
                         {% for et_val, et_label in event_type_choices %}
                         <option value="{{ et_val }}" {% if filter_event_type == et_val %}selected{% endif %}>{{ et_label }}</option>
                         {% endfor %}
                     </select>
-                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ filter_from_date }}" placeholder="С" style="width:160px">
-                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ filter_to_date }}" placeholder="По" style="width:160px">
+                    <input type="date" name="from_date" class="form-control form-control-sm select-w-160" value="{{ filter_from_date }}" placeholder="С">
+                    <input type="date" name="to_date" class="form-control form-control-sm select-w-160" value="{{ filter_to_date }}" placeholder="По">
                     <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-search"></i></button>
                     {% if filter_severity or filter_event_type or filter_from_date or filter_to_date %}
                     <a href="{% url 'siem:host_detail' host.pk %}" class="btn btn-sm btn-outline-secondary">Сбросить</a>

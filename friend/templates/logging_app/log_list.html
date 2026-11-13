@@ -1,0 +1,293 @@
+{% extends "access/base.html" %}
+
+{% block title %}Журнал операций — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-journal-text me-2"></i>Журнал операций</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Stats cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted d-block">Всего записей</small>
+                        <h3 class="mb-0">{{ logs_count }}</h3>
+                    </div>
+                    <i class="bi bi-database fs-2 text-muted"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted d-block">Сегодня</small>
+                        <h3 class="mb-0">{{ today_count }}</h3>
+                    </div>
+                    <i class="bi bi-calendar-day fs-2 text-primary"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted d-block">Предупреждения</small>
+                        <h3 class="mb-0">{{ warning_count }}</h3>
+                    </div>
+                    <i class="bi bi-exclamation-triangle fs-2 text-warning"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <small class="text-muted d-block">API endpoint</small>
+                        <h6 class="mb-0 text-monospace">/api/logging/event/</h6>
+                    </div>
+                    <i class="bi bi-plug fs-2 text-success"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <input type="text" name="q" class="form-control form-control-sm"
+                       placeholder="Поиск..." value="{{ current_q }}">
+            </div>
+            <div class="col-auto">
+                <select name="source" class="form-select form-select-sm">
+                    <option value="">Все источники</option>
+                    {% for src in sources %}
+                    <option value="{{ src }}" {% if current_source == src %}selected{% endif %}>
+                        {{ src }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <select name="action" class="form-select form-select-sm">
+                    <option value="">Все действия</option>
+                    {% for value, label in actions %}
+                    <option value="{{ value }}" {% if current_action == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <select name="severity" class="form-select form-select-sm">
+                    <option value="">Все уровни</option>
+                    {% for value, label in severities %}
+                    <option value="{{ value }}" {% if current_severity == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <input type="date" name="date_from" class="form-control form-control-sm"
+                       value="{{ current_date_from }}" placeholder="С">
+            </div>
+            <div class="col-auto">
+                <input type="date" name="date_to" class="form-control form-control-sm"
+                       value="{{ current_date_to }}" placeholder="По">
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-search"></i>
+                </button>
+                <a href="{% url 'logging_app:log_list' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- API Info -->
+<div class="alert alert-info py-2 mb-3">
+    <i class="bi bi-info-circle me-1"></i>
+    <strong>API для приёма событий:</strong> POST
+    <code>/api/logging/event/</code>
+    <button class="btn btn-sm btn-outline-info ms-2" onclick="toggleApiDoc()">
+        <i class="bi bi-code-slash"></i> Документация
+    </button>
+    <div id="apiDoc" style="display:none; margin-top:10px;">
+        <pre class="bg-dark text-light p-3 rounded" style="font-size:0.85rem;">
+{
+  "source": "access",
+  "action": "update",
+  "severity": "info",
+  "actor": "admin",
+  "actor_type": "user",
+  "target_model": "AccessGroup",
+  "target_id": 5,
+  "target_display": "fs-share-prod-rw",
+  "summary": "Группа обновлена",
+  "details": {"changed_fields": ["name", "description"]},
+  "ip_address": "127.0.0.1"
+}</pre>
+    </div>
+</div>
+
+<!-- Logs list -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if logs %}
+        <div class="list-group list-group-flush">
+            {% for log in logs %}
+            <div class="list-group-item list-group-item-action p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- Severity icon -->
+                        {% if log.severity == 'info' %}
+                        <i class="bi bi-info-circle text-primary"></i>
+                        {% elif log.severity == 'warning' %}
+                        <i class="bi bi-exclamation-triangle text-warning"></i>
+                        {% elif log.severity == 'error' %}
+                        <i class="bi bi-x-circle text-danger"></i>
+                        {% elif log.severity == 'critical' %}
+                        <i class="bi bi-x-circle-fill text-danger"></i>
+                        {% endif %}
+
+                        <!-- Action badge -->
+                        <span class="badge {% if log.action == 'create' %}bg-success{% elif log.action == 'update' %}bg-primary{% elif log.action == 'delete' or log.action == 'archive' %}bg-danger{% elif log.action == 'restore' %}bg-info{% else %}bg-secondary{% endif %}">
+                            {{ log.get_action_display }}
+                        </span>
+
+                        <!-- Source -->
+                        <span class="badge bg-light text-dark border">
+                            <i class="bi bi-tag"></i> {{ log.source }}
+                        </span>
+
+                        <!-- Timestamp -->
+                        <small class="text-muted">
+                            <i class="bi bi-clock"></i> {{ log.timestamp|date:"d.m.Y H:i:s" }}
+                        </small>
+
+                        {% if log.is_recent %}
+                        <span class="badge bg-success">
+                            <i class="bi bi-lightning"></i> Live
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Actor -->
+                    <div class="text-end" style="min-width: 150px;">
+                        <small class="text-muted d-block">
+                            <i class="bi bi-person"></i> {{ log.actor|default:"—" }}
+                        </small>
+                        {% if log.ip_address %}
+                        <small class="text-muted">
+                            <i class="bi bi-hdd"></i> {{ log.ip_address }}
+                        </small>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div class="mt-2">
+                    <strong>{{ log.target_display|default:log.target_model|default:"—" }}</strong>
+                    {% if log.target_model %}
+                    <small class="text-muted ms-2">({{ log.target_model }}#{{ log.target_id|default:"?" }})</small>
+                    {% endif %}
+                </div>
+
+                {% if log.summary %}
+                <small class="text-muted mt-1 d-block">{{ log.summary }}</small>
+                {% endif %}
+
+                <!-- Details toggle -->
+                {% if log.details %}
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-link text-muted p-0"
+                            onclick="toggleDetails({{ log.pk }})">
+                        <i class="bi bi-chevron-expand"></i> Показать детали
+                    </button>
+                    <div id="details-{{ log.pk }}" style="display:none;">
+                        <pre class="bg-light p-2 rounded mt-1" style="font-size:0.8rem; max-height:200px; overflow:auto;">{{ log.details|pprint }}</pre>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-journal-x fs-1 d-block mb-2"></i>
+            Записи журнала отсутствуют
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if is_paginated %}
+<div class="d-flex justify-content-center mt-4">
+    <ul class="pagination">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}
+                {% if current_q %}&q={{ current_q }}{% endif %}
+                {% if current_source %}&source={{ current_source }}{% endif %}
+                {% if current_action %}&action={{ current_action }}{% endif %}
+                {% if current_severity %}&severity={{ current_severity }}{% endif %}
+                {% if current_date_from %}&date_from={{ current_date_from }}{% endif %}
+                {% if current_date_to %}&date_to={{ current_date_to }}{% endif %}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        <li class="page-item disabled">
+            <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}
+                {% if current_q %}&q={{ current_q }}{% endif %}
+                {% if current_source %}&source={{ current_source }}{% endif %}
+                {% if current_action %}&action={{ current_action }}{% endif %}
+                {% if current_severity %}&severity={{ current_severity }}{% endif %}
+                {% if current_date_from %}&date_from={{ current_date_from }}{% endif %}
+                {% if current_date_to %}&date_to={{ current_date_to }}{% endif %}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}
+
+<script>
+function toggleApiDoc() {
+    var doc = document.getElementById('apiDoc');
+    doc.style.display = doc.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleDetails(id) {
+    var el = document.getElementById('details-' + id);
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

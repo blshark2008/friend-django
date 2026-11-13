@@ -1,0 +1,118 @@
+{% extends "access/base.html" %}
+
+{% block title %}{{ group.display_name }} — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-collection me-2"></i>{{ group.display_name }}</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:group_edit' pk=group.pk %}" class="btn btn-outline-secondary">
+        <i class="bi bi-pencil"></i> Редактировать
+    </a>
+    <a href="{% url 'access:grant_create' %}?group={{ group.pk }}" class="btn btn-outline-success">
+        <i class="bi bi-plus-lg"></i> Выдать доступ
+    </a>
+    <a href="{% url 'access:group_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад к списку
+    </a>
+</div>
+
+<!-- Group details -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Информация о группе</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <strong>Наименование:</strong><br>
+                {{ group.display_name }}
+            </div>
+            <div class="col-md-6">
+                <strong>Статус:</strong><br>
+                {% if group.is_active %}
+                <span class="badge bg-success">Активна</span>
+                {% else %}
+                <span class="badge bg-secondary">Неактивна</span>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <strong>Аудит:</strong><br>
+                {% if group.audited %}
+                <span class="badge bg-info">
+                    <i class="bi bi-check2-circle"></i> Проведён
+                </span>
+                {% if group.audited_at %}
+                <small class="text-muted ms-2">{{ group.audited_at|date:"d.m.Y H:i" }}</small>
+                {% endif %}
+                {% else %}
+                <span class="badge bg-warning text-dark">
+                    <i class="bi bi-exclamation-triangle"></i> Не проведён
+                </span>
+                {% endif %}
+            </div>
+            {% if group.description %}
+            <div class="col-12">
+                <strong>Описание:</strong><br>
+                {{ group.description }}
+            </div>
+            {% endif %}
+            {% if group.ad_group_dn %}
+            <div class="col-md-6">
+                <strong>AD группа:</strong><br>
+                <code>{{ group.ad_group_dn }}</code>
+                {% if group.ad_sync_enabled %}
+                <span class="badge bg-warning text-dark ms-1">
+                    <i class="bi bi-arrow-repeat"></i> Синхронизация
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
+            <div class="col-12">
+                <strong>Создана:</strong> {{ group.created_at|date:"d.m.Y H:i" }}<br>
+                <strong>Обновлена:</strong> {{ group.updated_at|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Grants -->
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-key me-2"></i>Гранты доступа ({{ group.grants.count }})</h6>
+    </div>
+    <div class="card-body p-0">
+        {% if group.grants.all %}
+        <div class="list-group list-group-flush">
+            {% for grant in group.grants.all %}
+            <div class="list-group-item list-group-item-action px-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-hdd-stack text-primary"></i>
+                        <strong>{{ grant.resource.name }}</strong>
+                        <span class="badge bg-info text-dark ms-2">{{ grant.resource.get_type_display }}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary">{{ grant.get_level_display }}</span>
+                        {% if grant.is_expired %}
+                        <span class="badge bg-warning">Просрочен</span>
+                        {% endif %}
+                        {% if grant.is_revoked %}
+                        <span class="badge bg-danger">Отозван</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-3 text-muted">
+            <small>Гранты доступа не назначены</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

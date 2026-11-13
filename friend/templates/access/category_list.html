@@ -1,0 +1,71 @@
+{% extends "access/base.html" %}
+
+{% block title %}Категории ресурсов — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-folder me-2"></i>Категории ресурсов</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:category_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Добавить категорию
+    </a>
+    <a href="{% url 'access:resource_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-hdd-stack"></i> Ресурсы
+    </a>
+    <a href="{% url 'access:group_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-collection"></i> Группы доступа
+    </a>
+</div>
+
+<!-- Categories list -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if categories %}
+        <div class="list-group list-group-flush">
+            {% for category in categories %}
+            <div class="list-group-item list-group-item-action p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-folder text-primary"></i>
+                        <span class="fw-semibold">{{ category.name }}</span>
+
+                        {% if category.is_active %}
+                        <span class="badge bg-success">Активна</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Неактивна</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="text-end" style="min-width: 80px;">
+                            <small class="text-muted d-block">
+                                <i class="bi bi-hdd-stack"></i> {{ category.resources.all.count }} ресурсов
+                            </small>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'access:category_edit' pk=category.pk %}" class="btn btn-outline-secondary" title="Редактировать">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'access:category_delete' pk=category.pk %}" class="btn btn-outline-danger" title="Удалить">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% if category.description %}
+                <small class="text-muted mt-1 d-block">{{ category.description|truncatewords:15 }}</small>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-folder fs-1 d-block mb-2"></i>
+            Категории отсутствуют
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -66,14 +66,14 @@
             <div class="row mb-3 g-3">
                 <div class="col-md-6">
                     <label class="form-label fw-semibold small">Подразделение</label>
-                    <div style="max-width: 100%;">
+                    <div class="w-100">
                         {{ form.department }}
                         {% if form.department.errors %}<div class="text-danger small">{{ form.department.errors }}</div>{% endif %}
                     </div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold small">Должность</label>
-                    <div style="max-width: 100%;">
+                    <div class="w-100">
                         {{ form.position }}
                         {% if form.position.errors %}<div class="text-danger small">{{ form.position.errors }}</div>{% endif %}
                     </div>
@@ -82,14 +82,14 @@
             <div class="row mb-3 g-3">
                 <div class="col-md-6">
                     <label class="form-label fw-semibold small">Дата приёма</label>
-                    <div style="max-width: 100%;">
+                    <div class="w-100">
                         {{ form.hire_date }}
                         {% if form.hire_date.errors %}<div class="text-danger small">{{ form.hire_date.errors }}</div>{% endif %}
                     </div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold small">Дата увольнения</label>
-                    <div style="max-width: 100%;">
+                    <div class="w-100">
                         {{ form.fire_date }}
                         {% if form.fire_date.errors %}<div class="text-danger small">{{ form.fire_date.errors }}</div>{% endif %}
                     </div>

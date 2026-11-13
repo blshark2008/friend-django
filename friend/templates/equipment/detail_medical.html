@@ -44,7 +44,7 @@
             <div class="card-header"><h6 class="mb-0">Основная информация</h6></div>
             <div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" style="width:40%">Модель</td><td>{{ instance.model }}</td></tr>
+                    <tr><td class="text-muted" class="detail-label">Модель</td><td>{{ instance.model }}</td></tr>
                     {% if instance.serial_number %}
                     <tr><td class="text-muted">Серийный номер</td><td>{{ instance.serial_number }}</td></tr>
                     {% endif %}
@@ -64,7 +64,7 @@
             <div class="card-body">
                 <table class="table table-sm mb-0">
                     {% if instance.calibration_date %}
-                    <tr><td class="text-muted" style="width:40%">Дата калибровки</td><td>{{ instance.calibration_date|date:"d.m.Y" }}</td></tr>
+                    <tr><td class="text-muted" class="detail-label">Дата калибровки</td><td>{{ instance.calibration_date|date:"d.m.Y" }}</td></tr>
                     {% endif %}
                     {% if instance.next_calibration %}
                     <tr><td class="text-muted">След. калибровка</td><td>{{ instance.next_calibration|date:"d.m.Y" }}</td></tr>
@@ -79,7 +79,7 @@
             <div class="card-header"><h6 class="mb-0">Расположение</h6></div>
             <div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" style="width:40%">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
+                    <tr><td class="text-muted" class="detail-label">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
                     <tr><td class="text-muted">Место</td><td>{{ instance.place|default:"—" }}</td></tr>
                 </table>
             </div>

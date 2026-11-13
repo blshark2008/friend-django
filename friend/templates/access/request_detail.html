@@ -1,0 +1,132 @@
+{% extends "access/base.html" %}
+
+{% block title %}Заявка: {{ request.requester.get_full_name }} → {{ request.resource.name }} — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-inbox me-2"></i>Заявка на доступ</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:request_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад к списку
+    </a>
+</div>
+
+<!-- Request details -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Информация о заявке</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <strong>Заявитель:</strong><br>
+                {{ request.requester.get_full_name|default:request.requester.username }}
+            </div>
+            <div class="col-md-6">
+                <strong>Статус:</strong><br>
+                {% if request.status == 'new' %}
+                <span class="badge bg-warning text-dark">Новая</span>
+                {% elif request.status == 'approved' %}
+                <span class="badge bg-info">Согласована</span>
+                {% elif request.status == 'granted' %}
+                <span class="badge bg-success">Доступ выдан</span>
+                {% elif request.status == 'rejected' %}
+                <span class="badge bg-danger">Отклонена</span>
+                {% elif request.status == 'done' %}
+                <span class="badge bg-secondary">Закрыта</span>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <strong>Ресурс:</strong><br>
+                <a href="{% url 'access:resource_detail' pk=request.resource.pk %}">{{ request.resource.name }}</a>
+                <span class="badge bg-info text-dark ms-2">{{ request.resource.get_type_display }}</span>
+            </div>
+            <div class="col-md-6">
+                <strong>Уровень доступа:</strong><br>
+                <span class="badge bg-primary">{{ request.get_level_display }}</span>
+            </div>
+            {% if request.justification %}
+            <div class="col-12">
+                <strong>Обоснование:</strong><br>
+                {{ request.justification }}
+            </div>
+            {% endif %}
+            {% if request.approver %}
+            <div class="col-md-6">
+                <strong>Согласовал:</strong><br>
+                {{ request.approver.get_full_name }}
+            </div>
+            {% endif %}
+            {% if request.rejection_reason %}
+            <div class="col-12">
+                <strong>Причина отклонения:</strong><br>
+                <span class="text-danger">{{ request.rejection_reason }}</span>
+            </div>
+            {% endif %}
+            {% if request.grant %}
+            <div class="col-12">
+                <strong>Грант:</strong><br>
+                <a href="{% url 'access:grant_delete' pk=request.grant.pk %}">{{ request.grant }}</a>
+            </div>
+            {% endif %}
+            <div class="col-12">
+                <strong>Создана:</strong> {{ request.created_at|date:"d.m.Y H:i" }}<br>
+                <strong>Обновлена:</strong> {{ request.updated_at|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions -->
+{% if request.status == 'new' or request.status == 'approved' %}
+<div class="card shadow-sm mb-3">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-gear me-2"></i>Действия</h6>
+    </div>
+    <div class="card-body">
+        <form method="post" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="approve">
+            <button type="submit" class="btn btn-outline-info">
+                <i class="bi bi-check-circle"></i> Согласовать
+            </button>
+        </form>
+        <form method="post" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="grant">
+            <button type="submit" class="btn btn-outline-success">
+                <i class="bi bi-key"></i> Выдать доступ
+            </button>
+        </form>
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal">
+            <i class="bi bi-x-circle"></i> Отклонить
+        </button>
+    </div>
+</div>
+{% endif %}
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" class="modal-content">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reject">
+            <div class="modal-header">
+                <h5 class="modal-title">Отклонить заявку</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label for="rejection_reason" class="form-label">Причина отклонения</label>
+                <textarea name="rejection_reason" id="rejection_reason" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="submit" class="btn btn-danger">Отклонить</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -113,7 +113,7 @@
                     <input type="text" class="form-control" id="userSearchInput" placeholder="ФИО или табельный номер">
                     <button type="button" class="btn btn-primary" id="userSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
                 </div>
-                <div id="userSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
+                <div id="userSearchResults" class="list-group search-results-xl"></div>
             </div>
         </div>
     </div>
@@ -132,7 +132,7 @@
                     <input type="text" class="form-control" id="deptSearchInput" placeholder="Название подразделения">
                     <button type="button" class="btn btn-success" id="deptSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
                 </div>
-                <div id="deptSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
+                <div id="deptSearchResults" class="list-group search-results-xl"></div>
             </div>
         </div>
     </div>
@@ -151,7 +151,7 @@
                     <input type="text" class="form-control" id="groupSearchInput" placeholder="Название группы рассылки">
                     <button type="button" class="btn btn-info text-white" id="groupSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
                 </div>
-                <div id="groupSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
+                <div id="groupSearchResults" class="list-group search-results-xl"></div>
             </div>
         </div>
     </div>
@@ -187,7 +187,7 @@ function renderRecipientsList() {
             if (el) {
                 html += `<span class="badge bg-primary me-1 mb-1">
                     ${el.dataset.name}
-                    <button type="button" class="btn-close btn-close-white ms-1" onclick="removeUser(${id})" style="font-size:0.5rem;"></button>
+                    <button type="button" class="btn-close btn-close-white ms-1 btn-close-sm" onclick="removeUser(${id})"></button>
                 </span>`;
             }
         });
@@ -201,7 +201,7 @@ function renderRecipientsList() {
             if (el) {
                 html += `<span class="badge bg-success me-1 mb-1">
                     ${el.dataset.name}
-                    <button type="button" class="btn-close btn-close-white ms-1" onclick="removeDept(${id})" style="font-size:0.5rem;"></button>
+                    <button type="button" class="btn-close btn-close-white ms-1 btn-close-sm" onclick="removeDept(${id})"></button>
                 </span>`;
             }
         });
@@ -215,7 +215,7 @@ function renderRecipientsList() {
             if (el) {
                 html += `<span class="badge bg-info text-dark me-1 mb-1">
                     <i class="bi bi-people-fill me-1"></i>${el.dataset.name}
-                    <button type="button" class="btn-close btn-close-white ms-1" onclick="removeGroup(${id})" style="font-size:0.5rem;"></button>
+                    <button type="button" class="btn-close btn-close-white ms-1 btn-close-sm" onclick="removeGroup(${id})"></button>
                 </span>`;
             }
         });

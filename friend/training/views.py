@@ -10,8 +10,8 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from accounts.models import User, Department
-from .models import TrainingType, Training, TrainingEnrollment, TrainingCategory, SkillspaceGroup
-from .forms import TrainingTypeForm, TrainingForm, TrainingUserSelectionForm, TrainingCategoryForm
+from .models import TrainingType, Training, TrainingEnrollment, TrainingCategory, TrainingGoal, SkillspaceGroup
+from .forms import TrainingTypeForm, TrainingForm, TrainingUserSelectionForm, TrainingCategoryForm, TrainingGoalForm
 from .services.skillspace_api import (
     SkillspaceClient, SkillspaceAPIError,
     invite_student_to_training, sync_training_to_skillspace,
@@ -1165,8 +1165,260 @@ def training_report(request):
 
 
 # ============================================================================
-# Main page (redirect to types)
+# Training Goals (CRUD)
 # ============================================================================
+
+@login_required
+def training_goal_list(request):
+    """Список целей обучения."""
+    query = request.GET.get('q', '').strip()
+
+    goals = TrainingGoal.objects.all()
+    if query:
+        goals = goals.filter(
+            Q(name__icontains=query) |
+            Q(description__icontains=query)
+        )
+
+    goals = goals.order_by('name')
+
+    return render(request, 'training/goal_list.html', {
+        'goals': goals,
+        'query': query,
+    })
+
+
+@login_required
+def training_goal_create(request):
+    """Создание цели обучения."""
+    if request.method == 'POST':
+        form = TrainingGoalForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Цель обучения создана')
+            return redirect('training:goal_list')
+    else:
+        form = TrainingGoalForm()
+
+    return render(request, 'training/goal_form.html', {
+        'form': form,
+        'action': 'Создание',
+    })
+
+
+@login_required
+def training_goal_edit(request, pk):
+    """Редактирование цели обучения."""
+    goal = get_object_or_404(TrainingGoal, pk=pk)
+
+    if request.method == 'POST':
+        form = TrainingGoalForm(request.POST, instance=goal)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Цель обучения обновлена')
+            return redirect('training:goal_list')
+    else:
+        form = TrainingGoalForm(instance=goal)
+
+    return render(request, 'training/goal_form.html', {
+        'form': form,
+        'goal': goal,
+        'action': 'Редактирование',
+    })
+
+
+@login_required
+def training_goal_delete(request, pk):
+    """Удаление цели обучения."""
+    goal = get_object_or_404(TrainingGoal, pk=pk)
+
+    if request.method == 'POST':
+        goal.delete()
+        messages.success(request, 'Цель обучения удалена')
+        return redirect('training:goal_list')
+
+    return render(request, 'training/goal_confirm_delete.html', {
+        'obj': goal,
+    })
+
+
+# ============================================================================
+# Training Journal
+# ============================================================================
+
+@login_required
+def training_journal(request):
+    """Журнал обучения сотрудников."""
+    # Get filter parameters
+    goal_id = request.GET.get('goal', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    show_without = request.GET.get('show_without', 'false').lower() == 'true'
+
+    # Default period: current year
+    now = timezone.now()
+    default_date_from = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    default_date_to = now
+
+    if not date_from:
+        date_from = default_date_from.strftime('%Y-%m-%d')
+    if not date_to:
+        date_to = default_date_to.strftime('%Y-%m-%d')
+
+    # Parse dates
+    try:
+        date_from_obj = timezone.datetime.strptime(date_from, '%Y-%m-%d').date()
+        date_to_obj = timezone.datetime.strptime(date_to, '%Y-%m-%d').date()
+    except ValueError:
+        date_from_obj = default_date_from.date()
+        date_to_obj = default_date_to.date()
+
+    # Get goals
+    goals = TrainingGoal.objects.filter(is_active=True).order_by('name')
+    goal = None
+    if goal_id:
+        goal = get_object_or_404(TrainingGoal, pk=goal_id, is_active=True)
+
+    # Build journal data
+    journal_data = []
+    without_trainings = []
+    in_progress_data = []
+    not_started_data = []
+
+    if goal:
+        # Get all training types linked to this goal (including archived)
+        training_types = goal.training_types.all()
+
+        if training_types.exists():
+            # Get all trainings for these types
+            trainings = Training.objects.filter(
+                training_type__in=training_types,
+                is_active=True,
+            ).select_related('training_type')
+
+            # Get all enrollments for these trainings
+            enrollments = TrainingEnrollment.objects.filter(
+                training__in=trainings,
+            ).select_related(
+                'user', 'user__department', 'training', 'training__training_type'
+            )
+
+            # Completed enrollments within the period
+            # Use timezone-aware datetime comparison instead of __date
+            from datetime import datetime
+            dt_from = timezone.make_aware(datetime.combine(date_from_obj, datetime.min.time()))
+            dt_to = timezone.make_aware(datetime.combine(date_to_obj, datetime.max.time()))
+            
+            completed_enrollments = enrollments.filter(
+                status='completed',
+                completed_at__gte=dt_from,
+                completed_at__lte=dt_to,
+            ).distinct()
+
+            # Get user IDs who completed training in this period
+            completed_user_ids = set(
+                completed_enrollments.values_list('user_id', flat=True)
+            )
+
+            # Build journal entries for completed
+            for enrollment in completed_enrollments:
+                # Find previous successful completion for this user and training type
+                previous_completion = TrainingEnrollment.objects.filter(
+                    user=enrollment.user,
+                    training__training_type=enrollment.training.training_type,
+                    status='completed',
+                    completed_at__lt=enrollment.completed_at,
+                ).order_by('-completed_at').first()
+                
+                journal_data.append({
+                    'user': enrollment.user,
+                    'training_title': enrollment.training.title,
+                    'training_type_name': enrollment.training.training_type.name,
+                    'completed_at': enrollment.completed_at,
+                    'previous_completed_at': previous_completion.completed_at if previous_completion else None,
+                    'enrolled_at': enrollment.enrolled_at,
+                    'score': enrollment.score,
+                    'status': enrollment.status,
+                })
+
+            # Sort by user last name
+            journal_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
+
+            # In progress enrollments (started but not completed)
+            in_progress_enrollments = enrollments.filter(
+                status='in_progress',
+            ).distinct()
+
+            for enrollment in in_progress_enrollments:
+                in_progress_data.append({
+                    'user': enrollment.user,
+                    'training_title': enrollment.training.title,
+                    'training_type_name': enrollment.training.training_type.name,
+                    'enrolled_at': enrollment.enrolled_at,
+                    'score': enrollment.score,
+                    'status': enrollment.status,
+                })
+
+            in_progress_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
+
+            # Not started enrollments (assigned but not started)
+            not_started_enrollments = enrollments.filter(
+                status='not_started',
+            ).distinct()
+
+            for enrollment in not_started_enrollments:
+                not_started_data.append({
+                    'user': enrollment.user,
+                    'training_title': enrollment.training.title,
+                    'training_type_name': enrollment.training.training_type.name,
+                    'enrolled_at': enrollment.enrolled_at,
+                    'status': enrollment.status,
+                })
+
+            not_started_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
+
+            # Get all active employees (excluding fired)
+            all_employees = User.objects.filter(
+                is_fired=False,
+            ).select_related('department').order_by('last_name', 'first_name')
+
+            # Find employees without training in this period
+            if show_without:
+                for employee in all_employees:
+                    if employee.id not in completed_user_ids:
+                        without_trainings.append({
+                            'user': employee,
+                            'has_any_training': TrainingEnrollment.objects.filter(
+                                user=employee,
+                                training__training_type__in=training_types,
+                                status='completed',
+                            ).exists(),
+                        })
+
+    # Stats
+    total_completed = len(journal_data)
+    total_in_progress = len(in_progress_data)
+    total_not_started = len(not_started_data)
+    total_without = len(without_trainings)
+
+    context = {
+        'goals': goals,
+        'goal': goal,
+        'date_from': date_from,
+        'date_to': date_to,
+        'journal_data': journal_data,
+        'in_progress_data': in_progress_data,
+        'not_started_data': not_started_data,
+        'without_trainings': without_trainings,
+        'show_without': show_without,
+        'total_completed': total_completed,
+        'total_in_progress': total_in_progress,
+        'total_not_started': total_not_started,
+        'total_without': total_without,
+        'default_date_from': default_date_from.strftime('%Y-%m-%d'),
+        'default_date_to': default_date_to.strftime('%Y-%m-%d'),
+    }
+    return render(request, 'training/journal.html', context)
 
 @login_required
 def training_list(request):

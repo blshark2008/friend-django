@@ -1,0 +1,132 @@
+{% extends "access/base.html" %}
+
+{% block title %}Заявки на доступ — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-inbox me-2"></i>Заявки на доступ</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:request_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Новая заявка
+    </a>
+    <a href="{% url 'access:grant_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-key"></i> Гранты
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <input type="text" name="q" class="form-control form-control-sm"
+                       placeholder="Поиск..." value="{{ request.GET.q|default:'' }}">
+            </div>
+            <div class="col-auto">
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">Все статусы</option>
+                    {% for value, label in statuses %}
+                    <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-search"></i>
+                </button>
+                <a href="{% url 'access:request_list' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Requests list -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if requests %}
+        <div class="list-group list-group-flush">
+            {% for request in requests %}
+            <div class="list-group-item list-group-item-action p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-inbox text-primary"></i>
+                        <span class="fw-semibold">{{ request.requester.get_full_name }}</span>
+                        <i class="bi bi-arrow-right text-muted"></i>
+                        <span>{{ request.resource.name }}</span>
+                        <span class="badge bg-info text-dark">{{ request.resource.get_type_display }}</span>
+                        <span class="badge bg-primary">{{ request.get_level_display }}</span>
+                        {% if request.status == 'new' %}
+                        <span class="badge bg-warning text-dark">Новая</span>
+                        {% elif request.status == 'approved' %}
+                        <span class="badge bg-info">Согласована</span>
+                        {% elif request.status == 'granted' %}
+                        <span class="badge bg-success">Доступ выдан</span>
+                        {% elif request.status == 'rejected' %}
+                        <span class="badge bg-danger">Отклонена</span>
+                        {% elif request.status == 'done' %}
+                        <span class="badge bg-secondary">Закрыта</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="text-end" style="min-width: 100px;">
+                            <small class="text-muted d-block">
+                                <i class="bi bi-calendar"></i> {{ request.created_at|date:"d.m.Y" }}
+                            </small>
+                            {% if request.approver %}
+                            <small class="text-muted d-block">
+                                <i class="bi bi-person-check"></i> {{ request.approver.get_full_name }}
+                            </small>
+                            {% endif %}
+                        </div>
+                        <a href="{% url 'access:request_detail' pk=request.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </div>
+                </div>
+                {% if request.justification %}
+                <small class="text-muted mt-1 d-block">{{ request.justification|truncatewords:20 }}</small>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+            Заявки отсутствуют
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if is_paginated %}
+<div class="d-flex justify-content-center mt-4">
+    <ul class="pagination">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        <li class="page-item disabled">
+            <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

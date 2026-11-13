@@ -45,7 +45,7 @@
                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignUserModal">
                         <i class="bi bi-pencil me-1"></i>Заменить
                     </button>
-                    <form method="post" action="{% url 'equipment:clear_assign' equipment_type instance.pk %}" style="display:inline" onsubmit="return confirm('Освободить оборудование от пользователя?')">
+                    <form method="post" action="{% url 'equipment:clear_assign' equipment_type instance.pk %}" class="d-inline" onsubmit="return confirm('Освободить оборудование от пользователя?')">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-outline-danger" title="Освободить от пользователя">
                             <i class="bi bi-x-lg"></i>
@@ -183,7 +183,7 @@
                     <input type="text" class="form-control" id="userSearchInput" placeholder="ФИО или табельный номер">
                     <button type="button" class="btn btn-primary" id="userSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
                 </div>
-                <div id="userSearchResults" class="list-group" style="max-height: 300px; overflow-y: auto;"></div>
+                <div id="userSearchResults" class="list-group search-results-xl"></div>
             </div>
         </div>
     </div>

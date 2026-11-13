@@ -44,7 +44,7 @@
             <div class="card-header"><h6 class="mb-0">Основная информация</h6></div>
             <div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" style="width:40%">Инв. номер</td><td><strong>{{ instance.inventory_number }}</strong></td></tr>
+                    <tr><td class="text-muted" class="detail-label">Инв. номер</td><td><strong>{{ instance.inventory_number }}</strong></td></tr>
                     {% if instance.serial_number %}
                     <tr><td class="text-muted">Серийный номер</td><td>{{ instance.serial_number }}</td></tr>
                     {% endif %}
@@ -73,7 +73,7 @@
             <div class="card-body">
                 <table class="table table-sm mb-0">
                     {% if instance.ip_address %}
-                    <tr><td class="text-muted" style="width:40%">IP-адрес</td><td><code>{{ instance.ip_address }}</code></td></tr>
+                    <tr><td class="text-muted" class="detail-label">IP-адрес</td><td><code>{{ instance.ip_address }}</code></td></tr>
                     {% endif %}
                 </table>
             </div>
@@ -84,7 +84,7 @@
             <div class="card-header"><h6 class="mb-0">Расположение</h6></div>
             <div class="card-body">
                 <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" style="width:40%">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
+                    <tr><td class="text-muted" class="detail-label">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
                     <tr><td class="text-muted">Место</td><td>{{ instance.place|default:"—" }}</td></tr>
                 </table>
             </div>

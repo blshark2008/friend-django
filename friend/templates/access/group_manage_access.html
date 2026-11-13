@@ -1,0 +1,93 @@
+{% extends "access/base.html" %}
+
+{% block title %}Управление доступом — {{ group.name }} — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-key me-2"></i>Управление доступом — {{ group.name }}</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Back button -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:group_detail' pk=group.pk %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> К группе
+    </a>
+    <a href="{% url 'access:group_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-list"></i> К списку
+    </a>
+</div>
+
+<!-- Add resource -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-hdd-stack-plus me-2"></i>Добавить ресурс</h6>
+    </div>
+    <div class="card-body">
+        <form method="post" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_resource">
+            <div class="col-md-6">
+                <label for="id_resource" class="form-label">Ресурс</label>
+                <select name="resource_id" id="id_resource" class="form-select">
+                    <option value="">-- Выберите ресурс --</option>
+                    {% for r in available_resources %}
+                    <option value="{{ r.pk }}">{{ r.name }}{% if r.category %} ({{ r.category.name }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="id_access_level" class="form-label">Уровень доступа</label>
+                <select name="access_level" id="id_access_level" class="form-select">
+                    {% for value, label in resource_form.access_level.field.choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-plus-lg"></i> Добавить
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Group resources -->
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-hdd-stack me-2"></i>Ресурсы группы ({{ group_resources.count }})</h6>
+    </div>
+    <div class="card-body p-0">
+        {% if group_resources %}
+        <div class="list-group list-group-flush">
+            {% for access in group_resources %}
+            <div class="list-group-item list-group-item-action px-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-hdd-stack text-primary"></i>
+                        <strong>{{ access.resource.name }}</strong>
+                        {% if access.resource.category %}
+                        <small class="text-muted ms-2">({{ access.resource.category.name }})</small>
+                        {% endif %}
+                        <span class="badge bg-primary ms-2">{{ access.get_access_level_display }}</span>
+                    </div>
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="remove_resource">
+                        <input type="hidden" name="resource_id" value="{{ access.resource.pk }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-3 text-muted">
+            <small>Ресурсы не назначены</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

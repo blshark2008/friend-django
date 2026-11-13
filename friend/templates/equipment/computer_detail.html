@@ -86,7 +86,7 @@
                     <div class="card-header"><h6 class="mb-0">Аппаратное обеспечение</h6></div>
                     <div class="card-body">
                         <table class="table table-sm mb-0">
-                            <tr><td class="text-muted" style="width:40%">Процессор</td><td>{{ computer.cpu|default:"—" }}</td></tr>
+                            <tr><td class="text-muted" class="detail-label">Процессор</td><td>{{ computer.cpu|default:"—" }}</td></tr>
                             <tr><td class="text-muted">ОЗУ</td><td>{{ computer.ram_gb|default:"—" }} ГБ</td></tr>
                             <tr><td class="text-muted">Диск</td><td>{{ computer.storage_gb|default:"—" }} ГБ</td></tr>
                         </table>
@@ -98,7 +98,7 @@
                     <div class="card-header"><h6 class="mb-0">Программное обеспечение</h6></div>
                     <div class="card-body">
                         <table class="table table-sm mb-0">
-                            <tr><td class="text-muted" style="width:40%">ОС</td><td>{{ computer.os|default:"—" }}</td></tr>
+                            <tr><td class="text-muted" class="detail-label">ОС</td><td>{{ computer.os|default:"—" }}</td></tr>
                             <tr><td class="text-muted">Версия</td><td>{{ computer.os_version|default:"—" }}</td></tr>
                             <tr><td class="text-muted">Антивирус</td><td>{{ computer.antivirus_engine|default:"—" }}</td></tr>
                         </table>
@@ -110,7 +110,7 @@
                     <div class="card-header"><h6 class="mb-0">Сетевая информация</h6></div>
                     <div class="card-body">
                         <table class="table table-sm mb-0">
-                            <tr><td class="text-muted" style="width:40%">Имя в сети</td><td><strong>{{ computer.hostname }}</strong></td></tr>
+                            <tr><td class="text-muted" class="detail-label">Имя в сети</td><td><strong>{{ computer.hostname }}</strong></td></tr>
                             <tr><td class="text-muted">IP-адрес</td><td><code>{{ computer.ip_address|default:"—" }}</code></td></tr>
                             <tr><td class="text-muted">MAC-адрес</td><td><code>{{ computer.mac_address }}</code></td></tr>
                         </table>
@@ -122,7 +122,7 @@
                     <div class="card-header"><h6 class="mb-0">Расположение</h6></div>
                     <div class="card-body">
                         <table class="table table-sm mb-0">
-                            <tr><td class="text-muted" style="width:40%">Место</td><td>{{ computer.place|default:"—" }}</td></tr>
+                            <tr><td class="text-muted" class="detail-label">Место</td><td>{{ computer.place|default:"—" }}</td></tr>
                             <tr><td class="text-muted">Кабинет</td><td>{{ computer.location|default:"—" }}</td></tr>
                         </table>
                     </div>

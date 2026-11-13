@@ -1,0 +1,149 @@
+{% extends "access/base.html" %}
+
+{% block title %}Гранты доступа — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-key me-2"></i>Гранты доступа</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:grant_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Выдать доступ
+    </a>
+    <a href="{% url 'access:request_list' %}" class="btn btn-outline-info">
+        <i class="bi bi-inbox"></i> Заявки
+    </a>
+    <a href="{% url 'access:resource_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-hdd-stack"></i> Ресурсы
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <input type="text" name="q" class="form-control form-control-sm"
+                       placeholder="Поиск..." value="{{ request.GET.q|default:'' }}">
+            </div>
+            <div class="col-auto">
+                <select name="level" class="form-select form-select-sm">
+                    <option value="">Все уровни</option>
+                    {% for value, label in grant_levels %}
+                    <option value="{{ value }}" {% if current_level == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-auto">
+                <select name="grant_type" class="form-select form-select-sm">
+                    <option value="">Все типы</option>
+                    <option value="user" {% if current_grant_type == 'user' %}selected{% endif %}>Пользователь</option>
+                    <option value="group" {% if current_grant_type == 'group' %}selected{% endif %}>Группа</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <div class="form-check form-switch">
+                    <input type="checkbox" name="show_archived" class="form-check-input" id="showArchived"
+                           {% if show_archived %}checked{% endif %}>
+                    <label class="form-check-label" for="showArchived">Показать неактивные</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-search"></i>
+                </button>
+                <a href="{% url 'access:grant_list' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Grants list -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if grants %}
+        <div class="list-group list-group-flush">
+            {% for grant in grants %}
+            <div class="list-group-item list-group-item-action p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-2">
+                        {% if grant.user %}
+                        <i class="bi bi-person text-primary"></i>
+                        <span class="fw-semibold">{{ grant.user.get_full_name|default:grant.user.username }}</span>
+                        {% else %}
+                        <i class="bi bi-collection text-primary"></i>
+                        <span class="fw-semibold">{{ grant.group.name }}</span>
+                        {% endif %}
+                        <i class="bi bi-arrow-right text-muted"></i>
+                        <span>{{ grant.resource.name }}</span>
+                        <span class="badge bg-info text-dark">{{ grant.resource.get_type_display }}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary">{{ grant.get_level_display }}</span>
+                        {% if grant.is_expired %}
+                        <span class="badge bg-warning">Просрочен</span>
+                        {% endif %}
+                        {% if grant.is_revoked %}
+                        <span class="badge bg-danger">Отозван</span>
+                        {% endif %}
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'access:grant_delete' pk=grant.pk %}" class="btn btn-outline-danger" title="Удалить">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-1">
+                    <small class="text-muted">
+                        Выдан: {{ grant.granted_at|date:"d.m.Y H:i" }}
+                        {% if grant.expires_at %}
+                        | Истекает: {{ grant.expires_at|date:"d.m.Y" }}
+                        {% endif %}
+                        {% if grant.justification %}
+                        | {{ grant.justification|truncatewords:10 }}
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-key fs-1 d-block mb-2"></i>
+            Гранты доступа отсутствуют
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if is_paginated %}
+<div class="d-flex justify-content-center mt-4">
+    <ul class="pagination">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.level %}&level={{ request.GET.level }}{% endif %}{% if request.GET.grant_type %}&grant_type={{ request.GET.grant_type }}{% endif %}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        <li class="page-item disabled">
+            <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.level %}&level={{ request.GET.level }}{% endif %}{% if request.GET.grant_type %}&grant_type={{ request.GET.grant_type }}{% endif %}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,194 @@
+{% extends "access/base.html" %}
+
+{% block title %}Группы доступа — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-collection me-2"></i>Группы доступа</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:group_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Добавить группу
+    </a>
+    <a href="{% url 'access:resource_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-hdd-stack"></i> Ресурсы
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-auto">
+                <input type="text" name="q" class="form-control form-control-sm"
+                       placeholder="Поиск..." value="{{ request.GET.q|default:'' }}">
+            </div>
+            <div class="col-auto">
+                <div class="form-check form-switch">
+                    <input type="checkbox" name="show_archived" class="form-check-input" id="showArchived"
+                           {% if show_archived %}checked{% endif %}>
+                    <label class="form-check-label" for="showArchived">Показать удалённые</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="form-check form-switch">
+                    <input type="checkbox" name="audited" class="form-check-input" id="showAudited"
+                           value="1"
+                           {% if current_audited == '1' %}checked{% endif %}>
+                    <label class="form-check-label" for="showAudited">Только с аудитом</label>
+                </div>
+            </div>
+            <div class="col-auto">
+                <select name="ad_link" class="form-select form-select-sm">
+                    <option value="">Ссылка на AD</option>
+                    <option value="1" {% if current_ad_link == '1' %}selected{% endif %}>Есть</option>
+                    <option value="0" {% if current_ad_link == '0' %}selected{% endif %}>Нет</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-search"></i>
+                </button>
+                <a href="{% url 'access:group_list' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Groups table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if groups %}
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th>Наименование</th>
+                        <th style="width: 180px;">Ресурс</th>
+                        <th style="width: 140px;">Тип ресурса</th>
+                        <th style="width: 130px;">Статус</th>
+                        <th style="width: 130px;">Аудит</th>
+                        <th style="width: 100px;">AD</th>
+                        <th style="width: 100px;">Грантов</th>
+                        <th style="width: 160px;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in groups %}
+                    <tr>
+                        <td class="text-muted">{{ forloop.counter|add:start_index }}</td>
+                        <td>
+                            <a href="{% url 'access:group_detail' pk=group.pk %}" class="text-decoration-none fw-semibold">
+                                {{ group.display_name }}
+                            </a>
+                            {% if group.description %}
+                            <br><small class="text-muted">{{ group.description|truncatewords:10 }}</small>
+                            {% endif %}
+                            {% if group.pinned_department %}
+                            <br><small class="text-primary"><i class="bi bi-pin-angle"></i> {{ group.pinned_department.name }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if group.resource %}
+                            <a href="{% url 'access:resource_detail' pk=group.resource.pk %}" class="text-decoration-none">
+                                <i class="bi bi-hdd-stack text-primary"></i> {{ group.resource.name }}
+                            </a>
+                            {% else %}
+                            <small class="text-muted">—</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if group.resource %}
+                            <span class="badge bg-info text-dark">{{ group.resource.get_type_display }}</span>
+                            {% else %}
+                            <small class="text-muted">—</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if group.is_active %}
+                            <span class="badge bg-success">Активна</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Неактивна</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if group.audited %}
+                            <span class="badge bg-info">Пройден</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">Не проведён</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if group.ad_group_dn %}
+                            <span class="badge bg-success"><i class="bi bi-diagram-3"></i> AD</span>
+                            {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-diagram-3"></i> —</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">{{ group.grants_count }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'access:group_detail' pk=group.pk %}" class="btn btn-outline-primary" title="Просмотр">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if group.is_active %}
+                                <a href="{% url 'access:group_edit' pk=group.pk %}" class="btn btn-outline-secondary" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'access:group_delete' pk=group.pk %}" class="btn btn-outline-danger" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                                {% else %}
+                                <form method="post" action="{% url 'access:group_restore' pk=group.pk %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-success" title="Восстановить">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-collection fs-1 d-block mb-2"></i>
+            Группы доступа отсутствуют
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if is_paginated %}
+<div class="d-flex justify-content-center mt-4">
+    <ul class="pagination">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, val in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ val }}{% endif %}{% endfor %}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        <li class="page-item disabled">
+            <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, val in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ val }}{% endif %}{% endfor %}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}
+{% endblock %}

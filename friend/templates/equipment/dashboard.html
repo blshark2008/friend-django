@@ -105,16 +105,16 @@
 <!-- Таблица 1: По подразделению закрепленного за техникой сотрудника -->
 <h5 class="mb-3"><i class="bi bi-person-badge me-2"></i>Техника по подразделениям (закреплённые сотрудники)</h5>
 <div class="card mb-4">
-    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+    <div class="table-responsive search-results-xl">
         <table class="table table-sm table-hover dept-table mb-0" data-sortable>
             <thead>
                 <tr>
-                    <th style="width: 200px;" class="sortable">Подразделение</th>
+                    <th class="w-200 sortable">Подразделение</th>
                     {% for cat_name in all_categories %}
-                    <th style="width: 90px;" class="sortable">{{ cat_name }}</th>
+                    <th class="w-90 sortable">{{ cat_name }}</th>
                     {% endfor %}
-                    <th style="width: 70px;" class="sortable">Итого</th>
-                    <th style="width: 90px;" class="sortable">Сотрудников</th>
+                    <th class="w-70 sortable">Итого</th>
+                    <th class="w-90 sortable">Сотрудников</th>
                 </tr>
             </thead>
             <tbody>
@@ -136,16 +136,16 @@
 <!-- Таблица 2: По подразделениям МОЛ -->
 <h5 class="mb-3"><i class="bi bi-person-check me-2"></i>Техника по подразделениям (материально ответственные)</h5>
 <div class="card">
-    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+    <div class="table-responsive search-results-xl">
         <table class="table table-sm table-hover dept-table mb-0" data-sortable>
             <thead>
                 <tr>
-                    <th style="width: 200px;" class="sortable">Подразделение</th>
+                    <th class="w-200 sortable">Подразделение</th>
                     {% for cat_name in all_categories %}
-                    <th style="width: 90px;" class="sortable">{{ cat_name }}</th>
+                    <th class="w-90 sortable">{{ cat_name }}</th>
                     {% endfor %}
-                    <th style="width: 70px;" class="sortable">Итого</th>
-                    <th style="width: 90px;" class="sortable">Сотрудников</th>
+                    <th class="w-70 sortable">Итого</th>
+                    <th class="w-90 sortable">Сотрудников</th>
                 </tr>
             </thead>
             <tbody>
@@ -167,16 +167,16 @@
 <!-- Таблица 3: Подкатегории компьютерного оборудования — закрепленные сотрудники -->
 <h5 class="mb-3"><i class="bi bi-pc-display me-2"></i>Компьютерное оборудование по подразделениям (закреплённые сотрудники)</h5>
 <div class="card mb-4">
-    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+    <div class="table-responsive search-results-xl">
         <table class="table table-sm table-hover dept-table mb-0" data-sortable>
             <thead>
                 <tr>
-                    <th style="width: 200px;" class="sortable">Подразделение</th>
+                    <th class="w-200 sortable">Подразделение</th>
                     {% for sub_name in computer_subcat_names %}
-                    <th style="width: 90px;" class="sortable">{{ sub_name }}</th>
+                    <th class="w-90 sortable">{{ sub_name }}</th>
                     {% endfor %}
-                    <th style="width: 70px;" class="sortable">Итого</th>
-                    <th style="width: 90px;" class="sortable">Сотрудников</th>
+                    <th class="w-70 sortable">Итого</th>
+                    <th class="w-90 sortable">Сотрудников</th>
                 </tr>
             </thead>
             <tbody>
@@ -198,16 +198,16 @@
 <!-- Таблица 4: Подкатегории компьютерного оборудования — МОЛ -->
 <h5 class="mb-3"><i class="bi bi-pc-display-check me-2"></i>Компьютерное оборудование по подразделениям (материально ответственные)</h5>
 <div class="card">
-    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+    <div class="table-responsive search-results-xl">
         <table class="table table-sm table-hover dept-table mb-0" data-sortable>
             <thead>
                 <tr>
-                    <th style="width: 200px;" class="sortable">Подразделение</th>
+                    <th class="w-200 sortable">Подразделение</th>
                     {% for sub_name in computer_subcat_names %}
-                    <th style="width: 90px;" class="sortable">{{ sub_name }}</th>
+                    <th class="w-90 sortable">{{ sub_name }}</th>
                     {% endfor %}
-                    <th style="width: 70px;" class="sortable">Итого</th>
-                    <th style="width: 90px;" class="sortable">Сотрудников</th>
+                    <th class="w-70 sortable">Итого</th>
+                    <th class="w-90 sortable">Сотрудников</th>
                 </tr>
             </thead>
             <tbody>

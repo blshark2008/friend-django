@@ -13,8 +13,11 @@
         <i class="bi bi-pencil"></i> Редактировать
     </a>
     <a href="{% url 'access:group_create' %}?resource={{ resource.pk }}" class="btn btn-outline-success">
-        <i class="bi bi-plus-lg"></i> Привязать группу
+        <i class="bi bi-plus-lg"></i> Создать группу
     </a>
+    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#attachGroupModal">
+        <i class="bi bi-link-45deg"></i> Привязать группу
+    </button>
     <a href="{% url 'access:request_create' %}?resource={{ resource.pk }}" class="btn btn-outline-info">
         <i class="bi bi-inbox"></i> Заявка на доступ
     </a>
@@ -180,9 +183,16 @@
                         <small class="text-muted">
                             <i class="bi bi-key"></i> {{ group.grants_count }} грантов
                         </small>
-                        <a href="{% url 'access:group_edit' pk=group.pk %}" class="btn btn-sm btn-outline-secondary">
+                        <a href="{% url 'access:group_edit' pk=group.pk %}" class="btn btn-sm btn-outline-secondary" title="Редактировать">
                             <i class="bi bi-pencil"></i>
                         </a>
+                        <form method="post" action="{% url 'access:resource_detach_group' resource_pk=resource.pk group_id=group.pk %}" class="d-inline"
+                              onsubmit="return confirm('Отвязать группу от ресурса?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Отвязать группу">
+                                <i class="bi bi-unlink"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
                 {% if group.description %}
@@ -242,4 +252,115 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Modal привязки группы -->
+<div class="modal fade" id="attachGroupModal" tabindex="-1" aria-labelledby="attachGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="attachGroupModalLabel">
+                    <i class="bi bi-link-45deg me-2"></i>Привязать группу к ресурсу
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Фильтр -->
+                <div class="mb-3">
+                    <input type="text" id="groupSearch" class="form-control"
+                           placeholder="Поиск по названию группы, ресурсу или описанию..."
+                           oninput="searchGroups()">
+                </div>
+                <!-- Список групп -->
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover table-sm mb-0" id="groupTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Группа</th>
+                                <th style="width: 200px;">Ресурс</th>
+                                <th>Описание</th>
+                                <th style="width: 80px;" class="text-center">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for group in available_groups %}
+                            <tr class="group-row" data-name="{{ group.name|lower }}{{ group.display_name|lower }}{{ group.resource.name|lower }}{{ group.description|lower }}">
+                                <td>
+                                    <strong>{{ group.display_name }}</strong>
+                                    {% if group.is_active %}
+                                    <span class="badge bg-success ms-1">Активна</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary ms-1">Неактивна</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if group.resource %}
+                                    <a href="{% url 'access:resource_detail' pk=group.resource.pk %}" class="text-decoration-none">
+                                        {{ group.resource.name }}
+                                    </a>
+                                    {% else %}
+                                    <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td><small class="text-muted">{{ group.description|truncatewords:8|default:"—" }}</small></td>
+                                <td class="text-center">
+                                    <form method="post" action="{% url 'access:resource_attach_group' resource_pk=resource.pk %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="group_id" value="{{ group.pk }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary" title="Привязать">
+                                            <i class="bi bi-link-45deg"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">Нет доступных групп</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div id="groupSearchMsg" class="text-center text-muted mt-2" style="display: none;">
+                    Ничего не найдено
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Исправление aria-hidden для модального окна
+document.addEventListener('DOMContentLoaded', function () {
+    var modal = document.getElementById('attachGroupModal');
+    if (modal) {
+        modal.addEventListener('show.bs.modal', function () {
+            this.removeAttribute('aria-hidden');
+        });
+        modal.addEventListener('hide.bs.modal', function () {
+            this.setAttribute('aria-hidden', 'true');
+        });
+    }
+});
+
+function searchGroups() {
+    var query = document.getElementById('groupSearch').value.toLowerCase().trim();
+    var rows = document.querySelectorAll('.group-row');
+    var visibleCount = 0;
+
+    rows.forEach(function(row) {
+        var data = row.getAttribute('data-name');
+        var match = !query || data.includes(query);
+        row.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+
+    var msg = document.getElementById('groupSearchMsg');
+    if (msg) {
+        msg.style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+}
+</script>
 {% endblock %}

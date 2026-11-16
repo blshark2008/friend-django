@@ -1,0 +1,213 @@
+{% extends "access/base.html" %}
+
+{% block title %}Импорт внешних лиц — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-file-earmark-arrow-up me-2"></i>Импорт внешних лиц из CSV</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Upload form -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-upload me-2"></i>Загрузить CSV файл</h6>
+    </div>
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label for="csv_file" class="form-label">CSV файл</label>
+                    <input type="file" name="csv_file" id="csv_file" class="form-control" accept=".csv">
+                    <small class="text-muted d-block mt-1">
+                        Формат: <strong>ФИО, Должность, Email, Телефон</strong><br>
+                        Строки вида <em>"Отдел,,,"</em> — заголовки подразделений для последующих сотрудников.<br>
+                        ФИО берётся только первые 3 слова. Должность формируется как <em>"Отдел-Должность"</em>.
+                    </small>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-upload"></i> Загрузить
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Statistics summary -->
+{% if statistics and statistics.total_rows > 0 %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-info text-white">
+        <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Статистика импорта</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <div class="card bg-light border-0">
+                    <div class="card-body text-center">
+                        <h3 class="mb-0 text-muted">{{ statistics.total_rows }}</h3>
+                        <small class="text-muted">Всего строк</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-success">
+                    <div class="card-body text-center">
+                        <h3 class="mb-0 text-success">{{ statistics.created }}</h3>
+                        <small class="text-muted">Создано</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-primary">
+                    <div class="card-body text-center">
+                        <h3 class="mb-0 text-primary">{{ statistics.updated }}</h3>
+                        <small class="text-muted">Обновлено</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-danger">
+                    <div class="card-body text-center">
+                        <h3 class="mb-0 text-danger">{{ statistics.errors }}</h3>
+                        <small class="text-muted">Ошибки</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% if statistics.skipped_empty > 0 %}
+        <div class="mt-3">
+            <small class="text-muted">
+                <i class="bi bi-info-circle me-1"></i>
+                Пропущено (пустые данные): {{ statistics.skipped_empty }}
+            </small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Success results -->
+{% if success_results %}
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-success text-white">
+        <h6 class="mb-0"><i class="bi bi-check-circle me-2"></i>Успешно обработано: {{ success_results|length }} строк</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 60px;">#</th>
+                        <th>ФИО</th>
+                        <th style="width: 200px;">Подразделение</th>
+                        <th style="width: 200px;">Должность</th>
+                        <th>Email</th>
+                        <th>Телефон</th>
+                        <th style="width: 120px;">Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in success_results %}
+                    <tr>
+                        <td class="text-muted">{{ result.row }}</td>
+                        <td>{{ result.name }}</td>
+                        <td>
+                            {% if result.department %}
+                            <small>{{ result.department }}</small>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if result.position %}
+                            <small>{{ result.position }}</small>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if result.email %}
+                            <small>{{ result.email }}</small>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if result.phone %}
+                            <small>{{ result.phone }}</small>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if result.action == 'Создан' %}
+                            <span class="badge bg-success">Создан</span>
+                            {% else %}
+                            <span class="badge bg-primary">Обновлён</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Error results -->
+{% if error_results %}
+<div class="card shadow-sm">
+    <div class="card-header bg-danger text-white">
+        <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Ошибки: {{ error_results|length }} строк</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 60px;">#</th>
+                        <th>ФИО</th>
+                        <th style="width: 200px;">Подразделение</th>
+                        <th style="width: 200px;">Должность</th>
+                        <th>Ошибка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for error in error_results %}
+                    <tr class="table-danger">
+                        <td class="text-muted">{{ error.row }}</td>
+                        <td>{{ error.name }}</td>
+                        <td>
+                            {% if error.department %}
+                            <small>{{ error.department }}</small>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if error.position %}
+                            <small>{{ error.position }}</small>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ error.error }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Back button -->
+<div class="mt-3">
+    <a href="{% url 'access:external_user_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад к списку внешних лиц
+    </a>
+</div>
+{% endblock %}

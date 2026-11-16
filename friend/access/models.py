@@ -5,6 +5,36 @@ from django.utils import timezone
 User = get_user_model()
 
 
+class PositionRole(models.Model):
+    """Связь должности сотрудника с ролью доступа.
+
+    Определяет, какие роли доступа автоматически предоставляются
+    сотрудникам с данной должностью.
+    """
+    position = models.ForeignKey(
+        'accounts.Position', verbose_name='Должность',
+        on_delete=models.CASCADE, related_name='position_roles',
+    )
+    role = models.ForeignKey(
+        'Role', verbose_name='Роль',
+        on_delete=models.CASCADE, related_name='position_roles',
+    )
+    added_at = models.DateTimeField('Добавлена', auto_now_add=True)
+    added_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='position_roles_added',
+    )
+
+    class Meta:
+        verbose_name = 'Должность — Роль'
+        verbose_name_plural = 'Должности — Роли'
+        ordering = ['position__name', 'role__name']
+        unique_together = ['position', 'role']
+
+    def __str__(self):
+        return f'{self.position.name} → {self.role.name}'
+
+
 class Resource(models.Model):
     """Общая сущность: любой объект, доступ к которому учитываем."""
     class Type(models.TextChoices):
@@ -101,11 +131,13 @@ class Resource(models.Model):
 
     @property
     def grants_count(self):
-        return self.grants.filter(is_active=True).count()
+        # Гранты привязаны к группам, а не напрямую к ресурсам
+        # Возвращаем 0 — подсчёт ведётся через AccessGroup
+        return 0
 
     @property
     def active_users_count(self):
-        return self.grants.filter(is_active=True).values_list('user_id', flat=True).distinct().count()
+        return 0
 
 
 class NetworkResourceDetail(models.Model):
@@ -365,6 +397,17 @@ class AccessGroup(models.Model):
     def grants_count(self):
         return self.grants.filter(is_active=True).count()
 
+    @property
+    def resource_type(self):
+        """Возвращает тип ресурса, к которому привязана группа."""
+        if self.resource:
+            return self.resource.type
+        # Если ресурс не привязан, пытаемся извлечь из name
+        parts = self.name.split('-')
+        if len(parts) >= 1 and parts[0].upper() in dict(self.TYPE_PREFIXES).keys():
+            return parts[0].upper()
+        return ''
+
     def generate_name(self):
         """Конструирует наименование по правилу: ТИП-РЕСУРС-ОБЛАСТЬ-УРОВЕНЬ."""
         parts = []
@@ -421,24 +464,26 @@ class AccessGroup(models.Model):
 
 
 class AccessGrant(models.Model):
-    """Универсальный грант доступа: пользователь/группа → ресурс."""
+    """Грант доступа: пользователь → группа."""
 
     grant_type = models.CharField(
         'Тип гранта', max_length=10, choices=[
             ('user', 'Пользователь'),
             ('group', 'Группа'),
+            ('external', 'Внешнее лицо'),
         ], default='user',
     )
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, null=True, blank=True,
         related_name='access_grants',
     )
+    external_user = models.ForeignKey(
+        'ExternalUser', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='access_grants',
+    )
     group = models.ForeignKey(
         AccessGroup, on_delete=models.CASCADE, null=True, blank=True,
         related_name='grants',
-    )
-    resource = models.ForeignKey(
-        Resource, on_delete=models.CASCADE, related_name='grants',
     )
     is_active = models.BooleanField('Активен', default=True)
     granted_at = models.DateTimeField('Выдан', auto_now_add=True)
@@ -456,21 +501,16 @@ class AccessGrant(models.Model):
     class Meta:
         verbose_name = 'Грант доступа'
         verbose_name_plural = 'Гранты доступа'
-        unique_together = ['user', 'group', 'resource']
-        ordering = ['resource__name']
-        constraints = [
-            models.CheckConstraint(
-                check=(
-                    models.Q(grant_type='user', user__isnull=False, group__isnull=True)
-                    | models.Q(grant_type='group', user__isnull=True, group__isnull=False)
-                ),
-                name='grant_type_consistency',
-            ),
-        ]
+        ordering = ['group__name']
 
     def __str__(self):
-        who = self.user.get_full_name() if self.user else (self.group.name if self.group else '?')
-        return f'{who} → {self.resource.name}'
+        if self.external_user:
+            who = self.external_user.full_name
+        elif self.user:
+            who = self.user.get_full_name()
+        else:
+            who = '?'
+        return f'{who} → {self.group.name}'
 
     @property
     def is_expired(self):
@@ -526,15 +566,10 @@ class AccessRequest(models.Model):
         self.save()
 
     def grant_access(self, granted_by):
-        """Создать AccessGrant и закрыть заявку."""
-        grant = AccessGrant.objects.create(
-            grant_type='user',
-            user=self.requester,
-            resource=self.resource,
-            level=self.level,
-            granted_by=granted_by,
-            justification=self.justification,
-        )
+        """Закрыть заявку."""
+        self.status = self.Status.GRANTED
+        self.approver = granted_by
+        self.save()
         self.grant = grant
         self.status = self.Status.GRANTED
         self.save()
@@ -686,3 +721,102 @@ class RoleGroupContainer(models.Model):
 
     def __str__(self):
         return f'{self.role.name} → {self.group_container.name}'
+
+
+# ============================================================================
+# Подрядчики и внешние лица
+# ============================================================================
+
+class Organization(models.Model):
+    """Организация-подрядчик."""
+
+    name = models.CharField('Название', max_length=255, unique=True)
+    inn = models.CharField('ИНН', max_length=12, unique=True)
+    contact_name = models.CharField('Контактное лицо', max_length=255, blank=True, default='')
+    contact_phone = models.CharField('Телефон контакта', max_length=50, blank=True, default='')
+    contact_email = models.EmailField('Email контакта', blank=True, default='')
+    is_active = models.BooleanField('Активное сотрудничество', default=True)
+    created_at = models.DateTimeField('Создана', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлена', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Организация-подрядчик'
+        verbose_name_plural = 'Организации-подрядчики'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class Contract(models.Model):
+    """Договор с организацией-подрядчиком."""
+
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Черновик'
+        ACTIVE = 'active', 'Действующий'
+        CLOSED = 'closed', 'Закрыт'
+        TERMINATED = 'terminated', 'Расторгнут'
+
+    organization = models.ForeignKey(
+        Organization, verbose_name='Организация',
+        on_delete=models.CASCADE, related_name='contracts',
+    )
+    number = models.CharField('Номер', max_length=100)
+    date_from = models.DateField('Дата начала')
+    date_to = models.DateField('Дата окончания')
+    document = models.FileField('Скан договора', upload_to='contracts/%Y/%m/%d/', blank=True, null=True)
+    status = models.CharField(
+        'Статус', max_length=20, choices=Status.choices, default=Status.DRAFT,
+    )
+    closed_at = models.DateTimeField('Факт закрытия', null=True, blank=True)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Договор'
+        verbose_name_plural = 'Договоры'
+        ordering = ['-date_to']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(date_to__gt=models.F('date_from')),
+                name='date_to_greater_than_date_from',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.organization.name} — {self.number} от {self.date_from.strftime("%d.%m.%Y")}'
+
+    @property
+    def is_active(self):
+        return self.status == self.Status.ACTIVE and self.date_to >= timezone.now().date()
+
+
+class ExternalUser(models.Model):
+    """Внешнее лицо (сотрудник подрядчика или физлицо)."""
+
+    class UserType(models.TextChoices):
+        CONTRACTOR_EMPLOYEE = 'contractor_employee', 'Сотрудник подрядчика'
+        INDIVIDUAL = 'individual', 'Физическое лицо'
+
+    contract = models.ForeignKey(
+        Contract, verbose_name='Договор',
+        on_delete=models.CASCADE, related_name='external_users',
+    )
+    full_name = models.CharField('ФИО', max_length=255)
+    user_type = models.CharField(
+        'Тип', max_length=30, choices=UserType.choices, default=UserType.CONTRACTOR_EMPLOYEE,
+    )
+    id_doc_no = models.CharField('Номер документа', max_length=50, blank=True, default='')
+    department = models.CharField('Подразделение', max_length=255, blank=True, default='')
+    position = models.CharField('Должность', max_length=255, blank=True, default='')
+    is_active = models.BooleanField('Активен', default=True)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Внешнее лицо'
+        verbose_name_plural = 'Внешние лица'
+        ordering = ['full_name']
+
+    def __str__(self):
+        return f'{self.full_name} ({self.get_user_type_display()})'

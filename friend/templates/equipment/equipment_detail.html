@@ -78,6 +78,10 @@
                     <span class="badge bg-success">Активно</span>
                     {% elif instance.status == 'maintenance' %}
                     <span class="badge bg-warning text-dark">На обслуживании</span>
+                    {% elif instance.status == 'pending' %}
+                    <span class="badge bg-info">Не подтверждён учёт</span>
+                    {% elif instance.status == 'confirmed' %}
+                    <span class="badge bg-primary">Подтверждён учёт</span>
                     {% else %}
                     <span class="badge bg-danger">Списано</span>
                     {% endif %}
@@ -94,4 +98,49 @@
         </div>
     </div>
 </div>
+
+<!-- SIEM информация -->
+{% if instance.siem_host %}
+<div class="card table-card mb-4 border-info">
+    <div class="card-header bg-info bg-opacity-10">
+        <h6 class="mb-0"><i class="bi bi-cloud-check me-2"></i>SIEM данные</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="fw-semibold text-muted small">SIEM хост</div>
+                <div>
+                    <a href="{% url 'siem:host_detail' instance.siem_host.pk %}" class="text-decoration-none">
+                        <i class="bi bi-pc me-1"></i>{{ instance.siem_host.hostname }}
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="fw-semibold text-muted small">IP-адрес (SIEM)</div>
+                <div><code>{{ instance.siem_host.ip_address|default:'—' }}</code></div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="fw-semibold text-muted small">ОС (SIEM)</div>
+                <div>{{ instance.siem_host.os_name|default:instance.siem_host.os_info|default:'—' }}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="fw-semibold text-muted small">Антивирус</div>
+                <div>
+                    {% if instance.siem_host.antivirus_installed %}
+                    <span class="badge bg-success">
+                        <i class="bi bi-shield-check me-1"></i>{{ instance.siem_host.antivirus_name|default:'Установлен' }}
+                    </span>
+                    {% else %}
+                    <span class="badge bg-danger">Не установлен</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="fw-semibold text-muted small">Последний контакт</div>
+                <div>{{ instance.siem_host.last_seen|date:"d.m.Y H:i" }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

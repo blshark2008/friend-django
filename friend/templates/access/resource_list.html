@@ -49,6 +49,22 @@
                 </select>
             </div>
             <div class="col-auto">
+                <select name="groups" class="form-select form-select-sm">
+                    <option value="">Все группы</option>
+                    <option value="0" {% if current_groups == '0' %}selected{% endif %}>Без групп</option>
+                    <option value="1" {% if current_groups == '1' %}selected{% endif %}>1 группа</option>
+                    <option value="gt1" {% if current_groups == 'gt1' %}selected{% endif %}>2+ групп</option>
+                    <option value="gt5" {% if current_groups == 'gt5' %}selected{% endif %}>5+ групп</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <select name="audit" class="form-select form-select-sm">
+                    <option value="">Вся актуализация</option>
+                    <option value="valid" {% if current_audit == 'valid' %}selected{% endif %}>Актуализирован</option>
+                    <option value="invalid" {% if current_audit == 'invalid' %}selected{% endif %}>Не актуализирован</option>
+                </select>
+            </div>
+            <div class="col-auto">
                 <div class="form-check form-switch">
                     <input type="checkbox" name="show_archived" class="form-check-input" id="showArchived"
                            {% if show_archived %}checked{% endif %}>
@@ -80,9 +96,10 @@
                         <th style="width: 140px;">Тип</th>
                         <th style="width: 100px;">Статус</th>
                         <th style="width: 150px;">Актуализация</th>
+                        <th style="width: 100px;">Групп</th>
                         <th style="width: 100px;">Грантов</th>
                         <th style="width: 100px;">Пользов.</th>
-                        <th style="width: 160px;">Действия</th>
+                        <th style="width: 180px;">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -116,6 +133,11 @@
                             {% if resource.last_audit_date %}
                             <br><small class="text-muted">{{ resource.last_audit_date|date:"d.m.Y" }}</small>
                             {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <a href="{% url 'access:resource_detail' pk=resource.pk %}" class="btn btn-sm btn-outline-primary" title="Привязать группу">
+                                <i class="bi bi-collection"></i> {{ resource.access_groups.count }}
+                            </a>
                         </td>
                         <td class="text-center">{{ resource.grants_count }}</td>
                         <td class="text-center">{{ resource.active_users_count }}</td>

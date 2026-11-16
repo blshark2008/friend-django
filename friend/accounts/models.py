@@ -126,3 +126,10 @@ class User(AbstractUser):
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
+
+    def get_full_name(self):
+        """Возвращает полное ФИО с отчеством."""
+        parts = [self.last_name, self.first_name]
+        if self.patronymic:
+            parts.append(self.patronymic)
+        return ' '.join(parts)

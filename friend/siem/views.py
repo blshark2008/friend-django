@@ -26,6 +26,77 @@ from accounts.models import User as AccountUser
 
 
 # ============================================================================
+# Утилиты
+# ============================================================================
+
+def _sync_equipment_from_siem(host):
+    """Синхронизирует данные Equipment с SIEM Host.
+    
+    Первичная связь устанавливается по серийному номеру.
+    """
+    from equipment.models import Equipment
+    
+    # Ищем Equipment по serial number (первичный ключ связи)
+    equipment = None
+    
+    # 1. По serial number — используем host.serial_number (уже очищенный)
+    serial = host.serial_number.strip() if host.serial_number else ''
+    if serial:
+        equipment = Equipment.objects.filter(
+            serial_number=serial, archived=False
+        ).first()
+    
+    # 2. По hostname (если не нашли по serial)
+    if not equipment and host.hostname:
+        equipment = Equipment.objects.filter(
+            hostname__iexact=host.hostname, archived=False
+        ).first()
+    
+    # 3. По IP (если не нашли по serial или hostname)
+    if not equipment and host.ip_address:
+        equipment = Equipment.objects.filter(
+            ip_address=host.ip_address, archived=False
+        ).first()
+    
+    if not equipment:
+        return
+    
+    # Связываем с SIEM Host
+    update_fields = []
+    if equipment.siem_host != host:
+        equipment.siem_host = host
+        update_fields.append('siem_host')
+    
+    # Обновляем поля Equipment из SIEM (только если пустые)
+    if host.hostname and not equipment.hostname:
+        equipment.hostname = host.hostname
+        update_fields.append('hostname')
+    if host.ip_address and not equipment.ip_address:
+        equipment.ip_address = host.ip_address
+        update_fields.append('ip_address')
+    if host.mac_address and not equipment.mac_address:
+        equipment.mac_address = host.mac_address
+        update_fields.append('mac_address')
+    if host.os_name and not equipment.os:
+        equipment.os = host.os_name
+        update_fields.append('os')
+    if host.os_info and not equipment.os_version:
+        equipment.os_version = host.os_info
+        update_fields.append('os_version')
+    
+    # Обновляем антивирус
+    if host.antivirus_installed and not equipment.antivirus_engine:
+        equipment.antivirus_engine = host.antivirus_name or 'Unknown'
+        update_fields.append('antivirus_engine')
+    if host.antivirus_installed and not equipment.antivirus_active:
+        equipment.antivirus_active = True
+        update_fields.append('antivirus_active')
+    
+    if update_fields:
+        equipment.save(update_fields=update_fields)
+
+
+# ============================================================================
 # HTML-страницы
 # ============================================================================
 
@@ -948,8 +1019,12 @@ class InventoryIngestViewSet(viewsets.ViewSet):
                 update_fields = ['last_seen']
                 
                 # Обновляем поля Host из raw
-                if 'serial' in raw:
-                    host.serial_number = raw['serial']
+                if 'serial' in raw and raw['serial']:
+                    # Очищаем префикс "SN" если есть
+                    serial_val = raw['serial'].strip()
+                    if serial_val.startswith('SN'):
+                        serial_val = serial_val[2:]
+                    host.serial_number = serial_val
                     update_fields.append('serial_number')
                 if 'model' in raw:
                     host.os_info = raw['model']
@@ -1062,6 +1137,9 @@ class InventoryIngestViewSet(viewsets.ViewSet):
                 
                 if update_fields:
                     host.save(update_fields=update_fields)
+
+                # Синхронизация данных с Equipment
+                _sync_equipment_from_siem(host)
 
             InventorySnapshot.objects.create(host=host, **item)
             created += 1
@@ -1265,6 +1343,9 @@ class ExtendedHostInfoViewSet(viewsets.ViewSet):
         host.last_seen = timezone.now()
         update_fields.append('last_seen')
         host.save(update_fields=update_fields)
+
+        # Синхронизация данных с Equipment
+        _sync_equipment_from_siem(host)
 
         return Response({'status': 'ok'}, status=status.HTTP_200_OK)
 

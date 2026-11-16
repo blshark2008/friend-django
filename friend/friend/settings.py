@@ -25,7 +25,13 @@ SECRET_KEY = 'django-insecure-!84x3a%!7qt#m_vid1-o*ucy_uvb2@!rs^9p^#h#dk5elf)(qa
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '84.54.59.213', '[::1]', 'projectgame.ru', 'www.projectgame.ru', 'datalens.projectgame.ru']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '84.54.59.213', '[::1]', 'projectgame.ru', 'www.projectgame.ru', 'datalens.projectgame.ru', 'friend.projectgame.ru']
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://projectgame.ru',
+    'https://www.projectgame.ru',
+    'https://friend.projectgame.ru',
+]
 
 
 # Application definition
@@ -49,6 +55,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'friend.middleware.ScannerBlockMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',

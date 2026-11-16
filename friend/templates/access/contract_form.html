@@ -1,0 +1,235 @@
+{% extends "access/base.html" %}
+
+{% block title %}{% if form.instance.pk %}Редактирование{% else %}Создание{% endif %} договора — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0">
+    <i class="bi bi-{% if form.instance.pk %}pencil{% else %}plus-lg{% endif %} me-2"></i>
+    {% if form.instance.pk %}Редактирование договора{% else %}Новый договор{% endif %}
+</h4>
+{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Организация *</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="organization_display" readonly
+                               value="{% if form.instance.organization %}{{ form.instance.organization.name }}{% endif %}"
+                               placeholder="Выберите организацию...">
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#organizationModal">
+                            <i class="bi bi-search"></i>
+                        </button>
+                        {% if form.instance.organization %}
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearOrganization()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                    {{ form.organization }}
+                    {% if form.organization.errors %}
+                    <div class="text-danger small">{{ form.organization.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.number.id_for_label }}" class="form-label">Номер *</label>
+                    {{ form.number }}
+                    {% if form.number.errors %}
+                    <div class="text-danger small">{{ form.number.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.date_from.id_for_label }}" class="form-label">Дата начала *</label>
+                    {{ form.date_from }}
+                    {% if form.date_from.errors %}
+                    <div class="text-danger small">{{ form.date_from.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.date_to.id_for_label }}" class="form-label">Дата окончания *</label>
+                    {{ form.date_to }}
+                    <small class="form-text text-muted">Должна быть позже даты начала</small>
+                    {% if form.date_to.errors %}
+                    <div class="text-danger small">{{ form.date_to.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.status.id_for_label }}" class="form-label">Статус</label>
+                    {{ form.status }}
+                    {% if form.status.errors %}
+                    <div class="text-danger small">{{ form.status.errors }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label for="{{ form.document.id_for_label }}" class="form-label">Скан договора</label>
+                    {{ form.document }}
+                    {% if form.instance.document %}
+                    <br><small class="text-muted">
+                        <i class="bi bi-file-earmark-pdf"></i>
+                        <a href="{{ form.instance.document.url }}" target="_blank">Текущий файл</a>
+                    </small>
+                    {% endif %}
+                    {% if form.document.errors %}
+                    <div class="text-danger small">{{ form.document.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            <hr>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Сохранить
+                </button>
+                <a href="{% url 'access:contract_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Отмена
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Восстановление выбранной организации из формы
+    var selectedOrg = document.getElementById('{{ form.organization.id_for_label }}').value;
+    if (selectedOrg) {
+        var options = document.getElementById('{{ form.organization.id_for_label }}').options;
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].value === selectedOrg) {
+                document.getElementById('organization_display').value = options[i].text;
+                break;
+            }
+        }
+    }
+
+    // Исправление aria-hidden для модального окна
+    var organizationModal = document.getElementById('organizationModal');
+    if (organizationModal) {
+        organizationModal.addEventListener('show.bs.modal', function () {
+            this.removeAttribute('aria-hidden');
+        });
+        organizationModal.addEventListener('hide.bs.modal', function () {
+            this.setAttribute('aria-hidden', 'true');
+        });
+    }
+});
+
+function clearOrganization() {
+    document.getElementById('{{ form.organization.id_for_label }}').value = '';
+    document.getElementById('organization_display').value = '';
+}
+
+function selectOrganization(id, name) {
+    document.getElementById('{{ form.organization.id_for_label }}').value = id;
+    document.getElementById('organization_display').value = name;
+    var modal = bootstrap.Modal.getInstance(document.getElementById('organizationModal'));
+    modal.hide();
+}
+</script>
+
+<!-- Modal выбора организации -->
+<div class="modal fade" id="organizationModal" tabindex="-1" aria-labelledby="organizationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="organizationModalLabel">
+                    <i class="bi bi-building me-2"></i>Выберите организацию
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Фильтр -->
+                <div class="mb-3">
+                    <input type="text" id="organizationSearch" class="form-control"
+                           placeholder="Поиск по наименованию или ИНН..."
+                           oninput="filterOrganizations()">
+                </div>
+                <!-- Список организаций -->
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover table-sm" id="organizationTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Наименование</th>
+                                <th style="width: 120px;">ИНН</th>
+                                <th style="width: 100px;">Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for org in form.organization.queryset %}
+                            <tr class="organization-row" data-name="{{ org.name|lower }}" data-inn="{{ org.inn|lower }}">
+                                <td>{{ org.name }}</td>
+                                <td><code>{{ org.inn }}</code></td>
+                                <td>
+                                    {% if org.is_active %}
+                                    <span class="badge bg-success">Активна</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Неактивна</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-4">Организации не найдены</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function filterOrganizations() {
+    var query = document.getElementById('organizationSearch').value.toLowerCase().trim();
+    var rows = document.querySelectorAll('.organization-row');
+    var visibleCount = 0;
+
+    rows.forEach(function(row) {
+        var name = row.getAttribute('data-name');
+        var inn = row.getAttribute('data-inn');
+        var match = !query || name.includes(query) || inn.includes(query);
+        row.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+
+    // Показать сообщение если ничего не найдено
+    var tbody = document.querySelector('#organizationTable tbody');
+    var existingMsg = tbody.querySelector('.filter-empty');
+    if (visibleCount === 0 && !existingMsg) {
+        var tr = document.createElement('tr');
+        tr.className = 'filter-empty';
+        tr.innerHTML = '<td colspan="3" class="text-center text-muted py-4">Ничего не найдено</td>';
+        tbody.appendChild(tr);
+    } else if (visibleCount > 0 && existingMsg) {
+        existingMsg.remove();
+    }
+}
+
+// Выбор организации по клику
+document.addEventListener('click', function(e) {
+    var row = e.target.closest('.organization-row');
+    if (row) {
+        var name = row.querySelector('td').textContent.trim();
+        // Получаем ID из value скрытого поля формы
+        var select = document.getElementById('{{ form.organization.id_for_label }}');
+        var options = select.options;
+        var id = '';
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].text === name) {
+                id = options[i].value;
+                break;
+            }
+        }
+        selectOrganization(id, name);
+    }
+});
+</script>
+{% endblock %}

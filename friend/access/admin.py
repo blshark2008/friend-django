@@ -1,10 +1,11 @@
 from django.contrib import admin
 from .models import (
     Resource, AccessGroup, AccessGrant, AccessRequest, Role, RoleGroup,
-    GroupContainer, RoleGroupContainer, GroupContainerGroup,
+    GroupContainer, RoleGroupContainer, GroupContainerGroup, PositionRole,
     NetworkResourceDetail, SoftwareResourceDetail, RemoteAccessDetail,
     ServerResourceDetail, DatabaseResourceDetail, ApplicationResourceDetail,
     StorageResourceDetail, CloudResourceDetail, HardwareResourceDetail,
+    Organization, Contract, ExternalUser,
 )
 
 
@@ -38,10 +39,10 @@ class RoleGroupAdmin(admin.ModelAdmin):
 
 @admin.register(AccessGrant)
 class AccessGrantAdmin(admin.ModelAdmin):
-    list_display = ('user', 'group', 'resource', 'level', 'is_active', 'expires_at', 'granted_by')
-    list_filter = ('level', 'is_active', 'grant_type', 'resource__type')
-    search_fields = ('user__last_name', 'user__first_name', 'resource__name', 'group__name')
-    raw_id_fields = ('user', 'group', 'resource', 'granted_by')
+    list_display = ('user', 'group', 'is_active', 'expires_at', 'granted_by')
+    list_filter = ('is_active', 'grant_type')
+    search_fields = ('user__last_name', 'user__first_name', 'group__name')
+    raw_id_fields = ('user', 'group', 'granted_by')
     date_hierarchy = 'granted_at'
 
 
@@ -89,3 +90,38 @@ class GroupContainerGroupAdmin(admin.ModelAdmin):
     search_fields = ('group_container__name', 'access_group__name')
     raw_id_fields = ('group_container', 'access_group', 'added_by')
     date_hierarchy = 'added_at'
+
+
+@admin.register(PositionRole)
+class PositionRoleAdmin(admin.ModelAdmin):
+    list_display = ('position', 'role', 'added_at', 'added_by')
+    list_filter = ('role__is_active', 'added_at')
+    search_fields = ('position__name', 'role__name')
+    raw_id_fields = ('position', 'role', 'added_by')
+    date_hierarchy = 'added_at'
+
+
+@admin.register(Organization)
+class OrganizationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'inn', 'contact_name', 'contact_phone', 'is_active', 'created_at')
+    list_filter = ('is_active', 'created_at')
+    search_fields = ('name', 'inn', 'contact_name')
+    date_hierarchy = 'created_at'
+
+
+@admin.register(Contract)
+class ContractAdmin(admin.ModelAdmin):
+    list_display = ('organization', 'number', 'date_from', 'date_to', 'status', 'created_at')
+    list_filter = ('status', 'organization', 'created_at')
+    search_fields = ('number', 'organization__name')
+    raw_id_fields = ('organization',)
+    date_hierarchy = 'created_at'
+
+
+@admin.register(ExternalUser)
+class ExternalUserAdmin(admin.ModelAdmin):
+    list_display = ('full_name', 'contract', 'user_type', 'department', 'position', 'is_active')
+    list_filter = ('user_type', 'is_active', 'contract__status')
+    search_fields = ('full_name', 'department', 'position', 'id_doc_no')
+    raw_id_fields = ('contract',)
+    date_hierarchy = 'created_at'

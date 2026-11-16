@@ -7,7 +7,7 @@
 {% block page_title %}
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <h4 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Редактирование {{ type_label }}</h4>
-    <a href="{% if from_inventory %}{% url 'equipment:inventory' %}{% else %}{% url 'equipment:detail' equipment_type instance.pk %}{% endif %}" class="btn btn-outline-secondary btn-sm">
+    <a href="{% if search_query %}{% url 'equipment:inventory_search' %}?q={{ search_query|urlencode }}{% else %}{% url 'equipment:inventory' %}{% endif %}" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrow-left me-1"></i> Назад
     </a>
 </div>
@@ -16,6 +16,16 @@
 {% block content %}
 <form method="post">
     {% csrf_token %}
+
+    <!-- Кнопки (мобильная версия — вверху, в строку) -->
+    <div class="d-flex gap-2 d-md-none mb-3">
+        <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-check-lg me-1"></i> Сохранить
+        </button>
+        <a href="{% if search_query %}{% url 'equipment:inventory_search' %}?q={{ search_query|urlencode }}{% else %}{% url 'equipment:inventory' %}{% endif %}" class="btn btn-secondary flex-fill">
+            <i class="bi bi-x-lg me-1"></i> Отмена
+        </a>
+    </div>
 
     {% if form.non_field_errors %}
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -26,62 +36,41 @@
     </div>
     {% endif %}
 
-    <!-- Замена пользователя -->
-    <div class="card mb-3">
-        <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="bi bi-person-badge me-2"></i>Замена пользователя</h6>
-        </div>
-        <div class="card-body">
-            {% if instance.assigned_user %}
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                    <strong>Текущий пользователь:</strong>
-                    <span class="ms-2">{{ instance.assigned_user.get_full_name|default:instance.assigned_user.username }}</span>
-                    <span class="text-muted small ms-2">
-                        {% if instance.assigned_user.department %}· {{ instance.assigned_user.department.name }}{% endif %}
-                    </span>
-                </div>
-                <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignUserModal">
-                        <i class="bi bi-pencil me-1"></i>Заменить
-                    </button>
-                    <form method="post" action="{% url 'equipment:clear_assign' equipment_type instance.pk %}" class="d-inline" onsubmit="return confirm('Освободить оборудование от пользователя?')">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-outline-danger" title="Освободить от пользователя">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </form>
-                </div>
-            </div>
-            {% else %}
-            <div class="text-muted small mb-3">Пользователь не назначен</div>
-            {% endif %}
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignUserModal">
-                <i class="bi bi-person-plus me-1"></i>
-                {% if instance.assigned_user %}Заменить пользователя{% else %}Назначить пользователя{% endif %}
-            </button>
-        </div>
-    </div>
-
     <!-- Замена МОЛ -->
     <div class="card mb-3">
         <div class="card-header bg-light">
             <h6 class="mb-0"><i class="bi bi-person-check me-2"></i>Замена МОЛ</h6>
         </div>
         <div class="card-body">
-            <div class="mb-0">
-                <label class="form-label fw-semibold">{{ form.responsible_user.label }}</label>
-                {{ form.responsible_user }}
-                {% if form.responsible_user.errors %}
-                <div class="invalid-feedback d-block">{{ form.responsible_user.errors.0 }}</div>
-                {% endif %}
-                {% if form.responsible_user.help_text %}
-                <div class="form-text">{{ form.responsible_user.help_text }}</div>
-                {% endif %}
-                {% if instance.responsible_user %}
-                <div class="mt-1 text-muted small">Текущий МОЛ: <strong>{{ instance.responsible_user.get_full_name|default:instance.responsible_user.username }}</strong></div>
-                {% endif %}
+            {% if instance.responsible_user %}
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <strong>Текущий МОЛ:</strong>
+                    <span class="ms-2">{{ instance.responsible_user.get_full_name|default:instance.responsible_user.username }}</span>
+                    <span class="text-muted small ms-2">
+                        {% if instance.responsible_user.department %}· {{ instance.responsible_user.department.name }}{% endif %}
+                    </span>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignMolModal">
+                        <i class="bi bi-pencil me-1"></i>Заменить
+                    </button>
+                    <form method="post" action="{% url 'equipment:clear_mol' equipment_type instance.pk %}" class="d-inline" onsubmit="return confirm('Освободить оборудование от МОЛ?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger" title="Освободить от МОЛ">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
+            {% else %}
+            <div class="text-muted small mb-3">МОЛ не назначен</div>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignMolModal">
+                <i class="bi bi-person-plus me-1"></i> Назначить МОЛ
+            </button>
+            {% endif %}
+            <!-- Скрытое поле для валидации формы -->
+            <input type="hidden" name="responsible_user" value="{{ instance.responsible_user.id|default:'' }}">
         </div>
     </div>
 
@@ -159,31 +148,31 @@
         </div>
     </div>
 
-    <!-- Кнопки -->
-    <div class="d-flex gap-2 btn-group-mobile">
+    <!-- Кнопки (десктоп — внизу) -->
+    <div class="d-none d-md-flex gap-2 btn-group-mobile">
         <button type="submit" class="btn btn-primary">
             <i class="bi bi-check-lg me-1"></i> Сохранить
         </button>
-        <a href="{% if from_inventory %}{% url 'equipment:inventory' %}{% else %}{% url 'equipment:detail' equipment_type instance.pk %}{% endif %}" class="btn btn-secondary">
+        <a href="{% if search_query %}{% url 'equipment:inventory_search' %}?q={{ search_query|urlencode }}{% else %}{% url 'equipment:inventory' %}{% endif %}" class="btn btn-secondary">
             <i class="bi bi-x-lg me-1"></i> Отмена
         </a>
     </div>
 </form>
 
-<!-- Модальное окно: Назначить/Заменить пользователя -->
-<div class="modal fade" id="assignUserModal" tabindex="-1">
+<!-- Модальное окно: Назначить/Заменить МОЛ -->
+<div class="modal fade" id="assignMolModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Назначить пользователя</h5>
+                <h5 class="modal-title"><i class="bi bi-person-check me-2"></i>Назначить МОЛ</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="input-group mb-3">
-                    <input type="text" class="form-control" id="userSearchInput" placeholder="ФИО или табельный номер">
-                    <button type="button" class="btn btn-primary" id="userSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
+                    <input type="text" class="form-control" id="molSearchInput" placeholder="ФИО или табельный номер">
+                    <button type="button" class="btn btn-primary" id="molSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
                 </div>
-                <div id="userSearchResults" class="list-group search-results-xl"></div>
+                <div id="molSearchResults" class="list-group search-results-xl"></div>
             </div>
         </div>
     </div>
@@ -193,20 +182,20 @@
 
 {% block extra_js %}
 <script>
-// Поиск пользователей
-let userSearchTimeout = null;
+// Поиск МОЛ
+let molSearchTimeout = null;
 
-function searchUsers(query) {
+function searchMol(query) {
     fetch("{% url 'equipment:search_users' %}?q=" + encodeURIComponent(query))
         .then(r => r.json())
         .then(data => {
-            const container = document.getElementById('userSearchResults');
+            const container = document.getElementById('molSearchResults');
             if (data.users.length === 0) {
                 container.innerHTML = '<div class="list-group-item text-muted">Ничего не найдено</div>';
                 return;
             }
             container.innerHTML = data.users.map(u => `
-                <button type="button" class="list-group-item list-group-item-action" onclick="assignUser(${u.id}, '${u.name.replace(/'/g, "\\'")}')">
+                <button type="button" class="list-group-item list-group-item-action" onclick="assignMol(${u.id}, '${u.name.replace(/'/g, "\\'")}')">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <strong>${u.name}</strong>
@@ -221,12 +210,11 @@ function searchUsers(query) {
                 </button>
             `).join('');
         })
-        .catch(err => console.error('searchUsers error:', err));
+        .catch(err => console.error('searchMol error:', err));
 }
 
-// Назначить пользователя
-function assignUser(userId, userName) {
-    // Получаем CSRF токен из cookies
+// Назначить МОЛ
+function assignMol(userId, molName) {
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -244,7 +232,7 @@ function assignUser(userId, userName) {
     
     const csrfToken = getCookie('csrftoken');
     
-    fetch("{% url 'equipment:assign_ajax' equipment_type instance.pk %}", {
+    fetch("{% url 'equipment:assign_mol_ajax' equipment_type instance.pk %}", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -257,26 +245,26 @@ function assignUser(userId, userName) {
         if (data.status === 'ok') {
             location.reload();
         } else {
-            alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
+            alert('Ошибка: ' + (data.error || 'Не удалось назначить МОЛ'));
         }
     })
-    .catch(err => console.error('assignUser error:', err));
+    .catch(err => console.error('assignMol error:', err));
 }
 
-// Обработчики поиска
-const userInput = document.getElementById('userSearchInput');
-const userBtn = document.getElementById('userSearchBtn');
-if (userInput) {
-    userInput.addEventListener('input', function() {
-        clearTimeout(userSearchTimeout);
-        userSearchTimeout = setTimeout(() => searchUsers(this.value.trim()), 300);
+// Обработчики поиска МОЛ
+const molInput = document.getElementById('molSearchInput');
+const molBtn = document.getElementById('molSearchBtn');
+if (molInput) {
+    molInput.addEventListener('input', function() {
+        clearTimeout(molSearchTimeout);
+        molSearchTimeout = setTimeout(() => searchMol(this.value.trim()), 300);
     });
 }
-if (userBtn) {
-    userBtn.addEventListener('click', function() {
-        const q = document.getElementById('userSearchInput').value.trim();
+if (molBtn) {
+    molBtn.addEventListener('click', function() {
+        const q = document.getElementById('molSearchInput').value.trim();
         if (q.length >= 2) {
-            searchUsers(q);
+            searchMol(q);
         }
     });
 }

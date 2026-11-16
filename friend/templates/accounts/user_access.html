@@ -28,10 +28,235 @@
     <i class="bi bi-arrow-left me-1"></i>Назад к списку
 </a>
 
-<!-- Access card -->
+<!-- Access management -->
+<div class="d-flex gap-2 mb-4">
+    <a href="{% url 'access:position_roles' %}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-briefcase-fill me-1"></i>Роли должностей
+    </a>
+</div>
+
+<!-- Все группы доступа (из грантов + ролей) -->
+{% if all_access_groups %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0"><i class="bi bi-shield-check me-2"></i>Все группы доступа</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Группа доступа</th>
+                        <th>Ресурс</th>
+                        <th>Тип ресурса</th>
+                        <th>Источник</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in all_access_groups %}
+                    <tr>
+                        <td class="text-nowrap">{{ group.display_name }}</td>
+                        <td>
+                            {% if group.resource %}
+                                {{ group.resource.name }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if group.resource %}
+                            <span class="badge bg-secondary">{{ group.resource.get_type_display }}</span>
+                            {% elif group.type_prefix %}
+                            <span class="badge bg-secondary">{{ group.get_type_category }}</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1 flex-wrap">
+                                {% if group.id in grant_group_ids %}
+                                <span class="badge bg-primary">Грант</span>
+                                {% endif %}
+                                {% if group.id in role_group_ids %}
+                                <span class="badge bg-info text-dark">Роль</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Network grants -->
+{% if network_grants %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Сетевые ресурсы</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Группа доступа</th>
+                        <th>Ресурс</th>
+                        <th>Категория</th>
+                        <th>Дата выдачи</th>
+                        <th>Истекает</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for grant in network_grants %}
+                    <tr>
+                        <td class="text-nowrap">{{ grant.group.display_name }}</td>
+                        <td>{{ grant.group.resource.name }}</td>
+                        <td>
+                            {% if grant.group.type_prefix %}
+                            <span class="badge bg-secondary">{{ grant.group.get_type_category }}</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap">{{ grant.granted_at|date:"d.m.Y" }}</td>
+                        <td class="text-nowrap">
+                            {% if grant.expires_at %}
+                                {% if grant.is_expired %}
+                                <span class="badge bg-danger">{{ grant.expires_at|date:"d.m.Y" }}</span>
+                                {% else %}
+                                {{ grant.expires_at|date:"d.m.Y" }}
+                                {% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Software grants -->
+{% if software_grants %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-pc-display me-2"></i>Программные ресурсы</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Группа доступа</th>
+                        <th>Программа</th>
+                        <th>Категория</th>
+                        <th>Дата выдачи</th>
+                        <th>Истекает</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for grant in software_grants %}
+                    <tr>
+                        <td class="text-nowrap">{{ grant.group.display_name }}</td>
+                        <td>{{ grant.group.resource.name }}</td>
+                        <td>
+                            {% if grant.group.type_prefix %}
+                            <span class="badge bg-secondary">{{ grant.group.get_type_category }}</span>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                        <td class="text-nowrap">{{ grant.granted_at|date:"d.m.Y" }}</td>
+                        <td class="text-nowrap">
+                            {% if grant.expires_at %}
+                                {% if grant.is_expired %}
+                                <span class="badge bg-danger">{{ grant.expires_at|date:"d.m.Y" }}</span>
+                                {% else %}
+                                {{ grant.expires_at|date:"d.m.Y" }}
+                                {% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Other resource grants -->
+{% if other_grants %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="bi bi-collection me-2"></i>Прочие ресурсы</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Группа доступа</th>
+                        <th>Ресурс</th>
+                        <th>Тип</th>
+                        <th>Дата выдачи</th>
+                        <th>Истекает</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for grant in other_grants %}
+                    <tr>
+                        <td class="text-nowrap">{{ grant.group.display_name }}</td>
+                        <td>{{ grant.group.resource.name }}</td>
+                        <td>
+                            <span class="badge bg-secondary">{{ grant.group.resource.get_type_display }}</span>
+                        </td>
+                        <td class="text-nowrap">{{ grant.granted_at|date:"d.m.Y" }}</td>
+                        <td class="text-nowrap">
+                            {% if grant.expires_at %}
+                                {% if grant.is_expired %}
+                                <span class="badge bg-danger">{{ grant.expires_at|date:"d.m.Y" }}</span>
+                                {% else %}
+                                {{ grant.expires_at|date:"d.m.Y" }}
+                                {% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not network_grants and not software_grants and not other_grants %}
 <div class="card shadow-sm">
     <div class="card-header bg-warning">
         <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Доступы</h5>
+    </div>
+    <div class="card-body text-center text-muted py-5">
+        <i class="bi bi-shield-lock display-1 d-block mb-3"></i>
+        <p class="mb-0">Гранты доступа отсутствуют</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Django native groups and permissions -->
+{% if groups or permissions %}
+<div class="card shadow-sm">
+    <div class="card-header bg-warning">
+        <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Группы и права (Django)</h5>
     </div>
     <div class="card-body">
         {% if groups %}
@@ -67,12 +292,8 @@
                 </table>
             </div>
         </div>
-        {% elif not groups %}
-        <div class="text-center text-muted py-5">
-            <i class="bi bi-shield-lock display-1 d-block mb-3"></i>
-            <p class="mb-0">Доступы отсутствуют</p>
-        </div>
         {% endif %}
     </div>
 </div>
+{% endif %}
 {% endblock %}

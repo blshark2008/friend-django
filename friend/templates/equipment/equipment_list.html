@@ -42,6 +42,13 @@
     .equipment-row:hover {
         background: #f8f9fa;
     }
+    .table thead th a:hover {
+        color: #0d6efd;
+        text-decoration: underline;
+    }
+    .table thead th .bi {
+        font-size: 0.75rem;
+    }
 </style>
 {% endblock %}
 
@@ -190,13 +197,61 @@
         <table class="table table-hover mb-0">
             <thead>
                 <tr>
-                    <th class="w-50">Статус</th>
-                    <th class="w-120">Инв. номер</th>
-                    <th>Техника</th>
-                    <th class="w-140">Категория</th>
-                    <th class="w-160">Закреплён за</th>
-                    <th class="w-160">Материально ответственный</th>
-                    <th class="w-100">Действия</th>
+                    <th class="w-auto">
+                        <a href="?sort=status&order={% if current_sort == 'status' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% for key, val in filters.items %}{% if key != 'sort' and key != 'order' %}&{{ key }}={{ val }}{% endif %}{% endfor %}"
+                           class="text-decoration-none text-dark" title="Сортировать по статусу">
+                            Статус
+                            {% if current_sort == 'status' %}
+                                {% if current_order == 'asc' %}<i class="bi bi-caret-up-fill"></i>{% else %}<i class="bi bi-caret-down-fill"></i>{% endif %}
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="w-auto">
+                        <a href="?sort=inventory_number&order={% if current_sort == 'inventory_number' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% for key, val in filters.items %}{% if key != 'sort' and key != 'order' %}&{{ key }}={{ val }}{% endif %}{% endfor %}"
+                           class="text-decoration-none text-dark" title="Сортировать по инв. номеру">
+                            Инв. номер
+                            {% if current_sort == 'inventory_number' %}
+                                {% if current_order == 'asc' %}<i class="bi bi-caret-up-fill"></i>{% else %}<i class="bi bi-caret-down-fill"></i>{% endif %}
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="w-auto">
+                        <a href="?sort=name&order={% if current_sort == 'name' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% for key, val in filters.items %}{% if key != 'sort' and key != 'order' %}&{{ key }}={{ val }}{% endif %}{% endfor %}"
+                           class="text-decoration-none text-dark" title="Сортировать по названию">
+                            Техника
+                            {% if current_sort == 'name' %}
+                                {% if current_order == 'asc' %}<i class="bi bi-caret-up-fill"></i>{% else %}<i class="bi bi-caret-down-fill"></i>{% endif %}
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="w-auto">
+                        <a href="?sort=category&order={% if current_sort == 'category' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% for key, val in filters.items %}{% if key != 'sort' and key != 'order' %}&{{ key }}={{ val }}{% endif %}{% endfor %}"
+                           class="text-decoration-none text-dark" title="Сортировать по категории">
+                            Категория
+                            {% if current_sort == 'category' %}
+                                {% if current_order == 'asc' %}<i class="bi bi-caret-up-fill"></i>{% else %}<i class="bi bi-caret-down-fill"></i>{% endif %}
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="w-auto">
+                        <a href="?sort=assigned_user&order={% if current_sort == 'assigned_user' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% for key, val in filters.items %}{% if key != 'sort' and key != 'order' %}&{{ key }}={{ val }}{% endif %}{% endfor %}"
+                           class="text-decoration-none text-dark" title="Сортировать по закрепленному сотруднику">
+                            Закреплён за
+                            {% if current_sort == 'assigned_user' %}
+                                {% if current_order == 'asc' %}<i class="bi bi-caret-up-fill"></i>{% else %}<i class="bi bi-caret-down-fill"></i>{% endif %}
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="w-auto">
+                        <a href="?sort=responsible_user&order={% if current_sort == 'responsible_user' and current_order == 'asc' %}desc{% else %}asc{% endif %}{% for key, val in filters.items %}{% if key != 'sort' and key != 'order' %}&{{ key }}={{ val }}{% endif %}{% endfor %}"
+                           class="text-decoration-none text-dark" title="Сортировать по материально ответственному">
+                            Материально ответственный
+                            {% if current_sort == 'responsible_user' %}
+                                {% if current_order == 'asc' %}<i class="bi bi-caret-up-fill"></i>{% else %}<i class="bi bi-caret-down-fill"></i>{% endif %}
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="w-auto">Действия</th>
                 </tr>
             </thead>
             <tbody>

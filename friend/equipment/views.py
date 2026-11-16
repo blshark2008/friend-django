@@ -310,7 +310,30 @@ def equipment_list(request):
                 | Q(responsible_user__patronymic__icontains=parts[0])
             )
 
-    equipment_qs = equipment_qs.order_by('-is_active', 'category', 'subcategory', 'inventory_number')
+    # Сортировка
+    allowed_sort_fields = {
+        'inventory_number': ['inventory_number', '-inventory_number'],
+        'name': ['name', '-name'],
+        'category': ['category__name', '-category__name'],
+        'assigned_user': ['assigned_user__last_name', '-assigned_user__last_name'],
+        'responsible_user': ['responsible_user__last_name', '-responsible_user__last_name'],
+        'status': ['status', '-status'],
+    }
+    sort_field = request.GET.get('sort', '')
+    sort_order = request.GET.get('order', '')
+
+    if sort_field in allowed_sort_fields:
+        if sort_order == 'desc':
+            equipment_qs = equipment_qs.order_by(*reversed(allowed_sort_fields[sort_field]))
+        else:
+            equipment_qs = equipment_qs.order_by(*allowed_sort_fields[sort_field])
+    else:
+        equipment_qs = equipment_qs.order_by('-is_active', 'category', 'subcategory', 'inventory_number')
+
+    equipment_qs = equipment_qs.select_related(
+        'assigned_user', 'responsible_user', 'category', 'subcategory',
+        'subcategory__parent',
+    )
 
     total_count = equipment_qs.count()
 
@@ -437,6 +460,11 @@ def equipment_list(request):
         'peripherals_count': peripherals_count,
         'phones_count': phones_count,
         'vks_count': vks_count,
+        # Сортировка
+        'current_sort': sort_field,
+        'current_order': sort_order,
+        # Filters для сохранения в сортировке
+        'filters': request.GET.copy,
     }
     return render(request, 'equipment/equipment_list.html', context)
 
@@ -867,6 +895,9 @@ def _process_csv_row(row, row_num, clean_field, processed_inventory_numbers,
     mol_field = clean_field(row.get('МОЛ/Место хранения', ''))
     name = clean_field(row.get('Наименование', ''))
     serial_number = clean_field(row.get('Заводской номер', ''))
+    # Очищаем префикс SN если есть
+    if serial_number and serial_number.upper().startswith('SN'):
+        serial_number = serial_number[2:]
     nfa_type = clean_field(row.get('Тип НФА', ''))
 
     # Debug: log specific inventory numbers
@@ -1443,6 +1474,8 @@ def equipment_edit(request, equipment_type, pk):
     
     type_labels = dict(EQUIPMENT_SUBTYPES)
     type_label = type_labels.get(equipment_type, equipment_type)
+    search_query = request.GET.get('q', '')
+    from_inventory = request.GET.get('from_inventory', '')
     return render(request, 'equipment/equipment_edit_simple.html', {
         **_sidebar_counts(),
         'form': form,
@@ -1451,6 +1484,8 @@ def equipment_edit(request, equipment_type, pk):
         'assigned_user': equipment.assigned_user,
         'mol_assignment': equipment.mol_assignments.filter(is_active=True).first(),
         'type_label': type_label,
+        'search_query': search_query,
+        'from_inventory': from_inventory,
     })
 
 def equipment_archive(request, equipment_type, pk):
@@ -1587,7 +1622,7 @@ def equipment_detail(request, equipment_type, pk):
     """Детальная информация об оборудовании с учётом настроек полей."""
     equipment = get_object_or_404(Equipment, pk=pk, archived=False)
     visible_fields = equipment.get_visible_fields(for_edit=False)
-    
+
     # Добавляем значения полей с форматированием
     for field in visible_fields:
         val = getattr(equipment, field['name'], None)
@@ -1600,11 +1635,47 @@ def equipment_detail(request, equipment_type, pk):
             field['value'] = str(val)
         else:
             field['value'] = val
-    
+        
+        # Для поля os добавляем версию из SIEM в скобках
+        if field['name'] == 'os' and equipment.siem_host and equipment.siem_host.os_info:
+            siem_version = equipment.siem_host.os_info.strip()
+            if siem_version and field['value']:
+                field['value'] = f"{field['value']} ({siem_version})"
+
+    # Бухгалтерские данные
+    accounting_data = {
+        'acquisition_date': equipment.acquisition_date,
+        'acquisition_cost': equipment.acquisition_cost,
+        'initial_number': equipment.initial_number,
+        'useful_life_months': equipment.useful_life_months,
+        'depreciation_method': equipment.depreciation_method,
+        'decommission_date': equipment.decommission_date,
+        'decommission_act': equipment.decommission_act,
+        'decommission_notes': equipment.decommission_notes,
+        'decommissioned_by': equipment.decommissioned_by,
+    }
+
+    # История списаний
+    decommission_records = equipment.decommission_records.order_by('-created_at')[:10]
+
+    # История перемещений
+    movements = equipment.movements.order_by('-move_datetime')[:20]
+
+    # История ремонтов
+    repairs = equipment.repairs.order_by('-created_at')[:20]
+
+    # История модернизаций
+    upgrades = equipment.upgrades.order_by('-created_at')[:20]
+
     return render(request, 'equipment/equipment_detail.html', {
         **_sidebar_counts(),
         'instance': equipment,
         'visible_fields': visible_fields,
+        'accounting': accounting_data,
+        'decommission_records': decommission_records,
+        'movements': movements,
+        'repairs': repairs,
+        'upgrades': upgrades,
     })
 
 def update_from_siem(request, equipment_type, pk):
@@ -1732,15 +1803,40 @@ def assigned_equipment(request):
     """Закрепленное оборудование — список оборудования с назначенными пользователями."""
     # Фильтры
     search = request.GET.get('search', '').strip()
-    user_filter = request.GET.get('user', '').strip()
     category_filter = request.GET.get('category', '').strip()
+    subcategory_filter = request.GET.get('subcategory', '').strip()
+    sort = request.GET.get('sort', '').strip()
     
-    equipment_qs = Equipment.objects.filter(
-        Q(assigned_user__isnull=False) | Q(responsible_user__isnull=False),
-        archived=False
-    ).select_related(
-        'assigned_user', 'responsible_user', 'category', 'subcategory', 'brand'
-    ).order_by('-is_active', 'category', 'inventory_number')
+    # Определяем порядок сортировки
+    valid_sorts = {
+        'inventory_number': 'inventory_number',
+        '-inventory_number': '-inventory_number',
+        'name': 'name',
+        '-name': '-name',
+        'category': 'category__name',
+        '-category': '-category__name',
+        'assigned_user': 'assigned_user__last_name',
+        '-assigned_user': '-assigned_user__last_name',
+        'responsible_user': 'responsible_user__last_name',
+        '-responsible_user': '-responsible_user__last_name',
+        'serial_number': 'serial_number',
+        '-serial_number': '-serial_number',
+    }
+    
+    if sort in valid_sorts:
+        equipment_qs = Equipment.objects.filter(
+            Q(assigned_user__isnull=False) | Q(responsible_user__isnull=False),
+            archived=False
+        ).select_related(
+            'assigned_user', 'responsible_user', 'category', 'subcategory', 'brand'
+        ).order_by(valid_sorts[sort])
+    else:
+        equipment_qs = Equipment.objects.filter(
+            Q(assigned_user__isnull=False) | Q(responsible_user__isnull=False),
+            archived=False
+        ).select_related(
+            'assigned_user', 'responsible_user', 'category', 'subcategory', 'brand'
+        ).order_by('-is_active', 'category', 'inventory_number')
     
     if search:
         equipment_qs = equipment_qs.filter(
@@ -1749,18 +1845,23 @@ def assigned_equipment(request):
             Q(serial_number__icontains=search) |
             Q(assigned_user__first_name__icontains=search) |
             Q(assigned_user__last_name__icontains=search) |
+            Q(assigned_user__patronymic__icontains=search) |
             Q(responsible_user__first_name__icontains=search) |
-            Q(responsible_user__last_name__icontains=search)
-        )
-    
-    if user_filter:
-        equipment_qs = equipment_qs.filter(
-            Q(assigned_user__id=user_filter) | Q(responsible_user__id=user_filter)
+            Q(responsible_user__last_name__icontains=search) |
+            Q(responsible_user__patronymic__icontains=search)
         )
     
     if category_filter:
         equipment_qs = equipment_qs.filter(category__slug=category_filter)
     
+    if subcategory_filter:
+        equipment_qs = equipment_qs.filter(subcategory__slug=subcategory_filter)
+
+    # Пагинация: 20 записей на страницу
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(equipment_qs, 20)
+    page_obj = paginator.get_page(page_number)
+
     # Статистика
     total_assigned = equipment_qs.count()
     by_user = equipment_qs.values('assigned_user__first_name', 'assigned_user__last_name').annotate(
@@ -1773,20 +1874,27 @@ def assigned_equipment(request):
     
     context = {
         **_sidebar_counts(),
-        'equipment_list': equipment_qs[:100],
+        'equipment_list': page_obj.object_list,
         'total_count': total_assigned,
         'by_user': by_user,
         'by_category': by_category,
         'current_search': search,
-        'current_user': user_filter,
         'current_category': category_filter,
-        'all_users': User.objects.filter(
-            equipment_assigned__isnull=False,
-            equipment_responsible__isnull=False
-        ).distinct().values_list('id', 'first_name', 'last_name'),
+        'current_subcategory': subcategory_filter,
+        'current_sort': sort,
+        'page_obj': page_obj,
         'all_categories': EquipmentCategory.objects.filter(
             parent__isnull=True, is_active=True
         ).values_list('slug', 'name'),
+        'all_subcategories': EquipmentCategory.objects.filter(
+            parent__isnull=False, is_active=True
+        ).select_related('parent').values_list('slug', 'name', 'parent__slug'),
+        'all_subcategories_json': json.dumps([
+            {'slug': sc['slug'], 'name': sc['name']}
+            for sc in EquipmentCategory.objects.filter(
+                parent__isnull=False, is_active=True
+            ).values('slug', 'name')
+        ]),
     }
     return render(request, 'equipment/assigned_equipment.html', context)
 
@@ -1828,11 +1936,17 @@ def inventory_search(request):
             Q(responsible_user__last_name__icontains=search_query)
         )
 
+    # Пагинация: 10 записей на страницу
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(equipment_qs, 10)
+    page_obj = paginator.get_page(page_number)
+
     context = {
         **_sidebar_counts(),
-        'equipment_list': equipment_qs[:100],
+        'equipment_list': page_obj.object_list,
         'total_count': equipment_qs.count(),
         'search_query': search_query,
+        'page_obj': page_obj,
     }
     return render(request, 'equipment/inventory_search.html', context)
 

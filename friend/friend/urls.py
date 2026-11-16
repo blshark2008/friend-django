@@ -24,11 +24,16 @@ from siem import views as siem_views
 from messaging.views import max_webhook, api_max_webhook
 from logging_app.views import api_log_event
 
+def root_redirect(request):
+    from django.shortcuts import redirect
+    return redirect('accounts:login')
+
 router = DefaultRouter()
 router.register(r'api/siem/ingest', siem_views.IngestViewSet, basename='ingest')
 router.register(r'api/siem/ingest/inventory', siem_views.InventoryIngestViewSet, basename='inventory')
 
 urlpatterns = [
+    path('', root_redirect, name='root'),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls', namespace='accounts')),
     path('equipment/', include('equipment.urls')),

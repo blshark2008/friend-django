@@ -358,6 +358,11 @@ class Equipment(models.Model):
 
     # --- SIEM ---
     last_scan = models.DateTimeField('Последний скан', blank=True, null=True)
+    siem_host = models.ForeignKey(
+        'siem.Host', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='equipment', verbose_name='SIEM хост',
+        help_text='Связь с SIEM хостом для синхронизации данных',
+    )
 
     # --- Даты ---
     created_at = models.DateTimeField('Создан', auto_now_add=True)

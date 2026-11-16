@@ -12,6 +12,15 @@
         border: none;
         border-radius: 12px;
         box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        cursor: default;
+    }
+    .stat-card.clickable {
+        cursor: pointer;
+        transition: box-shadow 0.2s, transform 0.15s;
+    }
+    .stat-card.clickable:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        transform: translateY(-2px);
     }
     .stat-card .card-body {
         padding: 1.5rem;
@@ -34,13 +43,41 @@
         background: #e9ecef;
         margin: 0.2rem;
     }
+    th a:hover {
+        color: #0d6efd !important;
+    }
+    th i.bi-arrow-up-short {
+        color: #0d6efd;
+    }
+    th i.bi-arrow-down-short {
+        color: #dc3545;
+    }
+    @media (max-width: 767.98px) {
+        .pagination {
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+        }
+        .page-link {
+            padding: 0.25rem 0.5rem !important;
+            font-size: 0.8rem !important;
+        }
+        .mobile-card .card-body {
+            padding: 0.75rem !important;
+        }
+        .mobile-card .small {
+            font-size: 0.8rem !important;
+        }
+        .mobile-card .text-primary {
+            font-size: 0.85rem !important;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <!-- Статистика -->
 <div class="row g-3 mb-4">
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="stat-card">
             <div class="card-body text-center">
                 <div class="stat-number text-primary">{{ total_count }}</div>
@@ -48,29 +85,58 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="stat-card">
+    <div class="col-md-4">
+        <div class="stat-card clickable" data-bs-toggle="collapse" data-bs-target="#topUsersCollapse" aria-expanded="false">
             <div class="card-body text-center">
                 <div class="stat-number text-success">{{ by_user|length }}</div>
-                <div class="stat-label">Ответственных лиц</div>
+                <div class="stat-label">Ответственных лиц <i class="bi bi-chevron-down"></i></div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="stat-card">
+    <div class="col-md-4">
+        <div class="stat-card clickable" data-bs-toggle="collapse" data-bs-target="#topCategoriesCollapse" aria-expanded="false">
             <div class="card-body text-center">
                 <div class="stat-number text-info">{{ by_category|length }}</div>
-                <div class="stat-label">Категорий</div>
+                <div class="stat-label">Категорий <i class="bi bi-chevron-down"></i></div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="stat-card">
-            <div class="card-body text-center">
-                <a href="{% url 'equipment:inventory_search' %}" class="text-decoration-none text-primary fw-bold">
-                    <i class="bi bi-search me-1"></i>Инвентаризационный поиск
-                </a>
+</div>
+
+<!-- Топ пользователей (collapse) -->
+<div class="collapse mb-4" id="topUsersCollapse">
+    <div class="card">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-people me-2"></i>Топ ответственных лиц</h6>
+        </div>
+        <div class="card-body">
+            {% for item in by_user %}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="user-badge">{{ item.assigned_user__last_name }} {{ item.assigned_user__first_name|default:"—" }}</span>
+                <span class="badge bg-primary">{{ item.count }}</span>
             </div>
+            {% empty %}
+            <p class="text-muted">Нет данных</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- По категориям (collapse) -->
+<div class="collapse mb-4" id="topCategoriesCollapse">
+    <div class="card">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-tags me-2"></i>По категориям</h6>
+        </div>
+        <div class="card-body">
+            {% for item in by_category %}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="user-badge">{{ item.category__name|default:"Без категории" }}</span>
+                <span class="badge bg-primary">{{ item.count }}</span>
+            </div>
+            {% empty %}
+            <p class="text-muted">Нет данных</p>
+            {% endfor %}
         </div>
     </div>
 </div>
@@ -79,22 +145,12 @@
 <div class="card mb-4">
     <div class="card-body">
         <form method="get" class="row g-2">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <input type="text" name="search" class="form-control form-control-sm" 
-                       placeholder="Поиск по имени, инв. номеру..." value="{{ current_search }}">
+                       placeholder="ФИО, инв. номер..." value="{{ current_search }}">
             </div>
-            <div class="col-md-3">
-                <select name="user" class="form-select form-select-sm">
-                    <option value="">Все пользователи</option>
-                    {% for user_id, first_name, last_name in all_users %}
-                    <option value="{{ user_id }}" {% if current_user == user_id|stringformat:"s" %}selected{% endif %}>
-                        {{ last_name }} {{ first_name }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select name="category" class="form-select form-select-sm">
+            <div class="col-md-2">
+                <select name="category" class="form-select form-select-sm" id="categoryFilter">
                     <option value="">Все категории</option>
                     {% for slug, name in all_categories %}
                     <option value="{{ slug }}" {% if current_category == slug %}selected{% endif %}>{{ name }}</option>
@@ -102,52 +158,37 @@
                 </select>
             </div>
             <div class="col-md-2">
+                <select name="subcategory" class="form-select form-select-sm" id="subcategoryFilter">
+                    <option value="">Все подкатегории</option>
+                    {% if not current_category %}
+                    {% for slug, name, parent_slug in all_subcategories %}
+                    <option value="{{ slug }}" {% if current_subcategory == slug %}selected{% endif %}>
+                        {{ name }}
+                    </option>
+                    {% endfor %}
+                    {% elif current_subcategory %}
+                    {% for slug, name, parent_slug in all_subcategories %}
+                    {% if parent_slug == current_category %}
+                    <option value="{{ slug }}" {% if current_subcategory == slug %}selected{% endif %}>{{ name }}</option>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+            <div class="col-md-2">
                 <button type="submit" class="btn btn-primary btn-sm w-100">Применить</button>
+            </div>
+            <div class="col-md-1">
+                <a href="?sort={{ current_sort }}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}" class="btn btn-outline-secondary btn-sm w-100" title="Сбросить фильтры">
+                    <i class="bi bi-x-lg"></i>
+                </a>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Топ пользователей -->
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Топ ответственных лиц</h6>
-            </div>
-            <div class="card-body">
-                {% for item in by_user %}
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="user-badge">{{ item.assigned_user__last_name }} {{ item.assigned_user__first_name|default:"—" }}</span>
-                    <span class="badge bg-primary">{{ item.count }}</span>
-                </div>
-                {% empty %}
-                <p class="text-muted">Нет данных</p>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-tags me-2"></i>По категориям</h6>
-            </div>
-            <div class="card-body">
-                {% for item in by_category %}
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="user-badge">{{ item.category__name|default:"Без категории" }}</span>
-                    <span class="badge bg-primary">{{ item.count }}</span>
-                </div>
-                {% empty %}
-                <p class="text-muted">Нет данных</p>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Таблица оборудования -->
-<div class="card">
+<div class="card d-none d-md-block">
     <div class="card-header">
         <h6 class="mb-0"><i class="bi bi-list-ul me-2"></i>Список закрепленного оборудования</h6>
     </div>
@@ -155,27 +196,115 @@
         <table class="table table-sm table-hover mb-0">
             <thead>
                 <tr>
-                    <th>Инв. номер</th>
-                    <th>Наименование</th>
-                    <th>Категория</th>
-                    <th>Закреплён</th>
-                    <th>МОЛ</th>
-                    <th>Серийный номер</th>
+                    <th>
+                        <a href="?sort=inventory_number{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}"
+                           class="text-decoration-none text-dark">
+                            Инв. номер
+                            {% if current_sort == 'inventory_number' %}
+                                <i class="bi bi-arrow-up-short"></i>
+                            {% elif current_sort == '-inventory_number' %}
+                                <i class="bi bi-arrow-down-short"></i>
+                            {% else %}
+                                <i class="bi bi-arrows-alt text-muted" style="font-size:0.7rem"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort=name{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}"
+                           class="text-decoration-none text-dark">
+                            Наименование
+                            {% if current_sort == 'name' %}
+                                <i class="bi bi-arrow-up-short"></i>
+                            {% elif current_sort == '-name' %}
+                                <i class="bi bi-arrow-down-short"></i>
+                            {% else %}
+                                <i class="bi bi-arrows-alt text-muted" style="font-size:0.7rem"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort=category{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}"
+                           class="text-decoration-none text-dark">
+                            Категория
+                            {% if current_sort == 'category' %}
+                                <i class="bi bi-arrow-up-short"></i>
+                            {% elif current_sort == '-category' %}
+                                <i class="bi bi-arrow-down-short"></i>
+                            {% else %}
+                                <i class="bi bi-arrows-alt text-muted" style="font-size:0.7rem"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort=assigned_user{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}"
+                           class="text-decoration-none text-dark">
+                            Закреплён
+                            {% if current_sort == 'assigned_user' %}
+                                <i class="bi bi-arrow-up-short"></i>
+                            {% elif current_sort == '-assigned_user' %}
+                                <i class="bi bi-arrow-down-short"></i>
+                            {% else %}
+                                <i class="bi bi-arrows-alt text-muted" style="font-size:0.7rem"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort=responsible_user{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}"
+                           class="text-decoration-none text-dark">
+                            МОЛ
+                            {% if current_sort == 'responsible_user' %}
+                                <i class="bi bi-arrow-up-short"></i>
+                            {% elif current_sort == '-responsible_user' %}
+                                <i class="bi bi-arrow-down-short"></i>
+                            {% else %}
+                                <i class="bi bi-arrows-alt text-muted" style="font-size:0.7rem"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort=serial_number{% if current_search %}&search={{ current_search }}{% endif %}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}"
+                           class="text-decoration-none text-dark">
+                             Серийный номер
+                            {% if current_sort == 'serial_number' %}
+                                <i class="bi bi-arrow-up-short"></i>
+                            {% elif current_sort == '-serial_number' %}
+                                <i class="bi bi-arrow-down-short"></i>
+                            {% else %}
+                                <i class="bi bi-arrows-alt text-muted" style="font-size:0.7rem"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th style="width: 40px;"></th>
                 </tr>
             </thead>
             <tbody>
-                {% for eq in equipment_list %}
+                {% for eq in page_obj %}
                 <tr>
-                    <td><code>{{ eq.inventory_number }}</code></td>
+                    <td>
+                        <a href="{% url 'equipment:detail' eq.category.slug eq.pk %}" class="text-decoration-none" title="Просмотр">
+                            <code>{{ eq.inventory_number }}</code>
+                        </a>
+                    </td>
                     <td>{{ eq.name|default:"—" }}</td>
                     <td>{{ eq.category|default:"—" }}</td>
                     <td>{{ eq.assigned_user|default:"—" }}</td>
                     <td>{{ eq.responsible_user|default:"—" }}</td>
                     <td>{{ eq.serial_number|default:"—" }}</td>
+                    <td>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{% url 'equipment:detail' eq.category.slug eq.pk %}"><i class="bi bi-eye me-2"></i>Просмотр</a></li>
+                                <li><a class="dropdown-item" href="{% url 'equipment:edit' eq.category.slug eq.pk %}"><i class="bi bi-pencil me-2"></i>Редактирование</a></li>
+                            </ul>
+                        </div>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
+                    <td colspan="7" class="text-center text-muted py-4">
                         <i class="bi bi-inbox me-2"></i>Нет закрепленного оборудования
                     </td>
                 </tr>
@@ -183,5 +312,149 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Пагинация (общая) -->
+    {% if page_obj.has_other_pages %}
+    <nav class="p-3">
+        <ul class="pagination pagination-sm justify-content-center flex-wrap">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if current_search %}search={{ current_search }}&{% endif %}{% if current_category %}category={{ current_category }}&{% endif %}{% if current_subcategory %}subcategory={{ current_subcategory }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}page={{ page_obj.previous_page_number }}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link"><i class="bi bi-chevron-left"></i></span>
+            </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <li class="page-item"><a class="page-link" href="?{% if current_search %}search={{ current_search }}&{% endif %}{% if current_category %}category={{ current_category }}&{% endif %}{% if current_subcategory %}subcategory={{ current_subcategory }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}page={{ num }}">{{ num }}</a></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?{% if current_search %}search={{ current_search }}&{% endif %}{% if current_category %}category={{ current_category }}&{% endif %}{% if current_subcategory %}subcategory={{ current_subcategory }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}page={{ page_obj.next_page_number }}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link"><i class="bi bi-chevron-right"></i></span>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
 </div>
+
+<!-- Мобильные карточки -->
+<div class="d-md-none">
+    <p class="text-muted mb-2">Всего: {{ total_count }} | На странице: {{ page_obj|length }}</p>
+    {% for eq in page_obj %}
+    <div class="card mb-2 mobile-card">
+        <div class="card-body p-2">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+                <div>
+                    <div class="fw-bold text-primary mb-1">
+                        <i class="bi bi-hash me-1"></i>#{{ eq.pk }}
+                    </div>
+                    <div class="mb-1">
+                        <a href="{% url 'equipment:detail' eq.category.slug eq.pk %}" class="badge bg-secondary me-1 text-decoration-none">{{ eq.inventory_number }}</a>
+                        {% if eq.category %}<span class="badge bg-info text-dark">{{ eq.category }}</span>{% endif %}
+                    </div>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{% url 'equipment:detail' eq.category.slug eq.pk %}"><i class="bi bi-eye me-2"></i>Просмотр</a></li>
+                        <li><a class="dropdown-item" href="{% url 'equipment:edit' eq.category.slug eq.pk %}"><i class="bi bi-pencil me-2"></i>Редактирование</a></li>
+                    </ul>
+                </div>
+            </div>
+            {% if eq.name %}
+            <div class="mb-1">
+                <div class="text-muted small">Наименование:</div>
+                <div>{{ eq.name }}</div>
+            </div>
+            {% endif %}
+            <div class="mb-1">
+                <div class="text-muted small">Закреплён:</div>
+                <div>{{ eq.assigned_user|default:"—" }}</div>
+            </div>
+            <div class="mb-1">
+                <div class="text-muted small">МОЛ:</div>
+                <div>{{ eq.responsible_user|default:"—" }}</div>
+            </div>
+            {% if eq.serial_number %}
+            <div>
+                <div class="text-muted small">Серийный номер:</div>
+                <div><code>{{ eq.serial_number }}</code></div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-4">
+        <i class="bi bi-inbox me-2"></i>Нет закрепленного оборудования
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+    const categoryFilter = document.getElementById('categoryFilter');
+    const subcategoryFilter = document.getElementById('subcategoryFilter');
+    const form = categoryFilter.closest('form');
+
+    function loadSubcategories(categorySlug) {
+        if (!categorySlug) {
+            // Если категория не выбрана, показываем все подкатегории
+            const allSubs = {{ all_subcategories_json|safe }};
+            const currentVal = subcategoryFilter.value;
+            subcategoryFilter.innerHTML = '<option value="">Все подкатегории</option>';
+            allSubs.forEach(sc => {
+                const opt = document.createElement('option');
+                opt.value = sc.slug;
+                opt.textContent = sc.name;
+                if (sc.slug === currentVal) opt.selected = true;
+                subcategoryFilter.appendChild(opt);
+            });
+            return;
+        }
+
+        fetch("{% url 'equipment:get_subcategories_ajax' %}?category_slug=" + encodeURIComponent(categorySlug))
+            .then(r => r.json())
+            .then(data => {
+                const currentVal = subcategoryFilter.value;
+                subcategoryFilter.innerHTML = '<option value="">Все подкатегории</option>';
+                data.forEach(sc => {
+                    const opt = document.createElement('option');
+                    opt.value = sc.slug;
+                    opt.textContent = sc.name;
+                    if (sc.slug === currentVal) opt.selected = true;
+                    subcategoryFilter.appendChild(opt);
+                });
+            })
+            .catch(err => console.error('loadSubcategories error:', err));
+    }
+
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', function() {
+            subcategoryFilter.value = '';
+            loadSubcategories(this.value);
+        });
+
+        // Загрузка подкатегорий при инициализации, если выбрана категория
+        if (categoryFilter.value) {
+            loadSubcategories(categoryFilter.value);
+        }
+    }
+</script>
 {% endblock %}

@@ -8,6 +8,7 @@ from .models import (
     NetworkResourceDetail, SoftwareResourceDetail, RemoteAccessDetail,
     ServerResourceDetail, DatabaseResourceDetail, ApplicationResourceDetail,
     StorageResourceDetail, CloudResourceDetail, HardwareResourceDetail,
+    Organization, Contract, ExternalUser,
 )
 
 User = get_user_model()
@@ -175,19 +176,13 @@ class AccessGroupForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Фильтруем ресурсы: показываем только те, к которым ещё не привязаны группы
-        attached_resource_ids = AccessGroup.objects.filter(
-            resource__isnull=False, is_active=True
-        ).values_list('resource_id', flat=True)
-        
+        # При редактировании — показываем все ресурсы, при создании — только свободные
         if self.instance and self.instance.pk:
-            # При редактировании — показываем текущий ресурс + свободные
-            current_resource_id = self.instance.resource_id
-            self.fields['resource'].queryset = Resource.objects.filter(
-                models.Q(pk=current_resource_id) | ~models.Q(pk__in=attached_resource_ids)
-            ).distinct()
+            self.fields['resource'].queryset = Resource.objects.all()
         else:
-            # При создании — только свободные ресурсы
+            attached_resource_ids = AccessGroup.objects.filter(
+                resource__isnull=False, is_active=True
+            ).values_list('resource_id', flat=True)
             self.fields['resource'].queryset = Resource.objects.filter(
                 ~models.Q(pk__in=attached_resource_ids)
             )
@@ -237,6 +232,26 @@ class AccessGrantForm(forms.ModelForm):
         fields = ['user', 'group', 'expires_at', 'justification']
         widgets = {
             'user': forms.Select(attrs={'class': 'form-select'}),
+            'group': forms.Select(attrs={'class': 'form-select'}),
+            'expires_at': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'justification': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.utils import timezone
+        from datetime import timedelta
+        self.initial['expires_at'] = timezone.now().date() + timedelta(days=365)
+
+
+class ExternalAccessGrantForm(forms.ModelForm):
+    """Форма для гранта доступа внешнему лицу."""
+
+    class Meta:
+        model = AccessGrant
+        fields = ['external_user', 'group', 'expires_at', 'justification']
+        widgets = {
+            'external_user': forms.Select(attrs={'class': 'form-select'}),
             'group': forms.Select(attrs={'class': 'form-select'}),
             'expires_at': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'justification': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
@@ -346,3 +361,56 @@ class GroupContainerGroupForm(forms.ModelForm):
             self.fields['access_group'].queryset = AccessGroup.objects.filter(
                 ~models.Q(pk__in=existing_ids)
             )
+
+
+# ============================================================================
+# Формы для подрядчиков
+# ============================================================================
+
+class OrganizationForm(forms.ModelForm):
+    """Форма для организации-подрядчика."""
+
+    class Meta:
+        model = Organization
+        fields = ['name', 'inn', 'contact_name', 'contact_phone', 'contact_email', 'is_active']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'inn': forms.TextInput(attrs={'class': 'form-control'}),
+            'contact_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'contact_phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'contact_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class ContractForm(forms.ModelForm):
+    """Форма для договора."""
+
+    class Meta:
+        model = Contract
+        fields = ['organization', 'number', 'date_from', 'date_to', 'document', 'status']
+        widgets = {
+            'organization': forms.Select(attrs={'class': 'form-select'}),
+            'number': forms.TextInput(attrs={'class': 'form-control'}),
+            'date_from': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'date_to': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'document': forms.FileInput(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+
+class ExternalUserForm(forms.ModelForm):
+    """Форма для внешнего лица."""
+
+    class Meta:
+        model = ExternalUser
+        fields = ['contract', 'full_name', 'user_type', 'id_doc_no', 'department', 'position', 'is_active']
+        widgets = {
+            'contract': forms.Select(attrs={'class': 'form-select'}),
+            'full_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'user_type': forms.Select(attrs={'class': 'form-select'}),
+            'id_doc_no': forms.TextInput(attrs={'class': 'form-control'}),
+            'department': forms.TextInput(attrs={'class': 'form-control'}),
+            'position': forms.TextInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }

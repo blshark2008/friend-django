@@ -561,7 +561,10 @@ class UserTrainingsView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['trainings'] = []  # Заглушка
+        user = self.object
+        context['enrollments'] = user.training_enrollments.select_related(
+            'training', 'training__training_type', 'training__training_type__category',
+        ).order_by('-enrolled_at')
         return context
 
 
@@ -593,9 +596,49 @@ class UserAccessView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.object
-        # Группы и права доступа
+        # Группы и права доступа (Django native)
         context['groups'] = user.groups.all()
         context['permissions'] = user.user_permissions.all()
+
+        # Гранты доступа (кастомная система), разбитые по типам
+        grants = user.access_grants.select_related(
+            'group', 'group__resource',
+        ).filter(is_active=True, revoked_at__isnull=True)
+        context['network_grants'] = grants.filter(group__resource__type='network')
+        context['software_grants'] = grants.filter(group__resource__type='software')
+        context['other_grants'] = grants.exclude(
+            group__resource__type__in=['network', 'software'],
+        ).exclude(group__resource__isnull=True)
+
+        grant_group_ids = set(grants.values_list('group', flat=True))
+        context['grant_group_ids'] = grant_group_ids
+
+        # Группы доступа из ролей должности
+        from access.models import AccessGroup
+        role_group_ids = set()
+        if user.position:
+            role_group_ids = set(
+                user.position.position_roles.select_related(
+                    'role__groups__access_group',
+                ).values_list(
+                    'role__groups__access_group', flat=True
+                ).distinct()
+            )
+        context['role_group_ids'] = role_group_ids
+
+        context['role_access_groups'] = AccessGroup.objects.filter(
+            id__in=role_group_ids
+        ).select_related(
+            'resource',
+        ).order_by('resource__type', 'name')
+
+        # Все группы доступа (из грантов + из ролей), без дубликатов
+        all_group_ids = grant_group_ids | role_group_ids
+        context['all_access_groups'] = AccessGroup.objects.filter(
+            id__in=all_group_ids
+        ).select_related(
+            'resource',
+        ).order_by('resource__type', 'name')
         return context
 
 

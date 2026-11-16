@@ -1,0 +1,113 @@
+{% extends "access/base.html" %}
+
+{% block title %}{{ organization.name }} — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-building me-2"></i>{{ organization.name }}</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:organization_edit' pk=organization.pk %}" class="btn btn-warning">
+        <i class="bi bi-pencil"></i> Редактировать
+    </a>
+    <a href="{% url 'access:organization_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад к списку
+    </a>
+</div>
+
+<!-- Organization details -->
+<div class="card shadow-sm mb-3">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Информация об организации</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <strong>Название:</strong><br>{{ organization.name }}
+            </div>
+            <div class="col-md-6">
+                <strong>ИНН:</strong><br><code>{{ organization.inn }}</code>
+            </div>
+            <div class="col-md-6">
+                <strong>Контактное лицо:</strong><br>{{ organization.contact_name|default:"—" }}
+            </div>
+            <div class="col-md-6">
+                <strong>Телефон:</strong><br>{{ organization.contact_phone|default:"—" }}
+            </div>
+            <div class="col-md-6">
+                <strong>Email:</strong><br>{{ organization.contact_email|default:"—" }}
+            </div>
+            <div class="col-md-6">
+                <strong>Статус:</strong><br>
+                {% if organization.is_active %}
+                <span class="badge bg-success">Активное сотрудничество</span>
+                {% else %}
+                <span class="badge bg-secondary">Неактивно</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contracts -->
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Договоры</h6>
+        <a href="{% url 'access:contract_create' %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> Новый договор
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if contracts %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Номер</th>
+                        <th>Дата начала</th>
+                        <th>Дата окончания</th>
+                        <th>Статус</th>
+                        <th style="width: 140px;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for contract in contracts %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'access:contract_detail' pk=contract.pk %}" class="text-decoration-none">
+                                {{ contract.number }}
+                            </a>
+                        </td>
+                        <td>{{ contract.date_from|date:"d.m.Y" }}</td>
+                        <td>{{ contract.date_to|date:"d.m.Y" }}</td>
+                        <td>
+                            {% if contract.status == 'active' %}
+                            <span class="badge bg-success">Действующий</span>
+                            {% elif contract.status == 'closed' %}
+                            <span class="badge bg-secondary">Закрыт</span>
+                            {% elif contract.status == 'terminated' %}
+                            <span class="badge bg-danger">Расторгнут</span>
+                            {% else %}
+                            <span class="badge bg-warning">Черновик</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'access:contract_detail' pk=contract.pk %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            Договоров пока нет
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

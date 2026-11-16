@@ -1,0 +1,143 @@
+{% extends "access/base.html" %}
+
+{% block title %}Грант — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-key me-2"></i>Грант доступа</h4>
+{% endblock %}
+
+{% block content %}
+<!-- Action buttons -->
+<div class="d-flex gap-2 mb-3">
+    <a href="{% url 'access:grant_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад к списку
+    </a>
+    {% if grant.is_active %}
+    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#archiveModal">
+        <i class="bi bi-trash"></i> Архивировать
+    </button>
+    {% else %}
+    <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#restoreModal">
+        <i class="bi bi-arrow-counterclockwise"></i> Восстановить
+    </button>
+    {% endif %}
+</div>
+
+<!-- Grant details -->
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Информация о гранте</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <strong>Пользователь:</strong><br>
+                {{ grant.user.get_full_name|default:grant.user.username }}
+            </div>
+            <div class="col-md-6">
+                <strong>Группа доступа:</strong><br>
+                <a href="{% url 'access:group_detail' pk=grant.group.pk %}">{{ grant.group.name }}</a>
+            </div>
+            <div class="col-md-6">
+                <strong>Статус:</strong><br>
+                {% if grant.is_revoked %}
+                <span class="badge bg-danger">Отозван</span>
+                {% elif grant.is_expired %}
+                <span class="badge bg-warning">Просрочен</span>
+                {% else %}
+                <span class="badge bg-success">Активен</span>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <strong>Выдан:</strong><br>
+                {{ grant.granted_at|date:"d.m.Y H:i" }}
+            </div>
+            <div class="col-md-6">
+                <strong>Истекает:</strong><br>
+                {% if grant.expires_at %}
+                    {% if grant.is_expired %}
+                    <span class="text-danger">{{ grant.expires_at|date:"d.m.Y" }}</span>
+                    {% else %}
+                    {{ grant.expires_at|date:"d.m.Y" }}
+                    {% endif %}
+                {% else %}
+                <span class="text-muted">Бессрочно</span>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <strong>Выдан кем:</strong><br>
+                {{ grant.granted_by.get_full_name|default:grant.granted_by.username|default:"—" }}
+            </div>
+            {% if grant.justification %}
+            <div class="col-12">
+                <strong>Обоснование:</strong><br>
+                {{ grant.justification }}
+            </div>
+            {% endif %}
+            {% if grant.revoked_at %}
+            <div class="col-12">
+                <strong>Отозван:</strong><br>
+                {{ grant.revoked_at|date:"d.m.Y H:i" }}
+            </div>
+            {% endif %}
+            <div class="col-12">
+                <strong>Создан:</strong> {{ grant.created_at|date:"d.m.Y H:i" }}<br>
+                <strong>Обновлён:</strong> {{ grant.updated_at|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal подтверждения архивирования -->
+<div class="modal fade" id="archiveModal" tabindex="-1" aria-labelledby="archiveModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger" id="archiveModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Архивирование гранта
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите архивировать грант для пользователя <strong>{{ grant.user.get_full_name|default:grant.user.username }}</strong> — группа <strong>{{ grant.group.name }}</strong>?</p>
+                <p class="text-muted small">Грант будет скрыт из активного списка, но сохранится в журнале.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form method="post" action="{% url 'access:grant_delete' pk=grant.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Архивировать
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal подтверждения восстановления -->
+<div class="modal fade" id="restoreModal" tabindex="-1" aria-labelledby="restoreModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-success" id="restoreModalLabel">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Восстановление гранта
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите восстановить грант для пользователя <strong>{{ grant.user.get_full_name|default:grant.user.username }}</strong> — группа <strong>{{ grant.group.name }}</strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form method="post" action="{% url 'access:grant_restore' pk=grant.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg"></i> Восстановить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

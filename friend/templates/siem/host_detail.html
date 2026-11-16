@@ -121,9 +121,17 @@
                         <h6 class="text-muted mb-3">Сетевая информация</h6>
                         <table class="table table-sm">
                             <tr><td class="text-muted col-half">Имя хоста:</td><td><strong>{{ host.hostname }}</strong></td></tr>
+                            <tr><td class="text-muted">Серийный номер:</td><td>{{ host.serial_number|default:"—" }}</td></tr>
                             <tr><td class="text-muted">IP-адрес:</td><td><code>{{ host.ip_address|default:"—" }}</code></td></tr>
                             <tr><td class="text-muted">MAC-адрес:</td><td>{{ host.mac_address|default:"—" }}</td></tr>
                             <tr><td class="text-muted">Версия агента:</td><td>{{ host.agent_version|default:"—" }}</td></tr>
+                            {% if host.equipment.first %}
+                            <tr><td class="text-muted">Оборудование:</td><td>
+                                <a href="{% url 'equipment:detail' 'computer_top' host.equipment.first.pk %}" class="text-decoration-none">
+                                    <i class="bi bi-pc-display me-1"></i>{{ host.equipment.first.inventory_number }}
+                                </a>
+                            </td></tr>
+                            {% endif %}
                         </table>
                     </div>
                     <div class="col-md-6">

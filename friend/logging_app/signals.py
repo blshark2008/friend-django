@@ -30,7 +30,7 @@ def get_client_ip(request):
     return ''
 
 
-def log_access_group_change(instance, action, summary, details=None, request=None):
+def log_access_group_change(instance, action, summary, details=None, request=None, target_model='AccessGroup'):
     """Записывает событие изменения группы доступа в журнал."""
     LogEntry.objects.create(
         source='access',
@@ -38,7 +38,7 @@ def log_access_group_change(instance, action, summary, details=None, request=Non
         severity='info',
         actor=request.user.get_full_name() if request and hasattr(request, 'user') and request.user.is_authenticated else 'system',
         actor_type='user' if request and hasattr(request, 'user') and request.user.is_authenticated else 'system',
-        target_model='AccessGroup',
+        target_model=target_model,
         target_id=instance.pk,
         target_display=instance.display_name if hasattr(instance, 'display_name') else str(instance),
         summary=summary,
@@ -147,13 +147,49 @@ def log_access_grant_save(sender, instance, created, **kwargs):
         log_access_group_change(
             instance,
             LogEntry.Action.GRANT,
-            f'Доступ предоставлен: {instance.user.get_full_name() if instance.user else instance.group.name} → {instance.resource.name}',
+            f'Доступ предоставлен: {instance.user.get_full_name() if instance.user else instance.group.name} → {instance.group.name}',
             {
-                'resource': instance.resource.name,
-                'level': instance.level,
+                'group': instance.group.name,
                 'expires_at': str(instance.expires_at) if instance.expires_at else None,
             },
+            target_model='AccessGrant',
         )
+
+
+@receiver(post_save, sender=AccessGrant)
+def log_access_grant_archive(sender, instance, created, **kwargs):
+    """Логирование архивирования гранта."""
+    if not created and not instance.is_active:
+        log_access_group_change(
+            instance,
+            LogEntry.Action.ARCHIVE,
+            f'Грант архивирован: {instance.user.get_full_name() if instance.user else instance.group.name} → {instance.group.name}',
+            {'old_status': 'active', 'new_status': 'archived'},
+            target_model='AccessGrant',
+        )
+
+
+@receiver(post_save, sender=AccessGrant)
+def log_access_grant_restore(sender, instance, created, **kwargs):
+    """Логирование восстановления гранта."""
+    if not created and instance.is_active:
+        try:
+            history = LogEntry.objects.filter(
+                source='access',
+                target_model='AccessGrant',
+                target_id=instance.pk,
+                action=LogEntry.Action.ARCHIVE,
+            ).order_by('-timestamp').first()
+            if history:
+                log_access_group_change(
+                    instance,
+                    LogEntry.Action.RESTORE,
+                    f'Грант восстановлен: {instance.user.get_full_name() if instance.user else instance.group.name} → {instance.group.name}',
+                    {'restored_from': 'archive'},
+                    target_model='AccessGrant',
+                )
+        except Exception:
+            pass
 
 
 # ============================================================================

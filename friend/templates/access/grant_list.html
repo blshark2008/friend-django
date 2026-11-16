@@ -7,10 +7,32 @@
 {% endblock %}
 
 {% block content %}
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link {% if not request.resolver_match.url_name == 'external_grant_list' %}active{% endif %}"
+           href="{% url 'access:grant_list' %}">
+            <i class="bi bi-people me-1"></i>Гранты сотрудников
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if request.resolver_match.url_name == 'external_grant_list' %}active{% endif %}"
+           href="{% url 'access:external_grant_list' %}">
+            <i class="bi bi-people-fill me-1"></i>Гранты сотрудников сторонних организаций
+        </a>
+    </li>
+</ul>
+
 <!-- Action buttons -->
 <div class="d-flex gap-2 mb-3">
     <a href="{% url 'access:grant_create' %}" class="btn btn-primary">
         <i class="bi bi-plus-lg"></i> Выдать доступ
+    </a>
+    <a href="{% url 'access:grant_import' %}" class="btn btn-outline-success">
+        <i class="bi bi-file-earmark-arrow-up"></i> Импорт из CSV
+    </a>
+    <a href="{% url 'access:grant_export' %}{% if current_user_q %}?user_q={{ current_user_q }}{% endif %}{% if current_group_q %}{% if current_user_q %}&{% else %}?{% endif %}group_q={{ current_group_q }}{% endif %}{% if current_resource_type %}{% if current_user_q or current_group_q %}&{% endif %}resource_type={{ current_resource_type }}{% endif %}{% if request.GET.show_archived %}{% if current_user_q or current_group_q or current_resource_type %}&{% endif %}show_archived=1{% endif %}" class="btn btn-outline-success">
+        <i class="bi bi-download"></i> Выгрузка в CSV
     </a>
     <a href="{% url 'access:request_list' %}" class="btn btn-outline-info">
         <i class="bi bi-inbox"></i> Заявки
@@ -25,13 +47,27 @@
     <div class="card-body py-2">
         <form method="get" class="row g-2 align-items-center">
             <div class="col-auto">
-                <input type="text" name="q" class="form-control form-control-sm"
-                       placeholder="Поиск..." value="{{ request.GET.q|default:'' }}">
+                <input type="text" name="user_q" class="form-control form-control-sm"
+                       placeholder="ФИО пользователя" value="{{ current_user_q }}">
+            </div>
+            <div class="col-auto">
+                <input type="text" name="group_q" class="form-control form-control-sm"
+                       placeholder="Группа" value="{{ current_group_q }}">
+            </div>
+            <div class="col-auto">
+                <select name="resource_type" class="form-select form-select-sm">
+                    <option value="">Все типы ресурсов</option>
+                    {% for type_code, type_name in resource_types %}
+                    <option value="{{ type_code }}" {% if current_resource_type == type_code %}selected{% endif %}>
+                        {{ type_name }}
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="col-auto">
                 <div class="form-check form-switch">
                     <input type="checkbox" name="show_archived" class="form-check-input" id="showArchived"
-                           {% if show_archived %}checked{% endif %}>
+                           {% if 'show_archived' in request.GET %}checked{% endif %}>
                     <label class="form-check-label" for="showArchived">Показать неактивные</label>
                 </div>
             </div>
@@ -47,53 +83,98 @@
     </div>
 </div>
 
-<!-- Grants list -->
+<!-- Grants table -->
 <div class="card shadow-sm">
     <div class="card-body p-0">
         {% if grants %}
-        <div class="list-group list-group-flush">
-            {% for grant in grants %}
-            <div class="list-group-item list-group-item-action p-3">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="d-flex align-items-center gap-2">
-                        {% if grant.user %}
-                        <i class="bi bi-person text-primary"></i>
-                        <span class="fw-semibold">{{ grant.user.get_full_name|default:grant.user.username }}</span>
-                        {% else %}
-                        <i class="bi bi-collection text-primary"></i>
-                        <span class="fw-semibold">{{ grant.group.name }}</span>
-                        {% endif %}
-                        <i class="bi bi-arrow-right text-muted"></i>
-                        <span>{{ grant.resource.name }}</span>
-                        <span class="badge bg-info text-dark">{{ grant.resource.get_type_display }}</span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        {% if grant.is_expired %}
-                        <span class="badge bg-warning">Просрочен</span>
-                        {% endif %}
-                        {% if grant.is_revoked %}
-                        <span class="badge bg-danger">Отозван</span>
-                        {% endif %}
-                        <div class="btn-group btn-group-sm">
-                            <a href="{% url 'access:grant_delete' pk=grant.pk %}" class="btn btn-outline-danger" title="Удалить">
-                                <i class="bi bi-trash"></i>
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th>Пользователь</th>
+                        <th>Группа</th>
+                        <th style="width: 150px;">Тип ресурса</th>
+                        <th style="width: 130px;">Статус</th>
+                        <th style="width: 130px;">Выдан</th>
+                        <th style="width: 130px;">Истекает</th>
+                        <th style="width: 200px;">Обоснование</th>
+                        <th style="width: 140px;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for grant in grants %}
+                    <tr>
+                        <td class="text-muted">{{ forloop.counter }}</td>
+                        <td>
+                            <a href="{% url 'access:grant_detail' pk=grant.pk %}" class="text-decoration-none fw-semibold">
+                                {{ grant.user.get_full_name|default:grant.user.username }}
                             </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-1">
-                    <small class="text-muted">
-                        Выдан: {{ grant.granted_at|date:"d.m.Y H:i" }}
-                        {% if grant.expires_at %}
-                        | Истекает: {{ grant.expires_at|date:"d.m.Y" }}
-                        {% endif %}
-                        {% if grant.justification %}
-                        | {{ grant.justification|truncatewords:10 }}
-                        {% endif %}
-                    </small>
-                </div>
-            </div>
-            {% endfor %}
+                        </td>
+                        <td>
+                            <a href="{% url 'access:grant_detail' pk=grant.pk %}" class="text-decoration-none">
+                                <i class="bi bi-collection text-primary"></i> {{ grant.group.name }}
+                            </a>
+                        </td>
+                        <td>
+                            {% if grant.group.resource %}
+                                <span class="badge bg-info">{{ grant.group.resource.get_type_display }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if grant.is_revoked %}
+                            <span class="badge bg-danger">Отозван</span>
+                            {% elif grant.is_expired %}
+                            <span class="badge bg-warning">Просрочен</span>
+                            {% else %}
+                            <span class="badge bg-success">Активен</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ grant.granted_at|date:"d.m.Y" }}</td>
+                        <td>
+                            {% if grant.expires_at %}
+                                {% if grant.is_expired %}
+                                <span class="text-danger">{{ grant.expires_at|date:"d.m.Y" }}</span>
+                                {% else %}
+                                {{ grant.expires_at|date:"d.m.Y" }}
+                                {% endif %}
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ grant.justification|truncatewords:5 }}</small>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'access:grant_detail' pk=grant.pk %}" class="btn btn-outline-primary" title="Просмотр">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if grant.is_active %}
+                                <button type="button" class="btn btn-outline-danger" title="Архивировать"
+                                        data-bs-toggle="modal" data-bs-target="#archiveModal"
+                                        data-action="{% url 'access:grant_delete' pk=grant.pk %}"
+                                        data-user="{{ grant.user.get_full_name|default:grant.user.username }}"
+                                        data-group="{{ grant.group.name }}">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                                {% else %}
+                                <button type="button" class="btn btn-outline-success" title="Восстановить"
+                                        data-bs-toggle="modal" data-bs-target="#restoreModal"
+                                        data-action="{% url 'access:grant_restore' pk=grant.pk %}"
+                                        data-user="{{ grant.user.get_full_name|default:grant.user.username }}"
+                                        data-group="{{ grant.group.name }}">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
         {% else %}
         <div class="text-center py-5 text-muted">
@@ -110,7 +191,7 @@
     <ul class="pagination">
         {% if page_obj.has_previous %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_user_q %}&user_q={{ current_user_q }}{% endif %}{% if current_group_q %}&group_q={{ current_group_q }}{% endif %}{% if current_resource_type %}&resource_type={{ current_resource_type }}{% endif %}{% if request.GET.show_archived %}&show_archived=1{% endif %}">
                 <i class="bi bi-chevron-left"></i>
             </a>
         </li>
@@ -120,7 +201,7 @@
         </li>
         {% if page_obj.has_next %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_user_q %}&user_q={{ current_user_q }}{% endif %}{% if current_group_q %}&group_q={{ current_group_q }}{% endif %}{% if current_resource_type %}&resource_type={{ current_resource_type }}{% endif %}{% if request.GET.show_archived %}&show_archived=1{% endif %}">
                 <i class="bi bi-chevron-right"></i>
             </a>
         </li>
@@ -128,4 +209,91 @@
     </ul>
 </div>
 {% endif %}
+
+<!-- Modal подтверждения архивирования -->
+<div class="modal fade" id="archiveModal" tabindex="-1" aria-labelledby="archiveModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger" id="archiveModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Архивирование гранта
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите архивировать грант для пользователя <strong id="archiveUserName"></strong> — группа <strong id="archiveGroupName"></strong>?</p>
+                <p class="text-muted small">Грант будет скрыт из активного списка, но сохранится в журнале.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form id="archiveForm" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Архивировать
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal подтверждения восстановления -->
+<div class="modal fade" id="restoreModal" tabindex="-1" aria-labelledby="restoreModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-success" id="restoreModalLabel">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>Восстановление гранта
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите восстановить грант для пользователя <strong id="restoreUserName"></strong> — группа <strong id="restoreGroupName"></strong>?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form id="restoreForm" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg"></i> Восстановить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Архивирование
+    const archiveModal = document.getElementById('archiveModal');
+    if (archiveModal) {
+        archiveModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const action = button.dataset.action;
+            const user = button.dataset.user;
+            const group = button.dataset.group;
+            
+            document.getElementById('archiveUserName').textContent = user;
+            document.getElementById('archiveGroupName').textContent = group;
+            document.getElementById('archiveForm').action = action;
+        });
+    }
+    
+    // Восстановление
+    const restoreModal = document.getElementById('restoreModal');
+    if (restoreModal) {
+        restoreModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const action = button.dataset.action;
+            const user = button.dataset.user;
+            const group = button.dataset.group;
+            
+            document.getElementById('restoreUserName').textContent = user;
+            document.getElementById('restoreGroupName').textContent = group;
+            document.getElementById('restoreForm').action = action;
+        });
+    }
+});
+</script>
 {% endblock %}

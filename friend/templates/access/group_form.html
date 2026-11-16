@@ -80,7 +80,20 @@
 
                 <!-- Привязка к ресурсу -->
                 <div class="col-md-6">
-                    <label for="{{ form.resource.id_for_label }}" class="form-label">Привязка к ресурсу</label>
+                    <label class="form-label">Привязка к ресурсу</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="resource_display" readonly
+                               value="{% if form.instance.resource %}{{ form.instance.resource.name }}{% endif %}"
+                               placeholder="Выберите ресурс...">
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#resourceModal" autofocus="false">
+                            <i class="bi bi-search"></i>
+                        </button>
+                        {% if form.instance.resource %}
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearResource()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                        {% endif %}
+                    </div>
                     {{ form.resource }}
                     <small class="form-text text-muted">
                         Группа будет привязана к выбранному ресурсу
@@ -271,6 +284,127 @@ document.addEventListener('DOMContentLoaded', function () {
     // Инициализация при загрузке
     updateLevelChoices();
     generateName();
+
+    // Восстановление выбранного ресурса из формы
+    var selectedResource = document.getElementById('{{ form.resource.id_for_label }}').value;
+    if (selectedResource) {
+        var options = document.getElementById('{{ form.resource.id_for_label }}').options;
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].value === selectedResource) {
+                document.getElementById('resource_display').value = options[i].text;
+                break;
+            }
+        }
+    }
+
+    // Исправление aria-hidden для модального окна
+    var resourceModal = document.getElementById('resourceModal');
+    if (resourceModal) {
+        resourceModal.addEventListener('show.bs.modal', function () {
+            this.removeAttribute('aria-hidden');
+        });
+        resourceModal.addEventListener('hide.bs.modal', function () {
+            this.setAttribute('aria-hidden', 'true');
+        });
+    }
+});
+
+function clearResource() {
+    document.getElementById('{{ form.resource.id_for_label }}').value = '';
+    document.getElementById('resource_display').value = '';
+}
+
+function selectResource(id, name) {
+    document.getElementById('{{ form.resource.id_for_label }}').value = id;
+    document.getElementById('resource_display').value = name;
+    var modal = bootstrap.Modal.getInstance(document.getElementById('resourceModal'));
+    modal.hide();
+}
+</script>
+
+<!-- Modal выбора ресурса -->
+<div class="modal fade" id="resourceModal" tabindex="-1" aria-labelledby="resourceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resourceModalLabel">
+                    <i class="bi bi-hdd-stack me-2"></i>Выберите ресурс
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Фильтр -->
+                <div class="mb-3">
+                    <input type="text" id="resourceSearch" class="form-control"
+                           placeholder="Поиск по наименованию или типу..."
+                           oninput="filterResources()">
+                </div>
+                <!-- Список ресурсов -->
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover table-sm" id="resourceTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Наименование</th>
+                                <th style="width: 150px;">Тип</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for resource in form.resource.queryset %}
+                            <tr class="resource-row" data-id="{{ resource.pk }}" data-name="{{ resource.name|lower }}" data-type="{{ resource.get_type_display|lower }}">
+                                <td>{{ resource.name }}</td>
+                                <td><span class="badge bg-info">{{ resource.get_type_display }}</span></td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="2" class="text-center text-muted py-4">Ресурсы не найдены</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function filterResources() {
+    var query = document.getElementById('resourceSearch').value.toLowerCase().trim();
+    var rows = document.querySelectorAll('.resource-row');
+    var visibleCount = 0;
+
+    rows.forEach(function(row) {
+        var name = row.getAttribute('data-name');
+        var type = row.getAttribute('data-type');
+        var match = !query || name.includes(query) || type.includes(query);
+        row.style.display = match ? '' : 'none';
+        if (match) visibleCount++;
+    });
+
+    // Показать сообщение если ничего не найдено
+    var tbody = document.querySelector('#resourceTable tbody');
+    var existingMsg = tbody.querySelector('.filter-empty');
+    if (visibleCount === 0 && !existingMsg) {
+        var tr = document.createElement('tr');
+        tr.className = 'filter-empty';
+        tr.innerHTML = '<td colspan="2" class="text-center text-muted py-4">Ничего не найдено</td>';
+        tbody.appendChild(tr);
+    } else if (visibleCount > 0 && existingMsg) {
+        existingMsg.remove();
+    }
+}
+
+// Выбор ресурса по клику
+document.addEventListener('click', function(e) {
+    var row = e.target.closest('.resource-row');
+    if (row) {
+        var name = row.querySelector('td').textContent.trim();
+        var id = row.getAttribute('data-id');
+        selectResource(id, name);
+    }
 });
 </script>
 {% endblock %}

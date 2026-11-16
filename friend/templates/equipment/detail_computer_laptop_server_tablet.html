@@ -54,7 +54,7 @@
     {% endif %}
 {% endblock %}
 
-{% block info_tabs %}
+{% block equipment_tabs %}
 <div class="row g-4">
     <!-- Основная информация -->
     <div class="col-md-6">
@@ -166,7 +166,86 @@
         </div>
     </div>
 
-    <!-- Закреплённый сотрудник -->
+</div>
+
+<!-- Статус безопасности -->
+<div class="card table-card mt-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Статус безопасности</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        {% if instance.antivirus_active %}
+                        <i class="bi bi-shield-check fs-3 text-success"></i>
+                        {% else %}
+                        <i class="bi bi-shield-x fs-3 text-danger"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0">Антивирус</h6>
+                        <small class="text-muted">{{ instance.antivirus_engine|default:"Не настроен" }}</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        {% if instance.is_secured %}
+                        <i class="bi bi-patch-check fs-3 text-success"></i>
+                        {% else %}
+                        <i class="bi bi-patch-exclamation fs-3 text-warning"></i>
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-0">Общий статус</h6>
+                        <small class="text-muted">{% if instance.is_secured %}Защищён{% else %}Требует внимания{% endif %}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block accounting_tabs %}
+<div class="row g-4">
+    <!-- Данные учёта -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Данные учёта</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted">Дата приобретения</td><td>{{ accounting.acquisition_date|date:"d.m.Y"|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Первоначальная стоимость</td><td>{{ accounting.acquisition_cost|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Инвентарный номер (бухг.)</td><td>{{ accounting.initial_number|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Срок полезного использования</td><td>{{ accounting.useful_life_months|default:"—" }} мес.</td></tr>
+                    <tr><td class="text-muted">Метод амортизации</td><td>{{ accounting.depreciation_method|default:"—" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Данные списания -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Данные списания</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted">Дата списания</td><td>{{ accounting.decommission_date|date:"d.m.Y"|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Акт списания</td><td>{{ accounting.decommission_act|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Примечания</td><td>{{ accounting.decommission_notes|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Списал</td><td>{{ accounting.decommissioned_by|default:"—" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Закреплённый сотрудник -->
+<div class="row g-4 mt-2">
     <div class="col-md-6">
         <div class="card table-card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -263,44 +342,102 @@
     </div>
 </div>
 
-<!-- Статус безопасности -->
+<!-- История списаний -->
+{% if decommission_records %}
 <div class="card table-card mt-4">
-    <div class="card-header">
-        <h6 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Статус безопасности</h6>
-    </div>
-    <div class="card-body">
-        <div class="row g-3">
-            <div class="col-md-4">
-                <div class="d-flex align-items-center">
-                    <div class="flex-shrink-0">
-                        {% if instance.antivirus_active %}
-                        <i class="bi bi-shield-check fs-3 text-success"></i>
-                        {% else %}
-                        <i class="bi bi-shield-x fs-3 text-danger"></i>
-                        {% endif %}
-                    </div>
-                    <div class="flex-grow-1 ms-3">
-                        <h6 class="mb-0">Антивирус</h6>
-                        <small class="text-muted">{{ instance.antivirus_engine|default:"Не настроен" }}</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="d-flex align-items-center">
-                    <div class="flex-shrink-0">
-                        {% if instance.is_secured %}
-                        <i class="bi bi-patch-check fs-3 text-success"></i>
-                        {% else %}
-                        <i class="bi bi-patch-exclamation fs-3 text-warning"></i>
-                        {% endif %}
-                    </div>
-                    <div class="flex-grow-1 ms-3">
-                        <h6 class="mb-0">Общий статус</h6>
-                        <small class="text-muted">{% if instance.is_secured %}Защищён{% else %}Требует внимания{% endif %}</small>
-                    </div>
-                </div>
-            </div>
+    <div class="card-header"><h6 class="mb-0">История списаний</h6></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead><tr><th>Дата</th><th>Акт</th><th>Примечание</th><th>Списал</th></tr></thead>
+                <tbody>
+                    {% for rec in decommission_records %}
+                    <tr>
+                        <td class="text-nowrap">{{ rec.created_at|date:"d.m.Y H:i" }}</td>
+                        <td>{{ rec.decommission_act|default:"—" }}</td>
+                        <td>{{ rec.notes|default:"—" }}</td>
+                        <td>{{ rec.decommissioned_by|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+{% endif %}
+
+<!-- История перемещений -->
+{% if movements %}
+<div class="card table-card mt-4">
+    <div class="card-header"><h6 class="mb-0">История перемещений</h6></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead><tr><th>Дата</th><th>Откуда</th><th>Куда</th><th>Примечание</th></tr></thead>
+                <tbody>
+                    {% for m in movements %}
+                    <tr>
+                        <td class="text-nowrap">{{ m.move_datetime|date:"d.m.Y H:i" }}</td>
+                        <td>{{ m.from_location|default:"—" }}</td>
+                        <td>{{ m.to_location|default:"—" }}</td>
+                        <td>{{ m.notes|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- История ремонтов -->
+{% if repairs %}
+<div class="card table-card mt-4">
+    <div class="card-header"><h6 class="mb-0">История ремонтов</h6></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead><tr><th>Дата</th><th>Описание</th><th>Стоимость</th><th>Статус</th></tr></thead>
+                <tbody>
+                    {% for r in repairs %}
+                    <tr>
+                        <td class="text-nowrap">{{ r.created_at|date:"d.m.Y H:i" }}</td>
+                        <td>{{ r.description|default:"—" }}</td>
+                        <td>{{ r.cost|default:"—" }}</td>
+                        <td>{% if r.is_completed %}<span class="badge bg-success">Выполнен</span>{% else %}<span class="badge bg-warning text-dark">В процессе</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- История модернизаций -->
+{% if upgrades %}
+<div class="card table-card mt-4">
+    <div class="card-header"><h6 class="mb-0">История модернизаций</h6></div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead><tr><th>Дата</th><th>Описание</th><th>Стоимость</th></tr></thead>
+                <tbody>
+                    {% for u in upgrades %}
+                    <tr>
+                        <td class="text-nowrap">{{ u.created_at|date:"d.m.Y H:i" }}</td>
+                        <td>{{ u.description|default:"—" }}</td>
+                        <td>{{ u.cost|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not decommission_records and not movements and not repairs and not upgrades %}
+<div class="text-center py-4 text-muted">История отсутствует</div>
+{% endif %}
 {% endblock %}

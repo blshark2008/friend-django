@@ -49,6 +49,75 @@
     .table thead th .bi {
         font-size: 0.75rem;
     }
+
+    /* Карточки для мобильных */
+    .equipment-card {
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 1rem;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .equipment-card:active {
+        transform: scale(0.98);
+    }
+    .equipment-card .card-body {
+        padding: 1rem;
+    }
+    .equipment-card .status-icon {
+        font-size: 1.5rem;
+    }
+    .equipment-card .inventory-number {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #0d6efd;
+    }
+    .equipment-card .equipment-name {
+        font-weight: 600;
+        font-size: 1rem;
+    }
+    .equipment-card .equipment-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .equipment-card .user-info {
+        font-size: 0.85rem;
+    }
+    .equipment-card .btn-group .btn {
+        padding: 0.35rem 0.6rem;
+    }
+
+    /* Карточки для мобильных */
+    .equipment-card {
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 1rem;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .equipment-card:active {
+        transform: scale(0.98);
+    }
+    .equipment-card .card-body {
+        padding: 1rem;
+    }
+    .equipment-card .inventory-number {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #0d6efd;
+    }
+    .equipment-card .equipment-name {
+        font-weight: 600;
+        font-size: 1rem;
+    }
+    .equipment-card .equipment-meta {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .equipment-card .user-info {
+        font-size: 0.85rem;
+    }
+    .equipment-card .btn-group .btn {
+        padding: 0.35rem 0.6rem;
+    }
 </style>
 {% endblock %}
 
@@ -182,7 +251,7 @@
         <a href="{% url 'equipment:add' equipment_type='computer' %}" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg me-1"></i>Добавить оборудование
         </a>
-        <a href="{% url 'equipment:export_excel' %}" class="btn btn-outline-primary btn-sm ms-1">
+        <a href="{% url 'equipment:export_excel' %}?{{ request.GET.urlencode }}" class="btn btn-outline-primary btn-sm ms-1">
             <i class="bi bi-download me-1"></i>Экспорт
         </a>
         <a href="{% url 'equipment:upload_os' %}" class="btn btn-outline-success btn-sm ms-1">
@@ -191,8 +260,107 @@
     </div>
 </div>
 
-<!-- Таблица -->
-<div class="card table-card">
+<!-- Карточки для мобильных -->
+<div class="d-md-none">
+    {% for item in equipment_list %}
+    <div class="card equipment-card" onclick="window.location.href='{% url 'equipment:detail' item.category.slug item.pk %}'">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="inventory-number">{{ item.inventory_number }}</div>
+                    <div class="equipment-meta">
+                        {% if item.serial_number %}
+                        <i class="bi bi-upc-scan me-1"></i>{{ item.serial_number }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div>
+                    {% if item.archived %}
+                    <span class="text-muted" title="Архив"><i class="bi bi-archive fs-5"></i></span>
+                    {% elif item.status == 'active' %}
+                    <span class="text-success" title="Активно"><i class="bi bi-check-circle fs-5"></i></span>
+                    {% elif item.status == 'maintenance' %}
+                    <span class="text-warning" title="Обслуживание"><i class="bi bi-tools fs-5"></i></span>
+                    {% elif item.status == 'pending' %}
+                    <span class="text-info" title="Не подтверждён учёт"><i class="bi bi-question-circle fs-5"></i></span>
+                    {% elif item.status == 'confirmed' %}
+                    <span class="text-primary" title="Подтверждён учёт"><i class="bi bi-patch-check fs-5"></i></span>
+                    {% else %}
+                    <span class="text-danger" title="Списано"><i class="bi bi-x-circle fs-5"></i></span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="equipment-name mb-1">{{ item.name|default:item.type_label }}</div>
+            
+            {% if item.brand or item.model %}
+            <div class="equipment-meta mb-1">
+                {{ item.brand }}{% if item.brand and item.model %} {% endif %}{{ item.model }}
+            </div>
+            {% endif %}
+            
+            {% if item.hostname %}
+            <div class="equipment-meta mb-1">
+                <i class="bi bi-hdd-network me-1"></i>{{ item.hostname }}
+            </div>
+            {% endif %}
+            
+            <div class="d-flex flex-wrap gap-1 mb-2">
+                <span class="badge bg-light text-dark border">
+                    <i class="bi bi-tag me-1"></i>{{ item.category_label }}
+                </span>
+                <span class="badge bg-light text-dark border">
+                    <i class="bi bi-cpu me-1"></i>{{ item.type_label }}
+                </span>
+            </div>
+            
+            <div class="user-info mb-2">
+                {% if item.assigned_user %}
+                <div class="mb-1">
+                    <i class="bi bi-person-circle text-primary me-1"></i>
+                    {{ item.assigned_user.get_full_name|default:item.assigned_user.username }}
+                </div>
+                {% else %}
+                <div class="text-muted mb-1 small">
+                    <i class="bi bi-dash-circle me-1"></i>Не закреплено
+                </div>
+                {% endif %}
+                
+                {% if item.responsible_user %}
+                <div class="mb-1">
+                    <i class="bi bi-person-badge text-success me-1"></i>
+                    {{ item.responsible_user.get_full_name|default:item.responsible_user.username }}
+                </div>
+                {% else %}
+                <div class="text-muted small">
+                    <i class="bi bi-dash-circle me-1"></i>Не назначен
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="d-flex gap-2" onclick="event.stopPropagation()">
+                <a href="{% url 'equipment:detail' item.category.slug item.pk %}"
+                   class="btn btn-outline-primary btn-sm flex-fill">
+                    <i class="bi bi-eye me-1"></i>Подробнее
+                </a>
+                <a href="{% url 'equipment:edit' item.category.slug item.pk %}"
+                   class="btn btn-outline-secondary btn-sm flex-fill">
+                    <i class="bi bi-pencil me-1"></i>Редактировать
+                </a>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-5">
+        <i class="bi bi-inbox display-6 text-muted d-block mb-3"></i>
+        <h5 class="text-muted">Оборудование не найдено</h5>
+        <p class="text-muted">Попробуйте изменить параметры поиска или добавьте новое оборудование</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Таблица для десктопа -->
+<div class="card table-card d-none d-md-block">
     <div class="table-responsive">
         <table class="table table-hover mb-0">
             <thead>
@@ -256,7 +424,7 @@
             </thead>
             <tbody>
                 {% for item in equipment_list %}
-                <tr class="equipment-row">
+                <tr class="equipment-row" onclick="window.location.href='{% url 'equipment:detail' item.category.slug item.pk %}'">
                     <td>
                         {% if item.archived %}
                         <span class="text-muted" title="Архив"><i class="bi bi-archive"></i></span>
@@ -316,13 +484,13 @@
                         <span class="text-muted"><i class="bi bi-dash-circle me-1"></i>Не назначен</span>
                         {% endif %}
                     </td>
-                    <td>
+                    <td onclick="event.stopPropagation()">
                         <div class="btn-group btn-group-sm">
-                            <a href="{% url 'equipment:detail' item.category item.pk %}"
+                            <a href="{% url 'equipment:detail' item.category.slug item.pk %}"
                                class="btn btn-outline-primary" title="Подробнее">
                                 <i class="bi bi-eye"></i>
                             </a>
-                            <a href="{% url 'equipment:edit' item.category item.pk %}"
+                            <a href="{% url 'equipment:edit' item.category.slug item.pk %}"
                                class="btn btn-outline-secondary" title="Редактировать">
                                 <i class="bi bi-pencil"></i>
                             </a>
@@ -343,7 +511,8 @@
     </div>
 </div>
 
-<!-- Пагинация -->
+<!-- Пагинация (скрыта на мобильных, показываем карточки-пагинацию ниже) -->
+<div class="d-none d-md-block">
 {% if page_obj.has_other_pages %}
 <div class="card mt-3">
     <div class="card-body py-3">
@@ -387,6 +556,58 @@
                         {% endif %}
                     </ul>
                 </nav>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Пагинация для мобильных -->
+{% if page_obj.has_other_pages %}
+<div class="d-md-none mt-3">
+    <div class="card">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <span class="text-muted small">
+                        Показано {{ page_obj.start_index }}–{{ page_obj.end_index }} из {{ total_count }}
+                    </span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-label mb-0 small text-muted">Строк:</label>
+                    <select id="perPageSelect" class="form-select form-select-sm w-auto">
+                        {% for size in valid_page_sizes %}
+                        <option value="{{ size }}" {% if size == current_per_page %}selected{% endif %}>
+                            {{ size }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_location %}&location={{ current_location }}{% endif %}#">&laquo;</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_location %}&location={{ current_location }}{% endif %}#">&lsaquo;</a>
+                            </li>
+                            {% endif %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Стр. {{ page_obj.number }}</span>
+                            </li>
+                            {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_location %}&location={{ current_location }}{% endif %}#">&rsaquo;</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_category %}&category={{ current_category }}{% endif %}{% if current_subcategory %}&subcategory={{ current_subcategory }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_location %}&location={{ current_location }}{% endif %}#">&raquo;</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
             </div>
         </div>
     </div>

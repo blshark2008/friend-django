@@ -195,7 +195,7 @@ class MessageListView(LoginRequiredMixin, ListView):
     """Список всех сообщений."""
     model = Message
     template_name = 'messaging/message_list.html'
-    context_object_name = 'messages'
+    context_object_name = 'message_list'
     paginate_by = 20
 
     def get_queryset(self):

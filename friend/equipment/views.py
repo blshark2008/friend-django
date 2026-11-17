@@ -209,6 +209,8 @@ class ComputerListView(ListView):
             archived=False).count()
         context['vks_count'] = Equipment.objects.filter(
             subcategory__slug='vks', archived=False).count()
+        # equipment_type из URL или по умолчанию computer_top
+        context['item_type'] = self.kwargs.get('equipment_type', 'computer_top')
         return context
 
 
@@ -581,9 +583,160 @@ def _sidebar_counts():
         ).order_by('name'),
     }
 
+@login_required
 def export_equipment_to_excel(request):
-    """Стуб: экспорт оборудования в Excel."""
-    return render(request, 'equipment/equipment_list.html', {**_sidebar_counts(), 'equipment_list': Equipment.objects.none()})
+    """Экспорт оборудования в Excel с учётом текущих фильтров."""
+    equipment_qs = Equipment.objects.filter(archived=False).select_related(
+        'assigned_user', 'responsible_user', 'category', 'subcategory', 'brand'
+    )
+
+    # Фильтры — те же, что и в equipment_list
+    category_slug = request.GET.get('category')
+    subcategory_slug = request.GET.get('subcategory')
+    search = request.GET.get('search', '').strip()
+    status = request.GET.get('status')
+    location = request.GET.get('location', '').strip()
+    assigned_dept = request.GET.get('assigned_dept', '').strip()
+    responsible_dept = request.GET.get('responsible_dept', '').strip()
+    assigned_user = request.GET.get('assigned_user', '').strip()
+    responsible_user = request.GET.get('responsible_user', '').strip()
+
+    if category_slug:
+        cat = EquipmentCategory.objects.filter(slug=category_slug, is_active=True).first()
+        if cat and cat.is_top_level:
+            equipment_qs = equipment_qs.filter(category=cat)
+    if subcategory_slug:
+        subcat = EquipmentCategory.objects.filter(slug=subcategory_slug, is_active=True).first()
+        if subcat and not subcat.is_top_level:
+            equipment_qs = equipment_qs.filter(subcategory=subcat)
+    if search:
+        equipment_qs = equipment_qs.filter(
+            Q(inventory_number__icontains=search)
+            | Q(serial_number__icontains=search)
+            | Q(name__icontains=search)
+            | Q(brand__name__icontains=search)
+            | Q(model__icontains=search)
+            | Q(hostname__icontains=search)
+            | Q(ip_address__icontains=search)
+            | Q(location__icontains=search)
+        )
+    if status:
+        equipment_qs = equipment_qs.filter(status=status)
+    if location:
+        equipment_qs = equipment_qs.filter(location__icontains=location)
+
+    if assigned_dept:
+        from accounts.models import Department as AccountDepartment
+        dept = AccountDepartment.objects.filter(name=assigned_dept).first()
+        if dept:
+            equipment_qs = equipment_qs.filter(assigned_user__department=dept)
+        else:
+            equipment_qs = equipment_qs.none()
+
+    if responsible_dept:
+        from accounts.models import Department as AccountDepartment
+        dept = AccountDepartment.objects.filter(name=responsible_dept).first()
+        if dept:
+            equipment_qs = equipment_qs.filter(responsible_user__department=dept)
+        else:
+            equipment_qs = equipment_qs.none()
+
+    if assigned_user:
+        parts = assigned_user.split()
+        if len(parts) >= 2:
+            last_name = parts[0]
+            first_name = parts[1]
+            equipment_qs = equipment_qs.filter(
+                Q(assigned_user__last_name__icontains=last_name)
+                & Q(assigned_user__first_name__icontains=first_name)
+            )
+        elif len(parts) == 1:
+            equipment_qs = equipment_qs.filter(
+                Q(assigned_user__last_name__icontains=parts[0])
+                | Q(assigned_user__first_name__icontains=parts[0])
+                | Q(assigned_user__patronymic__icontains=parts[0])
+            )
+
+    if responsible_user:
+        parts = responsible_user.split()
+        if len(parts) >= 2:
+            last_name = parts[0]
+            first_name = parts[1]
+            equipment_qs = equipment_qs.filter(
+                Q(responsible_user__last_name__icontains=last_name)
+                & Q(responsible_user__first_name__icontains=first_name)
+            )
+        elif len(parts) == 1:
+            equipment_qs = equipment_qs.filter(
+                Q(responsible_user__last_name__icontains=parts[0])
+                | Q(responsible_user__first_name__icontains=parts[0])
+                | Q(responsible_user__patronymic__icontains=parts[0])
+            )
+
+    # Создаём Excel-файл
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Оборудование'
+
+    # Заголовки
+    headers = [
+        'Инв. номер', 'Заводской номер', 'Название', 'Бренд', 'Модель',
+        'Категория', 'Подкатегория', 'Статус', 'Закреплён за',
+        'МОЛ', 'Подразделение МОЛ', 'Кабинет', 'Имя в сети', 'IP-адрес',
+        'MAC-адрес', 'ОС', 'Дата постановки на учёт', 'Стоимость',
+    ]
+    header_fill = PatternFill(start_color='4472C4', end_color='4472C4', fill_type='solid')
+    header_font = Font(bold=True, color='FFFFFF')
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+
+    # Данные
+    for row_idx, item in enumerate(equipment_qs.order_by('inventory_number'), 2):
+        row = [
+            item.inventory_number or '',
+            item.serial_number or '',
+            item.name or '',
+            item.brand.name if item.brand else '',
+            item.model or '',
+            item.category.name if item.category else '',
+            item.subcategory.name if item.subcategory else '',
+            dict(EQUIPMENT_STATUS_CHOICES).get(item.status, item.status),
+            str(item.assigned_user) if item.assigned_user else '',
+            str(item.responsible_user) if item.responsible_user else '',
+            item.responsible_user.department.name if item.responsible_user and item.responsible_user.department else '',
+            item.location or '',
+            item.hostname or '',
+            item.ip_address or '',
+            item.mac_address or '',
+            item.os or '',
+            item.acquisition_date.strftime('%d.%m.%Y') if item.acquisition_date else '',
+            str(item.acquisition_cost or ''),
+        ]
+        for col_idx, value in enumerate(row, 1):
+            ws.cell(row=row_idx, column=col_idx, value=value)
+
+    # Автоширина колонок
+    for column in ws.columns:
+        max_length = 0
+        column_letter = column[0].column_letter
+        for cell in column:
+            try:
+                if cell.value:
+                    max_length = max(max_length, len(str(cell.value)))
+            except Exception:
+                pass
+        adjusted_width = min(max_length + 4, 50)
+        ws.column_dimensions[column_letter].width = max(adjusted_width, 10)
+
+    # Ответ
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = 'attachment; filename="equipment_export.xlsx"'
+    wb.save(response)
+    return response
 
 @login_required
 def dashboard(request):
@@ -1466,9 +1619,42 @@ def equipment_edit(request, equipment_type, pk):
     if request.method == 'POST':
         form = EquipmentForm(request.POST, instance=equipment)
         if form.is_valid():
-            form.save()
+            # Обработка конструктора размещения
+            city_id = request.POST.get('location_city_id')
+            building_id = request.POST.get('location_building_id')
+            floor_id = request.POST.get('location_floor_id')
+            place = request.POST.get('location_place', '').strip()
+            
+            if city_id or building_id or floor_id:
+                parts = []
+                if city_id:
+                    try:
+                        parts.append(City.objects.get(pk=city_id).name)
+                    except City.DoesNotExist:
+                        pass
+                if building_id:
+                    try:
+                        parts.append(Building.objects.get(pk=building_id).name)
+                    except Building.DoesNotExist:
+                        pass
+                if floor_id:
+                    try:
+                        floor = Floor.objects.get(pk=floor_id)
+                        parts.append(f'Этаж {floor.floor_number}')
+                    except Floor.DoesNotExist:
+                        pass
+                if place:
+                    parts.append(place)
+                location = ' — '.join(parts)
+                form.cleaned_data['location'] = location
+                form.cleaned_data['place'] = place
+                equipment.location = location
+                equipment.place = place
+                form.save()
+            else:
+                form.save()
             messages.success(request, 'Оборудование успешно обновлено')
-            return redirect('equipment:detail', equipment_type=equipment.category, pk=equipment.pk)
+            return redirect('equipment:detail', equipment_type=equipment.category.slug, pk=equipment.pk)
     else:
         form = EquipmentForm(instance=equipment)
     
@@ -1476,16 +1662,134 @@ def equipment_edit(request, equipment_type, pk):
     type_label = type_labels.get(equipment_type, equipment_type)
     search_query = request.GET.get('q', '')
     from_inventory = request.GET.get('from_inventory', '')
-    return render(request, 'equipment/equipment_edit_simple.html', {
+    
+    # Если пришли из инвентаризации — упрощённая форма, иначе полная
+    if from_inventory:
+        template = 'equipment/equipment_edit_simple.html'
+        if search_query:
+            back_url = f"{reverse('equipment:inventory_search')}?q={search_query}"
+        else:
+            back_url = reverse('equipment:inventory')
+    else:
+        template = 'equipment/equipment_edit_full.html'
+        back_url = reverse('equipment:detail', kwargs={'equipment_type': equipment_type, 'pk': pk})
+    
+    # Текущее размещение для конструктора
+    current_location = equipment.location
+    current_place = equipment.place
+    
+    # Если place пустой, пытаемся извлечь его из location (всё после floor)
+    if not current_place and current_location:
+        for separator in [' — ', ' / ', ' / ']:
+            if separator in current_location:
+                parts = [p.strip() for p in current_location.split(separator)]
+                break
+        else:
+            parts = [p.strip() for p in current_location.split('/')]
+        
+        # Если parts[0] — Building и есть parts[1] с номером этажа,
+        # то всё остальное — place
+        if len(parts) >= 3:
+            # Проверяем, что parts[0] — это Building
+            building = Building.objects.filter(
+                name__iexact=parts[0], is_active=True
+            ).first()
+            if building:
+                # parts[2:] — это place
+                remaining = parts[2:]
+                if remaining:
+                    current_place = ' — '.join(remaining)
+    
+    # Парсим location в компоненты для предзаполнения конструктора
+    location_ids = {}  # city_id, building_id, floor_id, room_id
+    
+    if current_location:
+        # Определяем разделитель
+        for separator in [' — ', ' / ', ' / ']:
+            if separator in current_location:
+                parts = [p.strip() for p in current_location.split(separator)]
+                break
+        else:
+            parts = [p.strip() for p in current_location.split('/')]
+        
+        # --- Вариант 1: формат "Building / Floor / Place" ---
+        # Пример: "Блок А (стационар)/12 этаж/Склад Печериной"
+        if len(parts) >= 2:
+            # Ищем Building по первой части
+            building = Building.objects.filter(
+                name__iexact=parts[0], is_active=True
+            ).select_related('city').first()
+            
+            if building:
+                location_ids['building'] = building.pk
+                if building.city:
+                    location_ids['city'] = building.city.pk
+                
+                # Ищем Floor по второй части
+                if len(parts) >= 2:
+                    floor_num_str = parts[1].lower().replace('этаж', '').replace('эт.', '').replace('э', '').strip()
+                    try:
+                        floor_num = int(floor_num_str)
+                        floor = Floor.objects.filter(
+                            building=building,
+                            floor_number=floor_num,
+                            is_active=True
+                        ).first()
+                        if floor:
+                            location_ids['floor'] = floor.pk
+                    except ValueError:
+                        pass
+                
+                # Третья часть и далее — это place
+                if len(parts) >= 3:
+                    current_place = ' — '.join(parts[2:])
+        
+        # --- Вариант 2: формат "City — Building — Floor" ---
+        # Пример: "Кемерово — Блок А (стационар) — эт. 12 — Каб. 5"
+        if not location_ids.get('building') and len(parts) >= 2:
+            # Сначала ищем City
+            city = City.objects.filter(name__iexact=parts[0], is_active=True).first()
+            if city:
+                location_ids['city'] = city.pk
+                
+                # Ищем Building по второй части
+                if len(parts) >= 2:
+                    building = Building.objects.filter(
+                        name__iexact=parts[1], city=city, is_active=True
+                    ).first()
+                    if building:
+                        location_ids['building'] = building.pk
+                        
+                        # Ищем Floor
+                        if len(parts) >= 3:
+                            floor_num_str = parts[2].lower().replace('этаж', '').replace('эт.', '').replace('э', '').replace('э.', '').strip()
+                            try:
+                                floor_num = int(floor_num_str)
+                                floor = Floor.objects.filter(
+                                    building=building,
+                                    floor_number=floor_num,
+                                    is_active=True
+                                ).first()
+                                if floor:
+                                    location_ids['floor'] = floor.pk
+                            except ValueError:
+                                pass
+    
+    return render(request, template, {
         **_sidebar_counts(),
         'form': form,
         'instance': equipment,
-        'equipment_type': equipment.category,
+        'equipment_type': equipment.category.slug,
         'assigned_user': equipment.assigned_user,
         'mol_assignment': equipment.mol_assignments.filter(is_active=True).first(),
         'type_label': type_label,
         'search_query': search_query,
         'from_inventory': from_inventory,
+        'back_url': back_url,
+        'cities': City.objects.filter(is_active=True),
+        'location_ids': location_ids,
+        'current_location': current_location,
+        'current_place': current_place,
     })
 
 def equipment_archive(request, equipment_type, pk):
@@ -1667,15 +1971,61 @@ def equipment_detail(request, equipment_type, pk):
     # История модернизаций
     upgrades = equipment.upgrades.order_by('-created_at')[:20]
 
-    return render(request, 'equipment/equipment_detail.html', {
+    # Выбор шаблона на основе типа оборудования
+    template_map = {
+        'computer_top': 'equipment/detail_computer_laptop_server_tablet.html',
+        'printers_top': 'equipment/detail_printer.html',
+        'periphery_top': 'equipment/detail_peripheral.html',
+        'communication_top': 'equipment/detail_phone.html',
+        'video_top': 'equipment/detail_vks.html',
+        'medical_top': 'equipment/detail_medical.html',
+    }
+    template_name = template_map.get(equipment_type, 'equipment/detail_computer_laptop_server_tablet.html')
+
+    # type_icon и type_label
+    type_icons = {
+        'computer_top': 'bi bi-pc-display',
+        'printers_top': 'bi bi-printer',
+        'periphery_top': 'bi bi-usb',
+        'communication_top': 'bi bi-telephone',
+        'video_top': 'bi bi-camera-video',
+        'medical_top': 'bi bi-heart-pulse',
+    }
+    type_icon = type_icons.get(equipment_type, 'bi bi-pc-display')
+
+    type_labels = dict(EQUIPMENT_SUBTYPES)
+    type_label = type_labels.get(equipment_type, equipment_type)
+
+    # Все пользователи для модальных окон
+    from accounts.models import User
+    all_users = list(User.objects.filter(is_active=True).order_by('last_name', 'first_name'))
+
+    # URL для кнопки "Назад" — берём из реферера или дефолт
+    back_url = request.META.get('HTTP_REFERER', '')
+    # Не даём уходить с текущего домена
+    if back_url and '://' in back_url:
+        from urllib.parse import urlparse
+        ref_domain = urlparse(back_url).netloc
+        req_domain = request.get_host()
+        if ref_domain != req_domain:
+            back_url = ''
+    if not back_url:
+        back_url = request.META.get('HTTP_REFERER', reverse('equipment:equipment_list'))
+
+    return render(request, template_name, {
         **_sidebar_counts(),
         'instance': equipment,
+        'equipment_type': equipment_type,
         'visible_fields': visible_fields,
         'accounting': accounting_data,
         'decommission_records': decommission_records,
         'movements': movements,
         'repairs': repairs,
         'upgrades': upgrades,
+        'type_icon': type_icon,
+        'type_label': type_label,
+        'all_users': all_users,
+        'back_url': back_url,
     })
 
 def update_from_siem(request, equipment_type, pk):
@@ -2352,6 +2702,48 @@ def get_floors_ajax(request):
     data = [
         {'pk': f.pk, 'floor_number': f.floor_number}
         for f in floors
+    ]
+    return JsonResponse(data, safe=False)
+
+
+@login_required
+def get_buildings_ajax(request):
+    """AJAX: получить корпуса для города (или все, если city_id не указан)."""
+    city_id = request.GET.get('city_id')
+    if city_id:
+        buildings = Building.objects.filter(
+            city_id=city_id, is_active=True
+        ).order_by('name')
+    else:
+        buildings = Building.objects.filter(is_active=True).order_by('name')
+    data = [
+        {'pk': b.pk, 'name': b.name, 'address': b.address}
+        for b in buildings
+    ]
+    return JsonResponse(data, safe=False)
+
+
+@login_required
+def get_rooms_ajax(request):
+    """AJAX: получить кабинеты для этажа."""
+    floor_id = request.GET.get('floor_id')
+    rooms = Room.objects.filter(
+        floor_id=floor_id, is_active=True
+    ).order_by('room_number')
+    data = [
+        {'pk': r.pk, 'room_number': r.room_number, 'capacity': r.capacity}
+        for r in rooms
+    ]
+    return JsonResponse(data, safe=False)
+
+
+@login_required
+def get_cities_ajax(request):
+    """AJAX: получить все города."""
+    cities = City.objects.filter(is_active=True).order_by('name')
+    data = [
+        {'pk': c.pk, 'name': c.name, 'code': c.code}
+        for c in cities
     ]
     return JsonResponse(data, safe=False)
 

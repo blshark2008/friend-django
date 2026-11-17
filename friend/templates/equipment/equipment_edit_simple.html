@@ -7,7 +7,7 @@
 {% block page_title %}
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <h4 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Редактирование {{ type_label }}</h4>
-    <a href="{% if search_query %}{% url 'equipment:inventory_search' %}?q={{ search_query|urlencode }}{% else %}{% url 'equipment:inventory' %}{% endif %}" class="btn btn-outline-secondary btn-sm">
+    <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrow-left me-1"></i> Назад
     </a>
 </div>
@@ -22,7 +22,7 @@
         <button type="submit" class="btn btn-primary flex-fill">
             <i class="bi bi-check-lg me-1"></i> Сохранить
         </button>
-        <a href="{% if search_query %}{% url 'equipment:inventory_search' %}?q={{ search_query|urlencode }}{% else %}{% url 'equipment:inventory' %}{% endif %}" class="btn btn-secondary flex-fill">
+        <a href="{{ back_url }}" class="btn btn-secondary flex-fill">
             <i class="bi bi-x-lg me-1"></i> Отмена
         </a>
     </div>
@@ -35,6 +35,42 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     {% endif %}
+
+    <!-- Закреплённый пользователь -->
+    <div class="card mb-3">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-person-badge me-2"></i>Закреплённый пользователь</h6>
+        </div>
+        <div class="card-body">
+            {% if instance.assigned_user %}
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <strong>Текущий пользователь:</strong>
+                    <span class="ms-2">{{ instance.assigned_user.get_full_name|default:instance.assigned_user.username }}</span>
+                    <span class="text-muted small ms-2">
+                        {% if instance.assigned_user.department %}· {{ instance.assigned_user.department.name }}{% endif %}
+                    </span>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#assignUserModal">
+                        <i class="bi bi-pencil me-1"></i>Заменить
+                    </button>
+                    <form method="post" action="{% url 'equipment:clear_assign' equipment_type instance.pk %}" class="d-inline" onsubmit="return confirm('Освободить оборудование от пользователя?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger" title="Освободить от пользователя">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-muted small mb-3">Пользователь не назначен</div>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#assignUserModal">
+                <i class="bi bi-person-plus me-1"></i> Назначить пользователя
+            </button>
+            {% endif %}
+        </div>
+    </div>
 
     <!-- Замена МОЛ -->
     <div class="card mb-3">
@@ -123,26 +159,46 @@
             <h6 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Размещение</h6>
         </div>
         <div class="card-body">
+            <!-- Hidden поля для ID (отправляются при сохранении) -->
+            <input type="hidden" id="location_city_id" name="location_city_id" value="{{ location_ids.city|default:'' }}">
+            <input type="hidden" id="location_building_id" name="location_building_id" value="{{ location_ids.building|default:'' }}">
+            <input type="hidden" id="location_floor_id" name="location_floor_id" value="{{ location_ids.floor|default:'' }}">
+            
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label class="form-label fw-semibold">{{ form.location.label }}</label>
-                    {{ form.location }}
-                    {% if form.location.errors %}
-                    <div class="invalid-feedback d-block">{{ form.location.errors.0 }}</div>
-                    {% endif %}
-                    {% if form.location.help_text %}
-                    <div class="form-text">{{ form.location.help_text }}</div>
-                    {% endif %}
+                    <label class="form-label fw-semibold">Город</label>
+                    <select class="form-select" id="location_city">
+                        <option value="">— Выберите —</option>
+                        {% for city in cities %}
+                        <option value="{{ city.pk }}"{% if location_ids.city == city.pk %} selected{% endif %}>{{ city.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label class="form-label fw-semibold">{{ form.place.label }}</label>
-                    {{ form.place }}
-                    {% if form.place.errors %}
-                    <div class="invalid-feedback d-block">{{ form.place.errors.0 }}</div>
-                    {% endif %}
-                    {% if form.place.help_text %}
-                    <div class="form-text">{{ form.place.help_text }}</div>
-                    {% endif %}
+                    <label class="form-label fw-semibold">Корпус</label>
+                    <select class="form-select" id="location_building" disabled>
+                        <option value="">— Сначала выберите город —</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-semibold">Этаж</label>
+                    <select class="form-select" id="location_floor" disabled>
+                        <option value="">— Сначала выберите корпус —</option>
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-semibold">Кабинет</label>
+                    <input type="text" class="form-control" id="location_place" name="location_place" value="{{ current_place|default:'' }}" placeholder="Номер кабинета или описание">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-12 mb-3">
+                    <label class="form-label fw-semibold text-muted">Полный адрес</label>
+                    <div class="form-control-plaintext bg-light p-2 rounded" id="location_preview">
+                        {% if current_location %}{{ current_location }}{% else %}— не выбрано —{% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -153,11 +209,30 @@
         <button type="submit" class="btn btn-primary">
             <i class="bi bi-check-lg me-1"></i> Сохранить
         </button>
-        <a href="{% if search_query %}{% url 'equipment:inventory_search' %}?q={{ search_query|urlencode }}{% else %}{% url 'equipment:inventory' %}{% endif %}" class="btn btn-secondary">
+        <a href="{{ back_url }}" class="btn btn-secondary">
             <i class="bi bi-x-lg me-1"></i> Отмена
         </a>
     </div>
 </form>
+
+<!-- Модальное окно: Назначить/Заменить пользователя -->
+<div class="modal fade" id="assignUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Назначить пользователя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="userSearchInput" placeholder="ФИО или табельный номер">
+                    <button type="button" class="btn btn-primary" id="userSearchBtn"><i class="bi bi-search me-1"></i>Найти</button>
+                </div>
+                <div id="userSearchResults" class="list-group search-results-xl"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Модальное окно: Назначить/Заменить МОЛ -->
 <div class="modal fade" id="assignMolModal" tabindex="-1">
@@ -182,6 +257,91 @@
 
 {% block extra_js %}
 <script>
+// Поиск пользователей
+let userSearchTimeout = null;
+
+function searchUsers(query) {
+    fetch("{% url 'equipment:search_users' %}?q=" + encodeURIComponent(query))
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('userSearchResults');
+            if (data.users.length === 0) {
+                container.innerHTML = '<div class="list-group-item text-muted">Ничего не найдено</div>';
+                return;
+            }
+            container.innerHTML = data.users.map(u => `
+                <button type="button" class="list-group-item list-group-item-action" onclick="assignUser(${u.id}, '${u.name.replace(/'/g, "\\'")}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${u.name}</strong>
+                            <div class="small text-muted">
+                                Таб. №${u.tab_number}
+                                ${u.department ? ' · ' + u.department : ''}
+                                ${u.position ? ' · ' + u.position : ''}
+                            </div>
+                        </div>
+                        <i class="bi bi-check-circle text-success"></i>
+                    </div>
+                </button>
+            `).join('');
+        })
+        .catch(err => console.error('searchUsers error:', err));
+}
+
+function assignUser(userId, userName) {
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    const csrfToken = getCookie('csrftoken');
+    
+    fetch("{% url 'equipment:assign_ajax' equipment_type instance.pk %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+        },
+        body: 'user_id=' + userId + '&action=replace'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            location.reload();
+        } else {
+            alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
+        }
+    })
+    .catch(err => console.error('assignUser error:', err));
+}
+
+const userInput = document.getElementById('userSearchInput');
+const userBtn = document.getElementById('userSearchBtn');
+if (userInput) {
+    userInput.addEventListener('input', function() {
+        clearTimeout(userSearchTimeout);
+        userSearchTimeout = setTimeout(() => searchUsers(this.value.trim()), 300);
+    });
+}
+if (userBtn) {
+    userBtn.addEventListener('click', function() {
+        const q = document.getElementById('userSearchInput').value.trim();
+        if (q.length >= 2) {
+            searchUsers(q);
+        }
+    });
+}
+
 // Поиск МОЛ
 let molSearchTimeout = null;
 
@@ -268,5 +428,169 @@ if (molBtn) {
         }
     });
 }
+
+// ============================================================================
+// Конструктор размещения: Город → Корпус → Этаж → Кабинет
+// ============================================================================
+const locationCity = document.getElementById('location_city');
+const locationBuilding = document.getElementById('location_building');
+const locationFloor = document.getElementById('location_floor');
+const locationPlace = document.getElementById('location_place');
+const locationPreview = document.getElementById('location_preview');
+
+function updateLocationPreview() {
+    const buildingOpt = locationBuilding.options[locationBuilding.selectedIndex];
+    const floorOpt = locationFloor.options[locationFloor.selectedIndex];
+    
+    const parts = [];
+    if (locationCity.value) parts.push(locationCity.options[locationCity.selectedIndex].text);
+    if (locationBuilding.value) parts.push(buildingOpt.text);
+    if (locationFloor.value) parts.push(floorOpt.text);
+    
+    const place = locationPlace ? locationPlace.value : '';
+    if (place.trim()) parts.push(place.trim());
+    
+    let text = parts.length > 0 ? parts.join(' — ') : '— не выбрано —';
+    locationPreview.textContent = text;
+}
+
+if (locationCity) {
+    locationCity.addEventListener('change', function() {
+        locationBuilding.innerHTML = '<option value="">— Выберите —</option>';
+        locationFloor.innerHTML = '<option value="">— Сначала выберите корпус —</option>';
+        locationFloor.disabled = true;
+        
+        if (this.value) {
+            locationBuilding.disabled = false;
+            fetch('{% url "equipment:get_buildings_ajax" %}?city_id=' + this.value)
+                .then(r => r.json())
+                .then(data => {
+                    locationBuilding.innerHTML = '<option value="">— Выберите —</option>';
+                    data.forEach(b => {
+                        const opt = document.createElement('option');
+                        opt.value = b.pk;
+                        opt.textContent = b.name + (b.address ? ' (' + b.address + ')' : '');
+                        locationBuilding.appendChild(opt);
+                    });
+                });
+        } else {
+            locationBuilding.disabled = true;
+        }
+        updateLocationPreview();
+    });
+}
+
+if (locationBuilding) {
+    locationBuilding.addEventListener('change', function() {
+        locationFloor.innerHTML = '<option value="">— Сначала выберите корпус —</option>';
+        
+        if (this.value) {
+            locationFloor.disabled = false;
+            fetch('{% url "equipment:get_floors_ajax" %}?building_id=' + this.value)
+                .then(r => r.json())
+                .then(data => {
+                    locationFloor.innerHTML = '<option value="">— Выберите —</option>';
+                    data.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f.pk;
+                        opt.textContent = 'Этаж ' + f.floor_number;
+                        locationFloor.appendChild(opt);
+                    });
+                });
+        } else {
+            locationFloor.disabled = true;
+        }
+        updateLocationPreview();
+    });
+}
+
+if (locationPlace) {
+    locationPlace.addEventListener('input', updateLocationPreview);
+}
+
+// ============================================================================
+// Предзаполнение конструктора при загрузке (если location уже выбран)
+// ============================================================================
+function populateLocationFromIds() {
+    const cityId = document.getElementById('location_city_id').value;
+    const buildingId = document.getElementById('location_building_id').value;
+    const floorId = document.getElementById('location_floor_id').value;
+    
+    // Если есть building_id, но нет city_id — загружаем все корпуса
+    if (buildingId && !cityId) {
+        fetch('{% url "equipment:get_buildings_ajax" %}')
+            .then(r => r.json())
+            .then(data => {
+                locationBuilding.innerHTML = '<option value="">— Выберите —</option>';
+                data.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.pk;
+                    opt.textContent = b.name + (b.address ? ' (' + b.address + ')' : '');
+                    if (b.pk == buildingId) opt.selected = true;
+                    locationBuilding.appendChild(opt);
+                });
+                locationBuilding.disabled = false;
+                _populateFloors(buildingId, floorId);
+            });
+        return;
+    }
+    
+    if (!cityId && !buildingId) return;
+    
+    // 1. Выбираем город
+    if (locationCity && cityId) {
+        locationCity.value = cityId;
+    }
+    
+    // 2. Загружаем корпуса
+    if (locationBuilding && cityId) {
+        locationBuilding.disabled = false;
+        fetch('{% url "equipment:get_buildings_ajax" %}?city_id=' + cityId)
+            .then(r => r.json())
+            .then(data => {
+                locationBuilding.innerHTML = '<option value="">— Выберите —</option>';
+                data.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.pk;
+                    opt.textContent = b.name + (b.address ? ' (' + b.address + ')' : '');
+                    if (buildingId && b.pk == buildingId) opt.selected = true;
+                    locationBuilding.appendChild(opt);
+                });
+                _populateFloors(buildingId, floorId);
+            });
+    }
+}
+
+function _populateFloors(buildingId, floorId) {
+    if (!buildingId) {
+        locationFloor.innerHTML = '<option value="">— Сначала выберите корпус —</option>';
+        locationFloor.disabled = true;
+        updateLocationPreview();
+        return;
+    }
+    
+    fetch('{% url "equipment:get_floors_ajax" %}?building_id=' + buildingId)
+        .then(r => r.json())
+        .then(data => {
+            locationFloor.innerHTML = '<option value="">— Выберите —</option>';
+            data.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.pk;
+                opt.textContent = 'Этаж ' + f.floor_number;
+                if (floorId && f.pk == floorId) opt.selected = true;
+                locationFloor.appendChild(opt);
+            });
+            locationFloor.disabled = false;
+            updateLocationPreview();
+        });
+}
+
+document.addEventListener('DOMContentLoaded', populateLocationFromIds);
+
+// Предзаполнение place
+const placeInput = document.getElementById('location_place');
+{% if current_place %}
+if (placeInput) placeInput.value = '{{ current_place|escapejs }}';
+{% endif %}
 </script>
 {% endblock %}

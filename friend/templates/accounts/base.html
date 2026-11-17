@@ -12,10 +12,8 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- Sidebar toggle -->
-    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Свернуть/развернуть">
-        <i class="bi bi-chevron-left"></i>
-    </button>
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
 
     <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
@@ -25,102 +23,108 @@
         </div>
 
         <div class="sidebar-section">
-            <div class="sidebar-section-title">Основное</div>
-            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
-               href="{% url 'accounts:dashboard' %}" data-tooltip="Дашборд">
-                <i class="bi bi-grid-1x2"></i> <span>Дашборд</span>
+            <a class="nav-link sidebar-section-toggle {% if request.resolver_match.url_name != 'dashboard' %}collapsed{% endif %}" href="#section-osnovnoe" data-bs-toggle="collapse" aria-expanded="{% if request.resolver_match.url_name == 'dashboard' %}true{% else %}false{% endif %}">
+                <i class="bi bi-grid-1x2"></i>
+                <span>Основное</span>
+                <i class="bi bi-chevron-right section-arrow ms-auto"></i>
             </a>
+            <div class="sidebar-section-content collapse {% if request.resolver_match.url_name == 'dashboard' %}show{% endif %}" id="section-osnovnoe">
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+                   href="{% url 'accounts:dashboard' %}" data-tooltip="Дашборд">
+                    <span class="sub-dot"></span>
+                    <span>Дашборд</span>
+                </a>
+            </div>
         </div>
 
         <div class="sidebar-section">
-            <div class="sidebar-section-title">Сотрудники</div>
-            <a class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}"
-               href="{% url 'accounts:user_list' %}" data-tooltip="Список пользователей">
-                <i class="bi bi-people"></i> <span>Список пользователей</span>
-                <span class="badge bg-primary float-end">{{ users_count|default:0 }}</span>
+            <a class="nav-link sidebar-section-toggle {% if request.resolver_match.url_name != 'user_list' %}collapsed{% endif %}" href="#section-sotrudniki" data-bs-toggle="collapse" aria-expanded="{% if request.resolver_match.url_name == 'user_list' %}true{% else %}false{% endif %}">
+                <i class="bi bi-people"></i>
+                <span>Сотрудники</span>
+                <i class="bi bi-chevron-right section-arrow ms-auto"></i>
             </a>
-            <span class="nav-link {% if request.resolver_match.url_name == 'user_detail' %}active{% endif %}" data-tooltip="Профиль">
-                <i class="bi bi-person-badge"></i> <span>Профиль</span>
-            </span>
+            <div class="sidebar-section-content collapse {% if request.resolver_match.url_name == 'user_list' %}show{% endif %}" id="section-sotrudniki">
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}"
+                   href="{% url 'accounts:user_list' %}" data-tooltip="Список пользователей">
+                    <span class="sub-dot"></span>
+                    <span>Список пользователей</span>
+                    <span class="badge bg-primary sub-badge">{{ users_count|default:0 }}</span>
+                </a>
+            </div>
         </div>
 
         <div class="sidebar-section">
-            <div class="sidebar-section-title">Оргструктура</div>
-            <a class="nav-link {% if request.resolver_match.url_name == 'department_list' %}active{% endif %}"
-               href="{% url 'accounts:department_list' %}" data-tooltip="Список подразделений">
-                <i class="bi bi-building"></i> <span>Список подразделений</span>
-                <span class="badge bg-success float-end">{{ departments_count|default:0 }}</span>
+            <a class="nav-link sidebar-section-toggle {% if request.resolver_match.url_name != 'list' and request.resolver_match.url_name != 'type_list' and request.resolver_match.url_name != 'journal' and request.resolver_match.url_name != 'goal_list' %}collapsed{% endif %}" href="#section-obucheniya" data-bs-toggle="collapse" aria-expanded="{% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'type_list' or request.resolver_match.url_name == 'journal' or request.resolver_match.url_name == 'goal_list' %}true{% else %}false{% endif %}">
+                <i class="bi bi-mortarboard"></i>
+                <span>Обучения</span>
+                <i class="bi bi-chevron-right section-arrow ms-auto"></i>
             </a>
-            <a class="nav-link" href="{% url 'accounts:position_list' %}" data-tooltip="Должности">
-                <i class="bi bi-briefcase"></i> <span>Должности</span>
-            </a>
+            <div class="sidebar-section-content collapse {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'type_list' or request.resolver_match.url_name == 'journal' or request.resolver_match.url_name == 'goal_list' %}show{% endif %}" id="section-obucheniya">
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'type_list' %}active{% endif %}"
+                   href="{% url 'training:list' %}" data-tooltip="Обучающие курсы">
+                    <span class="sub-dot"></span>
+                    <span>Обучающие курсы</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'journal' %}active{% endif %}"
+                   href="{% url 'training:journal' %}" data-tooltip="Журнал обучения">
+                     <span class="sub-dot"></span>
+                     <span>Журнал обучения</span>
+                 </a>
+                 <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'goal_list' %}active{% endif %}"
+                   href="{% url 'training:goal_list' %}" data-tooltip="Цели обучения">
+                    <span class="sub-dot"></span>
+                    <span>Цели обучения</span>
+                </a>
+            </div>
         </div>
 
         <div class="sidebar-section">
-            <div class="sidebar-section-title">Доступы</div>
-            <a class="nav-link {% if 'role' in request.resolver_match.url_name %}active{% endif %}"
-               href="{% url 'access:role_list' %}" data-tooltip="Роли">
-                <i class="bi bi-person-badge"></i> <span>Роли</span>
+            <a class="nav-link sidebar-section-toggle {% if request.resolver_match.url_name != 'message_list' and request.resolver_match.url_name != 'message_create' and request.resolver_match.url_name != 'message_stats' %}collapsed{% endif %}" href="#section-soobshcheniya" data-bs-toggle="collapse" aria-expanded="{% if request.resolver_match.url_name == 'message_list' or request.resolver_match.url_name == 'message_create' or request.resolver_match.url_name == 'message_stats' %}true{% else %}false{% endif %}">
+                <i class="bi bi-chat-dots"></i>
+                <span>Сообщения</span>
+                <i class="bi bi-chevron-right section-arrow ms-auto"></i>
             </a>
-            <a class="nav-link {% if 'group' in request.resolver_match.url_name %}active{% endif %}"
-               href="{% url 'access:group_list' %}" data-tooltip="Группы доступа">
-                <i class="bi bi-people"></i> <span>Группы доступа</span>
-            </a>
-            <a class="nav-link {% if 'grant' in request.resolver_match.url_name %}active{% endif %}"
-               href="{% url 'access:grant_list' %}" data-tooltip="Гранты доступа">
-                <i class="bi bi-shield-check"></i> <span>Гранты доступа</span>
-            </a>
-            <a class="nav-link {% if 'request' in request.resolver_match.url_name %}active{% endif %}"
-               href="{% url 'access:request_list' %}" data-tooltip="Заявки на доступ">
-                <i class="bi bi-file-earmark-text"></i> <span>Заявки на доступ</span>
-            </a>
-            <a class="nav-link {% if 'container' in request.resolver_match.url_name %}active{% endif %}"
-               href="{% url 'access:container_list' %}" data-tooltip="Контейнеры групп">
-                <i class="bi bi-folder"></i> <span>Контейнеры групп</span>
-            </a>
-            <a class="nav-link {% if request.resolver_match.url_name == 'position_roles' %}active{% endif %}"
-               href="{% url 'access:position_roles' %}" data-tooltip="Роли должностей">
-                <i class="bi bi-briefcase"></i> <span>Роли должностей</span>
-            </a>
+            <div class="sidebar-section-content collapse {% if request.resolver_match.url_name == 'message_list' or request.resolver_match.url_name == 'message_create' or request.resolver_match.url_name == 'message_stats' %}show{% endif %}" id="section-soobshcheniya">
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'message_list' %}active{% endif %}"
+                   href="{% url 'messaging:message_list' %}" data-tooltip="Все сообщения">
+                    <span class="sub-dot"></span>
+                    <span>Все сообщения</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'message_create' %}active{% endif %}"
+                   href="{% url 'messaging:message_create' %}" data-tooltip="Новое сообщение">
+                    <span class="sub-dot"></span>
+                    <span>Новое сообщение</span>
+                </a>
+                <a class="nav-link sidebar-sublink {% if request.resolver_match.url_name == 'message_stats' %}active{% endif %}"
+                   href="{% url 'messaging:message_stats' %}" data-tooltip="Статистика">
+                    <span class="sub-dot"></span>
+                    <span>Статистика</span>
+                </a>
+            </div>
         </div>
 
-        <div class="sidebar-section">
-            <div class="sidebar-section-title">Оборудование</div>
-            <a class="nav-link" href="{% url 'equipment:equipment_list' %}" data-tooltip="Список техники">
-                <i class="bi bi-pc-display"></i> <span>Список техники</span>
-            </a>
-            <a class="nav-link" href="{% url 'equipment:dashboard' %}" data-tooltip="Дашборд оборудования">
-                <i class="bi bi-speedometer2"></i> <span>Дашборд оборудования</span>
-            </a>
-        </div>
-
-        <div class="sidebar-section">
-            <div class="sidebar-section-title">Безопасность</div>
-            <a class="nav-link" href="{% url 'siem:dashboard' %}" data-tooltip="SIEM дашборд">
-                <i class="bi bi-shield-check"></i> <span>SIEM дашборд</span>
-            </a>
-            <a class="nav-link" href="{% url 'siem:alerts_list' %}" data-tooltip="Алерты">
-                <i class="bi bi-bell"></i> <span>Алерты</span>
-            </a>
-            <a class="nav-link" href="{% url 'siem:hosts' %}" data-tooltip="Хосты">
-                <i class="bi bi-hdd-network"></i> <span>Хосты</span>
-            </a>
-        </div>
-
-        <div class="sidebar-section">
-            <div class="sidebar-section-title">Настройки</div>
-            <a class="nav-link" href="/admin/" data-tooltip="Админ-панель">
-                <i class="bi bi-gear"></i> <span>Админ-панель</span>
-            </a>
+        <!-- User menu -->
+        <div class="sidebar-user-menu">
+            <div class="d-flex flex-column align-items-center text-center gap-2">
+                <span class="text-white-50"><i class="bi bi-person-circle"></i> {{ user.get_full_name|default:user.username }}</span>
+                <a href="{% url 'accounts:logout' %}" class="btn btn-sm btn-outline-danger w-100">
+                    <i class="bi bi-box-arrow-right"></i> Выйти
+                </a>
+            </div>
         </div>
     </nav>
+
+    <!-- Sidebar toggle (desktop only) -->
+    <button class="sidebar-toggle d-md-flex" id="sidebarToggle" onclick="toggleSidebar()" title="Свернуть/развернуть">
+        <i class="bi bi-chevron-left"></i>
+    </button>
 
     <!-- Main content -->
     <main class="main-content">
         <!-- Top bar -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <button class="btn btn-sm btn-outline-secondary d-md-none me-2" onclick="document.getElementById('sidebar').classList.toggle('show')">
+                <button class="btn btn-sm btn-outline-secondary d-md-none me-2" onclick="openMobileSidebar()">
                     <i class="bi bi-list"></i>
                 </button>
                 {% block page_title %}{% endblock %}
@@ -164,13 +168,30 @@
             localStorage.setItem('accountsSidebarCollapsed', sidebar.classList.contains('collapsed'));
         }
 
+        function openMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.add('show');
+            sidebar.classList.remove('collapsed');
+            if (overlay) overlay.classList.add('show');
+        }
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.remove('show');
+            if (overlay) overlay.classList.remove('show');
+        }
+
         // Restore sidebar state on page load
         document.addEventListener('DOMContentLoaded', function() {
             const collapsed = localStorage.getItem('accountsSidebarCollapsed') === 'true';
             if (collapsed) {
-                document.getElementById('sidebar').classList.add('collapsed');
-                document.getElementById('sidebarToggle').classList.add('collapsed');
-                document.getElementById('sidebarToggle').querySelector('i').className = 'bi bi-chevron-right';
+                const sidebar = document.getElementById('sidebar');
+                const toggle = document.getElementById('sidebarToggle');
+                sidebar.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                toggle.querySelector('i').className = 'bi bi-chevron-right';
             }
         });
     </script>

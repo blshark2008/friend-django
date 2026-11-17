@@ -296,6 +296,132 @@ body {
     }
 }
 
+/* ===== Collapsible Sidebar Sections ===== */
+
+.sidebar-section {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-section-title {
+    padding: 0.5rem 1.25rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--sidebar-text-muted);
+    font-weight: 600;
+}
+
+.sidebar-section-toggle {
+    cursor: pointer;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.03);
+    margin: 0.25rem 0.5rem;
+    border-radius: 6px;
+}
+
+.sidebar-section-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-section-toggle .section-arrow {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+    opacity: 0.5;
+}
+
+.sidebar-section-toggle[aria-expanded="true"] .section-arrow {
+    transform: rotate(90deg);
+    opacity: 1;
+}
+
+.sidebar-section-content {
+    padding: 0.25rem 0;
+}
+
+.sidebar-sublink {
+    padding-left: 2.5rem;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.6);
+    border-left: 3px solid transparent;
+}
+
+.sidebar-sublink:hover {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.05);
+    border-left-color: var(--sidebar-active);
+}
+
+.sidebar-sublink.active {
+    color: #fff;
+    background: rgba(52, 152, 219, 0.15);
+    border-left-color: var(--sidebar-active);
+}
+
+.sidebar-sublink .sub-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+.sidebar-sublink .sub-badge {
+    font-size: 0.65rem;
+    padding: 0.2em 0.5em;
+    margin-left: auto;
+}
+
+/* Collapsed state — hide section content */
+.sidebar.collapsed .sidebar-section-toggle .section-arrow {
+    display: none;
+}
+
+.sidebar.collapsed .sidebar-section-content {
+    display: none !important;
+}
+
+/* ===== User Menu (sidebar bottom) ===== */
+
+.sidebar-user-menu {
+    padding: 1rem 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 0.5rem;
+}
+
+.sidebar.collapsed .sidebar-user-menu {
+    display: none;
+}
+
+.sidebar-user-menu .btn-outline-danger {
+    border-color: rgba(220, 53, 69, 0.5);
+    color: #ff6b7a;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.sidebar-user-menu .btn-outline-danger:hover {
+    background: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+}
+
+/* ===== Mobile overlay ===== */
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+.sidebar-overlay.show {
+    display: block;
+}
+
 /* ===== Стили для форм редактирования ===== */
 .form-select-sm {
     max-width: 100% !important;

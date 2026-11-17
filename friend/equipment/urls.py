@@ -98,7 +98,10 @@ urlpatterns = [
     path('locations/room/<int:pk>/edit/', views.location_room_edit, name='location_room_edit'),
     path('locations/room/<int:pk>/delete/', views.location_room_delete, name='location_room_delete'),
     # API
+    path('locations/api/cities/', views.get_cities_ajax, name='get_cities_ajax'),
+    path('locations/api/buildings/', views.get_buildings_ajax, name='get_buildings_ajax'),
     path('locations/api/floors/', views.get_floors_ajax, name='get_floors_ajax'),
+    path('locations/api/rooms/', views.get_rooms_ajax, name='get_rooms_ajax'),
     # Категории оборудования (AJAX)
     path('api/categories/', views.get_categories_ajax, name='get_categories_ajax'),
     path('api/subcategories/', views.get_subcategories_ajax, name='get_subcategories_ajax'),

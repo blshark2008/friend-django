@@ -1,0 +1,153 @@
+{% extends "accounts/base.html" %}
+
+{% block title %}Сообщение — «Друг»{% endblock %}
+
+{% block page_title %}
+<div class="d-flex align-items-center gap-3 flex-wrap">
+    <h4 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Сообщение</h4>
+    <a href="{% url 'messaging:message_list' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Назад
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Message details -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="mb-3">
+                    <h5 class="fw-bold">{{ message.title|default:"Без заголовка" }}</h5>
+                    <p class="text-muted mb-0">{{ message.content }}</p>
+                </div>
+                
+                <hr>
+                
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Отправитель</small>
+                        <strong>{{ message.sender.get_full_name|default:"—" }}</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Приоритет</small>
+                        {% if message.priority == 'urgent' %}
+                        <span class="badge bg-danger">Срочный</span>
+                        {% elif message.priority == 'high' %}
+                        <span class="badge bg-warning text-dark">Высокий</span>
+                        {% elif message.priority == 'normal' %}
+                        <span class="badge bg-info">Обычный</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Низкий</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Канал</small>
+                        <strong>{{ message.get_channel_display }}</strong>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Статус</small>
+                        {% if message.status == 'sent' %}
+                        <span class="badge bg-success">Отправлено</span>
+                        {% elif message.status == 'pending' %}
+                        <span class="badge bg-warning text-dark">В очереди</span>
+                        {% elif message.status == 'draft' %}
+                        <span class="badge bg-secondary">Черновик</span>
+                        {% else %}
+                        <span class="badge bg-danger">Ошибка</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Создано</small>
+                        <strong>{{ message.created_at|date:"d.m.Y H:i" }}</strong>
+                    </div>
+                    {% if message.sent_at %}
+                    <div class="col-md-4">
+                        <small class="text-muted d-block">Отправлено</small>
+                        <strong>{{ message.sent_at|date:"d.m.Y H:i" }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if message.error_message %}
+                <div class="alert alert-danger mt-3 mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>{{ message.error_message }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Recipients -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Получатели ({{ total_recipients }})</h6>
+                <span class="badge bg-success">Доставлено: {{ delivered_count }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Получатель</th>
+                                <th>Канал</th>
+                                <th>Статус</th>
+                                <th>Отправлено</th>
+                                <th>Доставлено</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for recipient in recipients %}
+                            <tr>
+                                <td>{{ recipient.recipient.get_full_name }}</td>
+                                <td>{{ recipient.get_delivery_channel_display }}</td>
+                                <td>
+                                    {% if recipient.delivery_status == 'delivered' %}
+                                    <span class="badge bg-success">Доставлено</span>
+                                    {% elif recipient.delivery_status == 'read' %}
+                                    <span class="badge bg-info">Прочитано</span>
+                                    {% elif recipient.delivery_status == 'pending' %}
+                                    <span class="badge bg-warning text-dark">В очереди</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Ошибка</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-nowrap small">{{ recipient.sent_at|date:"d.m.Y H:i"|default:"—" }}</td>
+                                <td class="text-nowrap small">{{ recipient.delivered_at|date:"d.m.Y H:i"|default:"—" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">Получатели отсутствуют</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Статистика</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <small>Доставлено</small>
+                        <small class="fw-bold">{{ delivered_count }}/{{ total_recipients }}</small>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        {% if total_recipients > 0 %}
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ delivered_count|add:0|floatformat:0|default:'0'|divisibleby:total_recipients|yesno:'100,0' }}%;"
+                             aria-valuenow="{{ delivered_count }}" aria-valuemin="0" aria-valuemax="{{ total_recipients }}">
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

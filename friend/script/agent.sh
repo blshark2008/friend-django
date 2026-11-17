@@ -283,23 +283,59 @@ collect_screen_locks
 # ===============================================================
 HASH_FILE="$STATE/hashes.new"
 HASH_EXISTS=0
+HASH_STALE=0
 if [ -f "$STATE/hashes" ] && [ -s "$STATE/hashes" ]; then
     HASH_EXISTS=1
+    # Проверяем timestamp: если файл старше N часов — считаем его устаревшим
+    HASH_AGE_SECONDS=$(( $(date +%s) - $(stat -c %Y "$STATE/hashes" 2>/dev/null || echo 0) ))
+    STALE_THRESHOLD=$((12 * 3600))  # 12 часов
+    if [ "$HASH_AGE_SECONDS" -gt "$STALE_THRESHOLD" ]; then
+        HASH_STALE=1
+        log "hashes file is stale (age=${HASH_AGE_SECONDS}s > ${STALE_THRESHOLD}s)"
+    fi
 fi
+
+CHANGED_COUNT=0
+CHANGED_FILES=""
 
 for F in /etc/passwd /etc/group /etc/shadow /etc/sudoers /etc/hosts; do
     [ -f "$F" ] || continue
     H=$(sha256sum "$F" 2>/dev/null | cut -d' ' -f1)
     
-    if [ "$HASH_EXISTS" -eq 1 ]; then
+    if [ "$HASH_EXISTS" -eq 1 ] && [ "$HASH_STALE" -eq 0 ]; then
         PREV=$(grep " ${F//\//\\/}$" "$STATE/hashes" 2>/dev/null | cut -d' ' -f1)
         if [ -n "$PREV" ] && [ "$PREV" != "$H" ]; then
-            printf '{"file": "%s"}' "$F" | event file_changed critical "Изменён критичный файл: $F"
-            log "file_changed $F"
+            CHANGED_COUNT=$((CHANGED_COUNT + 1))
+            CHANGED_FILES="$CHANGED_FILES $F"
+            log "file_changed DETECTED: $F (prev=$PREV curr=$H)"
         fi
     fi
     echo "$H $F" >> "$HASH_FILE"
 done
+
+# Защита от ложных срабатываний: если все 5 файлов изменились одновременно — это
+# скорее всего сброс состояния (бэкап/rsync), а не реальная атака.
+# Настоящие изменения критичных файлов происходят поодиночке.
+TOTAL_CHECKED=0
+for F in /etc/passwd /etc/group /etc/shadow /etc/sudoers /etc/hosts; do
+    [ -f "$F" ] && TOTAL_CHECKED=$((TOTAL_CHECKED + 1))
+done
+
+if [ "$HASH_EXISTS" -eq 1 ] && [ "$HASH_STALE" -eq 0 ] && [ "$CHANGED_COUNT" -gt 0 ]; then
+    if [ "$CHANGED_COUNT" -ge "$TOTAL_CHECKED" ]; then
+        log "SKIPPED mass file change alert (all files changed):$CHANGED_FILES"
+    else
+        for F in $CHANGED_FILES; do
+            printf '{"file": "%s"}' "$F" | event file_changed critical "Изменён критичный файл: $F"
+            log "file_changed $F"
+        done
+    fi
+fi
+
+if [ "$HASH_STALE" -eq 1 ]; then
+    log "hashes file is stale, resetting state (no alerts for this run)"
+fi
+
 mv "$HASH_FILE" "$STATE/hashes"
 
 # ===============================================================

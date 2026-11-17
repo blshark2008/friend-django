@@ -3,7 +3,7 @@
 
 {% block top_cards %}
     {% if instance.name %}
-    <div class="col-md-6 col-xl-3">
+    <div class="col">
         <div class="card stat-card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-heart-pulse fs-1 text-primary"></i>
@@ -14,7 +14,7 @@
     </div>
     {% endif %}
     {% if instance.location %}
-    <div class="col-md-6 col-xl-3">
+    <div class="col">
         <div class="card stat-card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-geo-alt fs-1 text-info"></i>
@@ -25,7 +25,7 @@
     </div>
     {% endif %}
     {% if instance.status %}
-    <div class="col-md-6 col-xl-3">
+    <div class="col">
         <div class="card stat-card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-circle fs-1 {% if instance.status == 'active' %}text-success{% else %}text-warning{% endif %}"></i>
@@ -37,7 +37,7 @@
     {% endif %}
 {% endblock %}
 
-{% block info_tabs %}
+{% block equipment_tabs %}
 <div class="row g-4">
     <div class="col-md-6">
         <div class="card table-card">
@@ -47,12 +47,6 @@
                     <tr><td class="text-muted" class="detail-label">Модель</td><td>{{ instance.model }}</td></tr>
                     {% if instance.serial_number %}
                     <tr><td class="text-muted">Серийный номер</td><td>{{ instance.serial_number }}</td></tr>
-                    {% endif %}
-                    {% if instance.assigned_user %}
-                    <tr><td class="text-muted">Закреплён за</td><td>{{ instance.assigned_user.last_name }} {{ instance.assigned_user.first_name }}</td></tr>
-                    {% endif %}
-                    {% if instance.responsible_user %}
-                    <tr><td class="text-muted">Мат. ответственный</td><td>{{ instance.responsible_user.last_name }} {{ instance.responsible_user.first_name }}</td></tr>
                     {% endif %}
                 </table>
             </div>
@@ -81,6 +75,106 @@
                 <table class="table table-sm mb-0">
                     <tr><td class="text-muted" class="detail-label">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
                     <tr><td class="text-muted">Место</td><td>{{ instance.place|default:"—" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block accounting_tabs %}
+<!-- Закреплённый сотрудник -->
+<div class="row g-4 mt-2">
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-person-badge me-1"></i> Закреплённый сотрудник</h6>
+                <div class="btn-group btn-group-sm">
+                    {% if instance.assigned_user %}
+                    <button type="button" class="btn btn-outline-warning" onclick="openReplaceUserModal('assigned', {{ instance.pk }}, '{{ equipment_type }}')">
+                        <i class="bi bi-arrow-repeat"></i> Заменить
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="clearAssignedUser('{{ equipment_type }}', {{ instance.pk }})">
+                        <i class="bi bi-x"></i>
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-outline-primary" onclick="openAddUserModal('assigned', {{ instance.pk }}, '{{ equipment_type }}')">
+                        <i class="bi bi-person-plus"></i> Добавить
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted" class="detail-label">ФИО</td>
+                        <td>
+                            {% if instance.assigned_user %}
+                            <strong>{{ instance.assigned_user.last_name }} {{ instance.assigned_user.first_name }} {{ instance.assigned_user.patronymic|default:"—" }}</strong>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if instance.assigned_user %}
+                    <tr><td class="text-muted">Табельный номер</td><td>{{ instance.assigned_user.tab_number|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Подразделение</td><td>{{ instance.assigned_user.department.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Должность</td><td>{{ instance.assigned_user.position.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Корп. Email</td><td>{{ instance.assigned_user.corporate_email|default:"—" }}</td></tr>
+                    {% else %}
+                    <tr><td class="text-muted">Табельный номер</td><td>—</td></tr>
+                    <tr><td class="text-muted">Подразделение</td><td>—</td></tr>
+                    <tr><td class="text-muted">Должность</td><td>—</td></tr>
+                    <tr><td class="text-muted">Email</td><td>—</td></tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОЛ (Материально ответственное лицо) -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-person-check me-1"></i> Материально ответственное лицо (МОЛ)</h6>
+                <div class="btn-group btn-group-sm">
+                    {% if instance.responsible_user %}
+                    <button type="button" class="btn btn-outline-warning" onclick="openReplaceUserModal('responsible', {{ instance.pk }}, '{{ equipment_type }}')">
+                        <i class="bi bi-arrow-repeat"></i> Заменить
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="clearResponsibleUser('{{ equipment_type }}', {{ instance.pk }})">
+                        <i class="bi bi-x"></i>
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-outline-primary" onclick="openAddUserModal('responsible', {{ instance.pk }}, '{{ equipment_type }}')">
+                        <i class="bi bi-person-plus"></i> Добавить
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted" class="detail-label">ФИО</td>
+                        <td>
+                            {% if instance.responsible_user %}
+                            <strong>{{ instance.responsible_user.last_name }} {{ instance.responsible_user.first_name }} {{ instance.responsible_user.patronymic|default:"—" }}</strong>
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if instance.responsible_user %}
+                    <tr><td class="text-muted">Табельный номер</td><td>{{ instance.responsible_user.tab_number|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Подразделение</td><td>{{ instance.responsible_user.department.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Должность</td><td>{{ instance.responsible_user.position.name|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Корп. Email</td><td>{{ instance.responsible_user.corporate_email|default:"—" }}</td></tr>
+                    {% else %}
+                    <tr><td class="text-muted">Табельный номер</td><td>—</td></tr>
+                    <tr><td class="text-muted">Подразделение</td><td>—</td></tr>
+                    <tr><td class="text-muted">Должность</td><td>—</td></tr>
+                    <tr><td class="text-muted">Email</td><td>—</td></tr>
+                    {% endif %}
                 </table>
             </div>
         </div>

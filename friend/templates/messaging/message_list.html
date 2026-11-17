@@ -3,6 +3,29 @@
 
 {% block title %}Сообщения — «Друг»{% endblock %}
 
+{% block messages %}
+{% if messages %}
+<div class="mb-3">
+    <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="systemMessagesDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-bell me-1"></i>Системные уведомления
+            <span class="badge bg-primary">{{ messages|length }}</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end w-100" aria-labelledby="systemMessagesDropdown">
+            <li><h6 class="dropdown-header">Уведомления</h6></li>
+            {% for message in messages %}
+            <li>
+                <a class="dropdown-item alert alert-{{ message.tags }} py-2 mb-1 border-0 shadow-sm" href="#" data-bs-dismiss="alert">
+                    {{ message }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-envelope-fill me-2"></i>Сообщения</h2>
@@ -106,7 +129,7 @@
 <!-- Список сообщений -->
 <div class="card border-0 shadow-sm table-card">
     <div class="card-body p-0">
-        {% if messages %}
+        {% if message_list %}
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead>
@@ -122,7 +145,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for message in messages %}
+                    {% for message in message_list %}
                     <tr>
                         <td class="ps-4">
                             <a href="{% url 'messaging:message_detail' message.pk %}" class="text-decoration-none">

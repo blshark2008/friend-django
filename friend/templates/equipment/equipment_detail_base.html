@@ -17,36 +17,18 @@
     </div>
     <div class="col">
         <div class="d-flex gap-2 flex-wrap justify-content-end">
-            <a href="{% url 'equipment:list' %}" class="btn btn-outline-secondary">
+            <a href="{{ back_url }}" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1"></i> Назад
             </a>
             <a href="{% url 'equipment:edit' equipment_type instance.pk %}" class="btn btn-primary">
                 <i class="bi bi-pencil me-1"></i> Редактировать
             </a>
-            {% if instance.serial_number %}
-            <button type="button" class="btn btn-success" id="syncFromSiemBtn"
-                    data-equipment-type="{{ equipment_type }}"
-                    data-equipment-pk="{{ instance.pk }}"
-                    data-serial="{{ instance.serial_number }}">
-                <i class="bi bi-arrow-repeat me-1"></i> Синхронизировать с SIEM
-            </button>
-            {% else %}
-            <button type="button" class="btn btn-secondary" disabled title="Укажите серийный номер в настройках">
-                <i class="bi bi-arrow-repeat me-1"></i> Синхронизировать с SIEM
-            </button>
-            {% endif %}
-            {% if instance.serial_number %}
-            <a href="{% url 'equipment:siem_host_redirect' instance.serial_number %}?equipment_type={{ equipment_type }}&equipment_pk={{ instance.pk }}"
-               class="btn btn-info">
-                <i class="bi bi-box-arrow-up-right me-1"></i> Перейти в SIEM
-            </a>
-            {% endif %}
         </div>
     </div>
 </div>
 
 <!-- ===== КАРТОЧКИ СВЕРХУ ===== -->
-<div class="row g-3 mb-4">
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
     {% block top_cards %}{% endblock %}
 </div>
 
@@ -183,28 +165,7 @@ function getCookie(name) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // SIEM sync
-    const siemBtn = document.getElementById('syncFromSiemBtn');
-    if (siemBtn && !siemBtn.disabled) {
-        siemBtn.addEventListener('click', function() {
-            const et = this.dataset.equipmentType;
-            const ek = this.dataset.equipmentPk;
-            this.disabled = true;
-            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Синхронизация...';
-            fetch('/equipment/update-siem/' + et + '/' + ek + '/', {
-                method: 'POST',
-                headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) location.reload();
-                else { alert('Ошибка: ' + data.error); siemBtn.disabled = false; siemBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Синхронизировать с SIEM'; }
-            })
-            .catch(err => { alert('Ошибка: ' + err.message); siemBtn.disabled = false; siemBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Синхронизировать с SIEM'; });
-        });
-    }
-
-    // Assign user
+// Assign user
     document.getElementById('detailAssignedSaveBtn').addEventListener('click', function() {
         const userId = document.getElementById('detailAssignedUserSelect').value;
         const btn = this;

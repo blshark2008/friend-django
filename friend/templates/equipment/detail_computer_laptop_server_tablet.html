@@ -2,33 +2,8 @@
 {% load static %}
 
 {% block top_cards %}
-    {% if instance.hostname %}
-    <div class="col-md-6 col-xl-3">
-        <div class="card stat-card h-100">
-            <div class="card-body text-center">
-                <i class="bi bi-hdd-network fs-1 text-info"></i>
-                <h6 class="mt-2 mb-0 text-muted">Сетевое имя</h6>
-                <strong>{{ instance.hostname }}</strong>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    {% if instance.ip_address %}
-    <div class="col-md-6 col-xl-3">
-        <div class="card stat-card h-100">
-            <div class="card-body text-center">
-                <i class="bi bi-ethernet fs-1 text-info"></i>
-                <h6 class="mt-2 mb-0 text-muted">IP / MAC</h6>
-                <small><code>{{ instance.ip_address }}</code></small>
-                {% if instance.mac_address %}
-                <br><small class="text-muted">{{ instance.mac_address }}</small>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
     {% if instance.cpu %}
-    <div class="col-md-6 col-xl-3">
+    <div class="col">
         <div class="card stat-card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-cpu fs-1 text-success"></i>
@@ -42,7 +17,7 @@
     </div>
     {% endif %}
     {% if instance.storage_gb %}
-    <div class="col-md-6 col-xl-3">
+    <div class="col">
         <div class="card stat-card h-100">
             <div class="card-body text-center">
                 <i class="bi bi-hdd fs-1 text-warning"></i>
@@ -211,41 +186,8 @@
 {% endblock %}
 
 {% block accounting_tabs %}
-<div class="row g-4">
-    <!-- Данные учёта -->
-    <div class="col-md-6">
-        <div class="card table-card">
-            <div class="card-header"><h6 class="mb-0">Данные учёта</h6></div>
-            <div class="card-body">
-                <table class="table table-sm mb-0">
-                    <tr><td class="text-muted">Дата приобретения</td><td>{{ accounting.acquisition_date|date:"d.m.Y"|default:"—" }}</td></tr>
-                    <tr><td class="text-muted">Первоначальная стоимость</td><td>{{ accounting.acquisition_cost|default:"—" }}</td></tr>
-                    <tr><td class="text-muted">Инвентарный номер (бухг.)</td><td>{{ accounting.initial_number|default:"—" }}</td></tr>
-                    <tr><td class="text-muted">Срок полезного использования</td><td>{{ accounting.useful_life_months|default:"—" }} мес.</td></tr>
-                    <tr><td class="text-muted">Метод амортизации</td><td>{{ accounting.depreciation_method|default:"—" }}</td></tr>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Данные списания -->
-    <div class="col-md-6">
-        <div class="card table-card">
-            <div class="card-header"><h6 class="mb-0">Данные списания</h6></div>
-            <div class="card-body">
-                <table class="table table-sm mb-0">
-                    <tr><td class="text-muted">Дата списания</td><td>{{ accounting.decommission_date|date:"d.m.Y"|default:"—" }}</td></tr>
-                    <tr><td class="text-muted">Акт списания</td><td>{{ accounting.decommission_act|default:"—" }}</td></tr>
-                    <tr><td class="text-muted">Примечания</td><td>{{ accounting.decommission_notes|default:"—" }}</td></tr>
-                    <tr><td class="text-muted">Списал</td><td>{{ accounting.decommissioned_by|default:"—" }}</td></tr>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Закреплённый сотрудник -->
-<div class="row g-4 mt-2">
+<div class="row g-4">
     <div class="col-md-6">
         <div class="card table-card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -336,6 +278,39 @@
                     <tr><td class="text-muted">Должность</td><td>—</td></tr>
                     <tr><td class="text-muted">Email</td><td>—</td></tr>
                     {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-3">
+    <!-- Данные учёта -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Данные учёта</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted">Дата приобретения</td><td>{{ accounting.acquisition_date|date:"d.m.Y"|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Первоначальная стоимость</td><td>{{ accounting.acquisition_cost|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Инвентарный номер (бухг.)</td><td>{{ accounting.initial_number|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Срок полезного использования</td><td>{{ accounting.useful_life_months|default:"—" }} мес.</td></tr>
+                    <tr><td class="text-muted">Метод амортизации</td><td>{{ accounting.depreciation_method|default:"—" }}</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Данные списания -->
+    <div class="col-md-6">
+        <div class="card table-card">
+            <div class="card-header"><h6 class="mb-0">Данные списания</h6></div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td class="text-muted">Дата списания</td><td>{{ accounting.decommission_date|date:"d.m.Y"|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Акт списания</td><td>{{ accounting.decommission_act|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Примечания</td><td>{{ accounting.decommission_notes|default:"—" }}</td></tr>
+                    <tr><td class="text-muted">Списал</td><td>{{ accounting.decommissioned_by|default:"—" }}</td></tr>
                 </table>
             </div>
         </div>

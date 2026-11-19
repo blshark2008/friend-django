@@ -8,6 +8,8 @@ from django.db.models import Q, Count
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.text import slugify
+import openpyxl
 
 from accounts.models import User, Department
 from .models import TrainingType, Training, TrainingEnrollment, TrainingCategory, TrainingGoal, SkillspaceGroup
@@ -1277,7 +1279,10 @@ def training_journal(request):
     goals = TrainingGoal.objects.filter(is_active=True).order_by('name')
     goal = None
     if goal_id:
-        goal = get_object_or_404(TrainingGoal, pk=goal_id, is_active=True)
+        try:
+            goal = TrainingGoal.objects.get(pk=goal_id, is_active=True)
+        except TrainingGoal.DoesNotExist:
+            goal = None
 
     # Build journal data
     journal_data = []
@@ -1300,7 +1305,7 @@ def training_journal(request):
             enrollments = TrainingEnrollment.objects.filter(
                 training__in=trainings,
             ).select_related(
-                'user', 'user__department', 'training', 'training__training_type'
+                'user', 'user__department', 'training', 'training__training_type', 'assigned_by'
             )
 
             # Completed enrollments within the period
@@ -1339,6 +1344,7 @@ def training_journal(request):
                     'enrolled_at': enrollment.enrolled_at,
                     'score': enrollment.score,
                     'status': enrollment.status,
+                    'assigned_by': enrollment.assigned_by,
                 })
 
             # Sort by user last name
@@ -1357,6 +1363,7 @@ def training_journal(request):
                     'enrolled_at': enrollment.enrolled_at,
                     'score': enrollment.score,
                     'status': enrollment.status,
+                    'assigned_by': enrollment.assigned_by,
                 })
 
             in_progress_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
@@ -1373,6 +1380,7 @@ def training_journal(request):
                     'training_type_name': enrollment.training.training_type.name,
                     'enrolled_at': enrollment.enrolled_at,
                     'status': enrollment.status,
+                    'assigned_by': enrollment.assigned_by,
                 })
 
             not_started_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
@@ -1477,3 +1485,407 @@ def training_create(request, type_pk):
         'training_type': training_type,
         'action': 'Создание',
     })
+
+
+# ============================================================================
+# Action 360 Report Upload
+# ============================================================================
+
+# Mapping of Excel status strings to TrainingEnrollment.Status codes
+STATUS_MAPPING = {
+    'не начито': 'not_started',
+    'неначато': 'not_started',
+    'not started': 'not_started',
+    'программа не начата': 'not_started',
+    'в процессе': 'in_progress',
+    'впроцессе': 'in_progress',
+    'in progress': 'in_progress',
+    'учится по плану': 'in_progress',
+    'учится по плану': 'in_progress',
+    'отстает от плана': 'in_progress',
+    'completed': 'completed',
+    'программа завершена': 'completed',
+    'пройдено': 'completed',
+    'пройдена': 'completed',
+    'пройдено_успешно': 'completed',
+    'успешно': 'completed',
+    'не пройдено': 'failed',
+    'непройдено': 'failed',
+    'не_пройдено': 'failed',
+    'failed': 'failed',
+    'не пройдена': 'failed',
+}
+
+
+def _normalize_status(status_str):
+    """Normalize status string from Excel to TrainingEnrollment.Status code."""
+    if not status_str:
+        return 'not_started'
+    key = str(status_str).strip().lower()
+    return STATUS_MAPPING.get(key, 'not_started')
+
+
+def _find_user_by_full_name(full_name):
+    """Search for user by full name parts."""
+    if not full_name:
+        return None
+    parts = full_name.strip().split()
+    if not parts:
+        return None
+
+    # Build query: at minimum last_name and first_name
+    query = Q()
+    if len(parts) >= 3:
+        query = Q(
+            last_name__iexact=parts[0],
+            first_name__iexact=parts[1],
+        )
+        # Try with patronymic match
+        patronymic_match = Q(patronymic__iexact=parts[2])
+        user = User.objects.filter(query & patronymic_match).exclude(is_fired=True).first()
+        if user:
+            return user
+        # Try without patronymic
+        user = User.objects.filter(query).exclude(is_fired=True).first()
+        if user:
+            return user
+    elif len(parts) == 2:
+        query = Q(
+            last_name__iexact=parts[0],
+            first_name__iexact=parts[1],
+        )
+        user = User.objects.filter(query).exclude(is_fired=True).first()
+        if user:
+            return user
+        # Try partial patronymic
+        user = User.objects.filter(
+            last_name__iexact=parts[0],
+            first_name__icontains=parts[1],
+        ).exclude(is_fired=True).first()
+        if user:
+            return user
+    else:
+        # Single name - search anywhere
+        user = User.objects.filter(
+            Q(last_name__iexact=parts[0]) |
+            Q(first_name__iexact=parts[0])
+        ).exclude(is_fired=True).first()
+        if user:
+            return user
+
+    return None
+
+
+def _find_assigner_by_full_name(full_name):
+    """Search for assigner user by full name (last_name first_name format)."""
+    if not full_name:
+        return None
+    parts = full_name.strip().split()
+    if not parts:
+        return None
+    if len(parts) >= 2:
+        return User.objects.filter(
+            last_name__iexact=parts[0],
+            first_name__iexact=parts[1],
+            is_fired=False,
+        ).first()
+    return User.objects.filter(
+        Q(last_name__iexact=parts[0]) | Q(first_name__iexact=parts[0])
+    ).exclude(is_fired=True).first()
+
+
+def _find_or_create_goal(goal_name):
+    """Find or create TrainingGoal."""
+    if not goal_name:
+        return None
+    goal_name = str(goal_name).strip()
+    if not goal_name:
+        return None
+    return TrainingGoal.objects.get_or_create(name=goal_name)[0]
+
+
+def _find_training_for_goal(goal, request_user):
+    """Find or create a Training for the given goal."""
+    if not goal:
+        return None
+
+    # Find TrainingType linked to this goal
+    training_types = goal.training_types.filter(is_active=True)
+    if not training_types.exists():
+        # Create a new TrainingType for this goal
+        training_type = TrainingType.objects.create(
+            name=goal.name,
+            description=f'Курс, созданный из отчета Актион360 для цели: {goal.name}',
+        )
+        goal.training_types.add(training_type)
+        training_types = TrainingType.objects.filter(pk=training_type.pk)
+
+    training_type = training_types.first()
+
+    # Find or create Training
+    training = Training.objects.filter(
+        training_type=training_type,
+        title=goal.name,
+        is_active=True,
+    ).first()
+
+    if not training:
+        training = Training.objects.create(
+            training_type=training_type,
+            title=goal.name,
+            description=f'Обучение, созданное из отчета Актион360',
+            status=Training.Status.ACTIVE,
+        )
+
+    return training
+
+
+@login_required
+def upload_action_report(request):
+    """Загрузка отчета Актион360 (Excel .xlsx)."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
+    file = request.FILES.get('report_file')
+    if not file:
+        return JsonResponse({'error': 'Файл не выбран'}, status=400)
+
+    if not file.name.endswith('.xlsx'):
+        return JsonResponse({'error': 'Поддерживаются только файлы .xlsx'}, status=400)
+
+    results = {
+        'total': 0,
+        'processed': 0,
+        'users_found': 0,
+        'users_not_found': 0,
+        'emails_updated': 0,
+        'phones_updated': 0,
+        'goals_created': 0,
+        'trainings_type_created': 0,
+        'trainings_created': 0,
+        'enrollments_created': 0,
+        'enrollments_updated': 0,
+        'assigners_found': 0,
+        'errors': [],
+        'warnings': [],
+    }
+    seen_rows = set()
+
+    try:
+        wb = openpyxl.load_workbook(file)
+        ws = wb.active
+
+        if ws is None:
+            return JsonResponse({'error': 'Лист книги пуст'}, status=400)
+
+        # Find header row by scanning all rows for "ФИО" or similar
+        header_row_idx = None
+        for r in range(1, min(ws.max_row + 1, 50)):
+            row_vals = [str(cell.value).strip() if cell.value else '' for cell in ws[r]]
+            for v in row_vals:
+                v_lower = v.lower()
+                if 'фио' in v_lower or 'фамилия' in v_lower:
+                    header_row_idx = r
+                    break
+            if header_row_idx:
+                break
+
+        if header_row_idx is None:
+            return JsonResponse({
+                'error': 'Не найдена строка с заголовками (столбец ФИО)'
+            }, status=400)
+
+        # Read headers from found row
+        headers = []
+        for cell in ws[header_row_idx]:
+            headers.append(str(cell.value).strip() if cell.value else '')
+
+        def find_column(*candidates):
+            """Find column index by multiple possible names."""
+            for i, h in enumerate(headers):
+                if h:
+                    h_lower = h.lower()
+                    for c in candidates:
+                        if c.lower() in h_lower:
+                            return i
+            return None
+
+        col_fio = find_column('фио', 'фамилия имя отчество', 'full name', 'сотрудник')
+        col_email = find_column('электронная почта', 'email', 'почта', 'e-mail')
+        col_phone = find_column('телефон', 'mobile', 'мобильный')
+        col_groups = find_column('группы')
+        col_program = find_column('название программы', 'программы')
+        col_assigner = find_column('назначил обучение', 'назначил', 'assigner')
+        col_goal = find_column('группа программ и тестов', 'цель обучения', 'training goal')
+        col_status = find_column('статус', 'статус обучения', 'status')
+
+        if col_fio is None:
+            return JsonResponse({
+                'error': 'Не найден столбец ФИО. Ожидаемые названия: ФИО, Фамилия Имя Отчество, Сотрудник'
+            }, status=400)
+
+        # Process rows starting after header
+        for row_idx, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True), start=header_row_idx + 1):
+            results['total'] += 1
+
+            try:
+                # Get full name
+                fio = row[col_fio] if col_fio < len(row) else None
+                if not fio or not str(fio).strip():
+                    results['warnings'].append(f'Строка {row_idx}: пропущена (пустое ФИО)')
+                    continue
+
+                fio = str(fio).strip()
+
+                # Find user
+                user = _find_user_by_full_name(fio)
+                if not user:
+                    results['users_not_found'] += 1
+                    results['errors'].append(f'Строка {row_idx}: сотрудник не найден — {fio}')
+                    continue
+
+                results['users_found'] += 1
+
+                # Update personal email if not set
+                if col_email is not None and col_email < len(row):
+                    email_val = row[col_email]
+                    if email_val and str(email_val).strip():
+                        email_val = str(email_val).strip()
+                        if not user.personal_email:
+                            user.personal_email = email_val
+                            user.save(update_fields=['personal_email'])
+                            results['emails_updated'] += 1
+
+                # Update personal phone if not set
+                if col_phone is not None and col_phone < len(row):
+                    phone_val = row[col_phone]
+                    if phone_val and str(phone_val).strip():
+                        phone_val = str(phone_val).strip()
+                        if not user.personal_phone:
+                            user.personal_phone = phone_val
+                            user.save(update_fields=['personal_phone'])
+                            results['phones_updated'] += 1
+
+                # Get training type from "Группы" column
+                group_name = ''
+                if col_groups is not None and col_groups < len(row):
+                    group_name = str(row[col_groups]).strip() if row[col_groups] else ''
+
+                # Get training title from "Название программы" column
+                program_name = ''
+                if col_program is not None and col_program < len(row):
+                    program_name = str(row[col_program]).strip() if row[col_program] else ''
+
+                # Get training goal from "Группа программ и тестов" column
+                goal_name = ''
+                if col_goal is not None and col_goal < len(row):
+                    goal_name = str(row[col_goal]).strip() if row[col_goal] else ''
+
+                if not goal_name:
+                    results['warnings'].append(f'Строка {row_idx}: {fio} — нет цели обучения, пропуск')
+                    continue
+
+                # Skip duplicate rows (same FIO + program_name)
+                row_key = f'{fio}|{program_name}'
+                if row_key in seen_rows:
+                    results['warnings'].append(f'Строка {row_idx}: {fio} — дубликат, пропуск')
+                    continue
+                seen_rows.add(row_key)
+
+                # Find or create TrainingGoal
+                goal = _find_or_create_goal(goal_name)
+
+                # Find or create TrainingType from "Группы"
+                training_type = None
+                if group_name:
+                    training_type, tt_created = TrainingType.objects.get_or_create(
+                        name=group_name,
+                        defaults={'description': f'Курс, созданный из отчета Актион360'}
+                    )
+                    if tt_created:
+                        results['trainings_type_created'] = results.get('trainings_type_created', 0) + 1
+
+                    # Link TrainingType with TrainingGoal
+                    if goal and goal not in training_type.goals.all():
+                        training_type.goals.add(goal)
+
+                # Find or create Training from "Название программы"
+                training = None
+                if training_type and program_name:
+                    training, tr_created = Training.objects.get_or_create(
+                        training_type=training_type,
+                        title=program_name,
+                        defaults={
+                            'description': f'Обучение, созданное из отчета Актион360',
+                            'status': Training.Status.ACTIVE,
+                        }
+                    )
+                    if tr_created:
+                        results['trainings_created'] = results.get('trainings_created', 0) + 1
+
+                if not training:
+                    results['errors'].append(f'Строка {row_idx}: {fio} — ошибка создания обучения')
+                    continue
+
+                # Get status
+                status_raw = ''
+                if col_status is not None and col_status < len(row):
+                    status_raw = str(row[col_status]).strip() if row[col_status] else ''
+                status_code = _normalize_status(status_raw)
+
+                # Validate status
+                valid_statuses = [s[0] for s in TrainingEnrollment.Status.choices]
+                if status_code not in valid_statuses:
+                    status_code = 'not_started'
+
+                # Find assigner by full name from Excel
+                assigner_name = ''
+                assigner = None
+                if col_assigner is not None and col_assigner < len(row):
+                    assigner_name = str(row[col_assigner]).strip() if row[col_assigner] else ''
+                    if assigner_name:
+                        assigner = _find_assigner_by_full_name(assigner_name)
+                        if assigner:
+                            results['assigners_found'] = results.get('assigners_found', 0) + 1
+
+                # Create or update enrollment
+                enrollment, created = TrainingEnrollment.objects.get_or_create(
+                    training=training,
+                    user=user,
+                    defaults={
+                        'status': status_code,
+                        'assigned_by': assigner if assigner else request.user,
+                    }
+                )
+
+                if not created:
+                    # Update existing enrollment
+                    changed = False
+                    if enrollment.status != status_code:
+                        enrollment.status = status_code
+                        changed = True
+                    if status_code == 'completed':
+                        enrollment.completed_at = timezone.now()
+                        changed = True
+                    if enrollment.assigned_by_id != (assigner.id if assigner else None):
+                        enrollment.assigned_by = assigner
+                        changed = True
+                    if changed:
+                        enrollment.save()
+                        results['enrollments_updated'] += 1
+                else:
+                    results['enrollments_created'] += 1
+
+                results['processed'] += 1
+
+            except Exception as e:
+                results['errors'].append(f'Строка {row_idx}: {str(e)}')
+                logger.error(f'Error processing row {row_idx}: {e}', exc_info=True)
+
+        wb.close()
+
+        return JsonResponse(results)
+
+    except Exception as e:
+        logger.error(f'Excel upload error: {e}', exc_info=True)
+        return JsonResponse({'error': f'Ошибка обработки файла: {str(e)}'}, status=500)

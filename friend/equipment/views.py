@@ -466,7 +466,7 @@ def equipment_list(request):
         'current_sort': sort_field,
         'current_order': sort_order,
         # Filters для сохранения в сортировке
-        'filters': request.GET.copy,
+        'filters': request.GET.copy(),
     }
     return render(request, 'equipment/equipment_list.html', context)
 
@@ -2135,9 +2135,51 @@ def assign_mol_batch(request):
     """Стуб: массовое назначение МОЛ."""
     return redirect('equipment:equipment_list')
 
+@login_required
 def equipment_inventory(request):
-    """Стуб: инвентаризация."""
-    return render(request, 'equipment/inventory.html', _sidebar_counts())
+    """Инвентаризационный поиск — главная страница поиска оборудования."""
+    search_query = request.GET.get('q', '').strip()
+
+    equipment_qs = Equipment.objects.filter(archived=False).select_related(
+        'assigned_user', 'responsible_user', 'category', 'subcategory', 'brand'
+    ).order_by('-is_active', 'category', 'inventory_number')
+
+    if search_query:
+        equipment_qs = equipment_qs.filter(
+            Q(name__icontains=search_query) |
+            Q(inventory_number__icontains=search_query) |
+            Q(serial_number__icontains=search_query) |
+            Q(hostname__icontains=search_query) |
+            Q(mac_address__icontains=search_query) |
+            Q(ip_address__icontains=search_query) |
+            Q(model__icontains=search_query) |
+            Q(brand__name__icontains=search_query) |
+            Q(cpu__icontains=search_query) |
+            Q(os__icontains=search_query) |
+            Q(antivirus_engine__icontains=search_query) |
+            Q(location__icontains=search_query) |
+            Q(place__icontains=search_query) |
+            Q(phone_number__icontains=search_query) |
+            Q(extension__icontains=search_query) |
+            Q(status__icontains=search_query) |
+            Q(assigned_user__first_name__icontains=search_query) |
+            Q(assigned_user__last_name__icontains=search_query) |
+            Q(responsible_user__first_name__icontains=search_query) |
+            Q(responsible_user__last_name__icontains=search_query)
+        )
+
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(equipment_qs, 10)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        **_sidebar_counts(),
+        'equipment_list': page_obj.object_list,
+        'total_count': equipment_qs.count(),
+        'search_query': search_query,
+        'page_obj': page_obj,
+    }
+    return render(request, 'equipment/inventory_search.html', context)
 
 def equipment_inventory_detail(request, equipment_type, pk):
     """Стуб: детальная инвентаризация."""

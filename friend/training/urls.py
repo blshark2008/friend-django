@@ -52,4 +52,7 @@ urlpatterns = [
 
     # Reports
     path('reports/', views.training_report, name='report'),
+
+    # Action 360 Report Upload
+    path('upload-action-report/', views.upload_action_report, name='upload_action_report'),
 ]

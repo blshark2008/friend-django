@@ -1,7 +1,7 @@
-{% extends 'equipment/equipment_detail_base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
-{% block top_cards %}
+{% block content %}
     {% if instance.name %}
     <div class="col">
         <div class="card stat-card h-100">
@@ -35,9 +35,8 @@
         </div>
     </div>
     {% endif %}
-{% endblock %}
 
-{% block equipment_tabs %}
+{# equipment_tabs #}
 <div class="row g-4">
     <div class="col-md-6">
         <div class="card table-card">
@@ -82,9 +81,7 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block accounting_tabs %}
 <!-- Закреплённый сотрудник -->
 <div class="row g-4 mt-2">
     <div class="col-md-6">

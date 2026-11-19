@@ -1,14 +1,21 @@
-{% extends "emergency/base.html" %}
+{% extends "base.html" %}
 {% load static %}
 
 {% block title %}{{ alert.title }} — Оповещение ГОиЧС — «Друг»{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>
-        <i class="bi bi-bell-fill me-2"></i>
-        {{ alert.title }}
-    </h2>
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            {% block page_title %}<h4 class="mb-0"><i class="bi bi-bell-fill me-2"></i>
+        {{ alert.title }}</h4>{% endblock %}
+
+        </div>
+
+    </div>
     <div>
         {% if alert.status == 'draft' %}
         <a href="{% url 'emergency:alert_edit' alert.pk %}" class="btn btn-outline-danger me-2">

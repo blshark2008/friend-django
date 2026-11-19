@@ -1,4 +1,4 @@
-{% extends "scenarios/base.html" %}
+{% extends "base.html" %}
 {% load static %}
 
 {% block title %}Запуск: {{ run.scenario.name }} — «Друг»{% endblock %}
@@ -6,7 +6,16 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2><i class="bi bi-play-circle me-2"></i>{{ run.scenario.name }}</h2>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+
+            <div>
+
+                {% block page_title %}<h4 class="mb-0"><i class="bi bi-play-circle me-2"></i>{{ run.scenario.name }}</h4>{% endblock %}
+
+            </div>
+
+        </div>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb mb-0">
                 <li class="breadcrumb-item"><a href="{% url 'scenarios:scenario_list' %}">Сценарии</a></li>
@@ -701,7 +710,7 @@ function performAbort() {
     fetch(`/scenarios/runs/${runId}/abort/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            'X-CSRFToken': window.CSRF_TOKEN
         }
     })
     .then(response => response.json())
@@ -724,7 +733,7 @@ function performCancel() {
     fetch(`/scenarios/runs/${runId}/cancel-run/`, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            'X-CSRFToken': window.CSRF_TOKEN
         }
     })
     .then(response => response.json())

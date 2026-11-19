@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-shield-lock me-2"></i>{{ title }}</h4>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    {% if action_en == 'create' %}
+                    <i class="bi bi-plus-circle me-2"></i>Новая внутренняя группа
+                    {% else %}
+                    <i class="bi bi-pencil-square me-2"></i>Редактирование группы
+                    {% endif %}
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.name.id_for_label }}" class="form-label fw-bold">
+                            Название <span class="text-danger">*</span>
+                        </label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                        <div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">Человекочитаемое название группы</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.code.id_for_label }}" class="form-label fw-bold">
+                            Технический код <span class="text-danger">*</span>
+                        </label>
+                        {{ form.code }}
+                        {% if form.code.errors %}
+                        <div class="invalid-feedback d-block">{{ form.code.errors|join:", " }}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Уникальный код для программной работы (только латиница, цифры и дефисы)
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.description.id_for_label }}" class="form-label fw-bold">Описание</label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                        <div class="invalid-feedback d-block">{{ form.description.errors|join:", " }}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">Описание назначения группы (необязательно)</small>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            {{ form.is_active }}
+                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                Активна
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">Неактивные группы не отображаются в списках</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            {{ form.is_system }}
+                            <label class="form-check-label" for="{{ form.is_system.id_for_label }}">
+                                Системная группа
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Системные группы защищены от удаления (необязательно)
+                        </small>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>{{ action }}
+                        </button>
+                        <a href="{% url 'accounts:internal_group_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-lg me-1"></i>Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

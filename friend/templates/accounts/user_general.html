@@ -1,4 +1,4 @@
-{% extends "accounts/base.html" %}
+{% extends "base.html" %}
 
 {% block title %}{{ user.get_full_name }} — Общая информация — «Друг»{% endblock %}
 
@@ -8,6 +8,11 @@
     <a href="{% url 'accounts:user_edit' user.pk %}" class="btn btn-outline-primary btn-sm">
         <i class="bi bi-pencil me-1"></i>Редактировать
     </a>
+    {% if has_password_reset_perm %}
+    <button type="button" class="btn btn-outline-warning btn-sm" id="resetPasswordBtn">
+        <i class="bi bi-key me-1"></i>Новый пароль
+    </button>
+    {% endif %}
     <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#sendMessageModal">
         <i class="bi bi-send me-1"></i>Отправить сообщение
     </button>
@@ -346,6 +351,28 @@
     }
 </style>
 <script>
+<script>
+// Валидация формы сброса пароля
+const resetForm = document.getElementById('resetPasswordForm');
+if (resetForm) {
+    resetForm.addEventListener('submit', function(e) {
+        const pwd = document.getElementById('new_password').value;
+        const confirm = document.getElementById('confirm_password').value;
+        const confirmInput = document.getElementById('confirm_password');
+        
+        if (pwd !== confirm) {
+            e.preventDefault();
+            confirmInput.classList.add('is-invalid');
+            return;
+        }
+        confirmInput.classList.remove('is-invalid');
+    });
+    
+    document.getElementById('confirm_password').addEventListener('input', function() {
+        this.classList.remove('is-invalid');
+    });
+}
+
 function toggleEdit(btn, section) {
     const card = btn.closest('.card');
     const viewMode = card.querySelector('.view-mode');
@@ -407,6 +434,46 @@ function toggleEdit(btn, section) {
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                     <button type="submit" class="btn btn-success">
                         <i class="bi bi-send me-1"></i>Отправить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно: Новый пароль -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'accounts:user_reset_password' user.pk %}" id="resetPasswordForm" novalidate>
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="resetPasswordModalLabel">
+                        <i class="bi bi-key me-2"></i>Новый пароль
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">Учётная запись: <strong>{{ user.username }}</strong></p>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Новый пароль</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required minlength="8" placeholder="Минимум 8 символов">
+                        <small class="text-muted">Пароль должен содержать минимум 8 символов</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Подтверждение пароля</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="8" placeholder="Повторите пароль">
+                        <div class="invalid-feedback">Пароли не совпадают</div>
+                    </div>
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        После смены пароля пользователь будет уведомлён через настроенные каналы связи.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-key me-1"></i>Сменить пароль
                     </button>
                 </div>
             </form>

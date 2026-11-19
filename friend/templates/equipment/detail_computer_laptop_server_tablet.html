@@ -1,35 +1,47 @@
-{% extends 'equipment/equipment_detail_base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
-{% block top_cards %}
+{% block page_title %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4 class="mb-0">
+        <i class="{{ type_icon }} me-2"></i>{{ instance.name|default:type_label }}
+    </h4>
+    <div>
+        <a href="{% url 'equipment:edit' equipment_type instance.pk %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i> Редактировать
+        </a>
+        <a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Назад
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex flex-wrap gap-2 mb-3">
     {% if instance.cpu %}
-    <div class="col">
-        <div class="card stat-card h-100">
-            <div class="card-body text-center">
-                <i class="bi bi-cpu fs-1 text-success"></i>
-                <h6 class="mt-2 mb-0 text-muted">Процессор</h6>
-                <strong>{{ instance.cpu }}</strong>
-                {% if instance.ram_gb %}
-                <br><small class="text-muted">{{ instance.ram_gb }} ГБ ОЗУ</small>
-                {% endif %}
-            </div>
+    <div class="card stat-card flex-shrink-0">
+        <div class="card-body py-1 px-2">
+            <i class="bi bi-cpu text-success"></i>
+            <small class="text-muted">Процессор:</small>
+            <strong>{{ instance.cpu }}</strong>
+            {% if instance.ram_gb %}
+            <small class="text-muted"> · {{ instance.ram_gb }} ГБ ОЗУ</small>
+            {% endif %}
         </div>
     </div>
     {% endif %}
     {% if instance.storage_gb %}
-    <div class="col">
-        <div class="card stat-card h-100">
-            <div class="card-body text-center">
-                <i class="bi bi-hdd fs-1 text-warning"></i>
-                <h6 class="mt-2 mb-0 text-muted">Диск</h6>
-                <strong>{{ instance.storage_gb }} ГБ</strong>
-            </div>
+    <div class="card stat-card flex-shrink-0">
+        <div class="card-body py-1 px-2">
+            <i class="bi bi-hdd text-warning"></i>
+            <small class="text-muted">Диск:</small>
+            <strong>{{ instance.storage_gb }} ГБ</strong>
         </div>
     </div>
     {% endif %}
-{% endblock %}
+    </div>
 
-{% block equipment_tabs %}
 <div class="row g-4">
     <!-- Основная информация -->
     <div class="col-md-6">
@@ -183,9 +195,7 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block accounting_tabs %}
 <!-- Закреплённый сотрудник -->
 <div class="row g-4">
     <div class="col-md-6">

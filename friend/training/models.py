@@ -159,6 +159,7 @@ class Training(models.Model):
     assigned_users = models.ManyToManyField(
         settings.AUTH_USER_MODEL, through='TrainingEnrollment',
         related_name='trainings', verbose_name='Сотрудники',
+        through_fields=('training', 'user'),
     )
     start_date = models.DateField('Дата начала', blank=True, null=True)
     end_date = models.DateField('Дата окончания', blank=True, null=True)
@@ -425,6 +426,11 @@ class TrainingEnrollment(models.Model):
     )
     enrolled_at = models.DateTimeField('Дата назначения', auto_now_add=True)
     completed_at = models.DateTimeField('Дата прохождения', blank=True, null=True)
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        blank=True, null=True, related_name='assigned_trainings',
+        verbose_name='Назначил',
+    )
     created_at = models.DateTimeField('Создан', auto_now_add=True)
     updated_at = models.DateTimeField('Обновлён', auto_now=True)
 

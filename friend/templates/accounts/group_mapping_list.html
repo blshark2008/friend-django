@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Связки AD-групп — «Друг»{% endblock %}
+
+{% block page_title %}
+<div class="d-flex justify-content-between align-items-center w-100">
+    <h4 class="mb-0"><i class="bi bi-link-45deg me-2"></i>Связки AD-групп</h4>
+    <a href="{% url 'accounts:group_mapping_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Создать связку
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card table-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Связки AD-групп с внутренними</h6>
+        <span class="badge bg-success">{{ mappings|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% if mappings %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>AD-группа</th>
+                        <th>DN в AD</th>
+                        <th>Описание</th>
+                        <th>Внутренняя группа</th>
+                        <th>Код</th>
+                        <th>Статус</th>
+                        <th style="width: 150px;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mapping in mappings %}
+                    <tr>
+                        <td>
+                            <strong>{{ mapping.ad_group_name }}</strong>
+                        </td>
+                        <td>
+                            <small class="text-muted" title="{{ mapping.ad_group_dn }}">
+                                {% if mapping.ad_group_dn %}
+                                    {{ mapping.ad_group_dn|truncatechars:40 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </small>
+                        </td>
+                        <td>
+                            <small class="text-muted">
+                                {{ mapping.ad_group_description|truncatewords:5|default:"—" }}
+                            </small>
+                        </td>
+                        <td>
+                            <span class="badge bg-primary">{{ mapping.internal_group.name }}</span>
+                        </td>
+                        <td><code>{{ mapping.internal_group.code }}</code></td>
+                        <td>
+                            {% if mapping.is_active %}
+                            <span class="badge bg-success">Активна</span>
+                            {% else %}
+                            <span class="badge bg-danger">Неактивна</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{% url 'accounts:group_mapping_edit' mapping.pk %}" 
+                                   class="btn btn-outline-primary" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'accounts:group_mapping_delete' mapping.pk %}" 
+                                   class="btn btn-outline-danger" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-link-45deg fs-1 d-block mb-2"></i>
+            Связок пока нет
+            <br>
+            <a href="{% url 'accounts:group_mapping_create' %}" class="btn btn-sm btn-outline-primary mt-2">
+                <i class="bi bi-plus-lg me-1"></i>Создать первую связку
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if is_paginated %}
+<div class="d-flex justify-content-center mt-4">
+    <nav>
+        <ul class="pagination">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1">&laquo;</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+
+            <li class="page-item disabled">
+                <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">&raquo;</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+{% endif %}
+{% endblock %}

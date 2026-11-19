@@ -1,7 +1,7 @@
-{% extends 'equipment/equipment_detail_base.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
-{% block top_cards %}
+{% block content %}
     {% if instance.name %}
     <div class="col">
         <div class="card stat-card h-100">
@@ -9,73 +9,9 @@
                 <i class="bi bi-telephone fs-1 text-primary"></i>
                 <h6 class="mt-2 mb-0 text-muted">Название</h6>
                 <strong>{{ instance.name }}</strong>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    {% if instance.phone_number %}
-    <div class="col">
-        <div class="card stat-card h-100">
-            <div class="card-body text-center">
-                <i class="bi bi-dialpad fs-1 text-info"></i>
-                <h6 class="mt-2 mb-0 text-muted">Внешний номер</h6>
-                <strong>{{ instance.phone_number }}</strong>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    {% if instance.extension %}
-    <div class="col">
-        <div class="card stat-card h-100">
-            <div class="card-body text-center">
-                <i class="bi bi-hash fs-1 text-success"></i>
-                <h6 class="mt-2 mb-0 text-muted">Внутренний номер</h6>
-                <strong>{{ instance.extension }}</strong>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-{% endblock %}
-
-{% block equipment_tabs %}
-<div class="row g-4">
-    <div class="col-md-6">
-        <div class="card table-card">
-            <div class="card-header"><h6 class="mb-0">Основная информация</h6></div>
-            <div class="card-body">
-                <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" class="detail-label">Инв. номер</td><td><strong>{{ instance.inventory_number }}</strong></td></tr>
-                    {% if instance.brand %}
-                    <tr><td class="text-muted">Бренд</td><td>{{ instance.brand }}</td></tr>
-                    {% endif %}
-                    {% if instance.model %}
-                    <tr><td class="text-muted">Модель</td><td>{{ instance.model }}</td></tr>
-                    {% endif %}
-                    {% if instance.phone_number %}
-                    <tr><td class="text-muted">Внешний номер</td><td>{{ instance.phone_number }}</td></tr>
-                    {% endif %}
-                    {% if instance.extension %}
-                    <tr><td class="text-muted">Внутренний номер</td><td>{{ instance.extension }}</td></tr>
-                    {% endif %}
-                </table>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card table-card">
-            <div class="card-header"><h6 class="mb-0">Расположение</h6></div>
-            <div class="card-body">
-                <table class="table table-sm mb-0">
-                    <tr><td class="text-muted" class="detail-label">Кабинет</td><td>{{ instance.location|default:"—" }}</td></tr>
-                    <tr><td class="text-muted">Место</td><td>{{ instance.place|default:"—" }}</td></tr>
-                </table>
-            </div>
-        </div>
-    </div>
 </div>
-{% endblock %}
 
-{% block accounting_tabs %}
+
 <!-- Закреплённый сотрудник -->
 <div class="row g-4 mt-2">
     <div class="col-md-6">

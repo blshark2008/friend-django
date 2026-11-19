@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load static training_extras %}
+
+{% block title %}Обучение — Типы{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/training.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-mortarboard-fill me-2"></i>Обучающие курсы</h1>
+    <div class="d-flex gap-2">
+        <a href="{% url 'training:category_list' %}" class="btn btn-outline-info">
+            <i class="bi bi-tags me-1"></i>Категории
+        </a>
+        <a href="{% url 'training:type_courses' %}" class="btn btn-outline-info">
+            <i class="bi bi-book me-1"></i>Курсы Skillspace
+        </a>
+        <a href="{% url 'training:type_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Создать тип
+        </a>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="mb-4">
+    <form method="get" class="row g-2">
+        <div class="col-auto">
+            <input type="text" name="q" class="form-control" placeholder="Поиск по названию..." value="{{ query|default:'' }}">
+        </div>
+        <div class="col-auto">
+            <select name="category" class="form-select">
+                <option value="">Все категории</option>
+                {% for cat in categories %}
+                <option value="{{ cat.pk }}" {% if selected_category == cat.pk|stringformat:"d" %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-outline-primary">
+                <i class="bi bi-search me-1"></i>Найти
+            </button>
+        </div>
+        {% if query or selected_category %}
+        <div class="col-auto">
+            <a href="{% url 'training:type_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-x me-1"></i>Сбросить
+            </a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Stats cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Всего типов</div>
+                <div class="h3 mb-0">{{ types.count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Активных</div>
+                <div class="h3 mb-0 text-success">{{ active_types_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Назначений</div>
+                <div class="h3 mb-0 text-primary">{{ types|sum_field:"active_trainings" }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Сотрудников</div>
+                <div class="h3 mb-0 text-info">{{ types|sum_field:"enrollments_count" }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Types table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Категория</th>
+                        <th>Название</th>
+                        <th>ID курса</th>
+                        <th>Назначений</th>
+                        <th>Сотрудников</th>
+                        <th>Статус</th>
+                        <th>Создан</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for type in types %}
+                    <tr>
+                        <td>
+                            {% if type.category %}
+                            <span class="badge bg-info">{{ type.category.name }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'training:type_trainings' type.pk %}" class="text-decoration-none">
+                                <strong>{{ type.name }}</strong>
+                            </a>
+                            {% if type.description %}
+                            <br><small class="text-muted">{{ type.description|truncatewords:15 }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if type.skillspace_course_id %}
+                                <code>{{ type.skillspace_course_id }}</code>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ type.active_trainings }}</td>
+                        <td>{{ type.total_enrollments }}</td>
+                        <td>
+                            {% if type.is_active %}
+                            <span class="badge bg-success">Активен</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Не активен</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ type.created_at|date:"d.m.Y" }}</td>
+                        <td class="text-nowrap">
+                            <a href="{% url 'training:type_edit' type.pk %}" class="btn btn-sm btn-outline-primary" title="Редактировать">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'training:type_delete' type.pk %}" class="btn btn-sm btn-outline-danger" title="Удалить">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                            Обучающие курсы не созданы
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

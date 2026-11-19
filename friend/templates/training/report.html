@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Отчёт по обучению{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/training.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-file-earmark-bar-graph me-2"></i>Отчёт по обучению</h1>
+    <a href="{% url 'training:type_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Назад
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Обучающий курс</label>
+                    <select name="type" class="form-select">
+                        <option value="">Все курсы</option>
+                        {% for tt in training_types %}
+                        <option value="{{ tt.pk }}" {% if current_type == tt.pk|stringformat:"d" %}selected{% endif %}>{{ tt.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Подразделение</label>
+                    <select name="department" class="form-select">
+                        <option value="">Все подразделения</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept.pk }}" {% if current_department == dept.pk|stringformat:"d" %}selected{% endif %}>{{ dept.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Статус</label>
+                    <select name="status" class="form-select">
+                        <option value="">Все статусы</option>
+                        <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>Пройдено</option>
+                        <option value="not_started" {% if current_status == 'not_started' %}selected{% endif %}>Не начато</option>
+                        <option value="in_progress" {% if current_status == 'in_progress' %}selected{% endif %}>В процессе</option>
+                        <option value="failed" {% if current_status == 'failed' %}selected{% endif %}>Не пройдено</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">С даты</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ current_date_from }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">По дату</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ current_date_to }}">
+                </div>
+            </div>
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-funnel me-1"></i>Применить
+                </button>
+                <a href="{% url 'training:report' %}" class="btn btn-outline-secondary">Сбросить</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="text-muted small">Всего назначений</div>
+                <div class="h3 mb-0">{{ total }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="text-muted small">Прошли</div>
+                <div class="h3 mb-0 text-success">{{ completed }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="text-muted small">Не прошли</div>
+                <div class="h3 mb-0 text-danger">{{ not_completed }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="text-muted small">Не пройдено</div>
+                <div class="h3 mb-0 text-warning">{{ failed }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Department breakdown -->
+{% if dept_stats %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-building me-2"></i>По подразделениям</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Подразделение</th>
+                        <th>Всего</th>
+                        <th>Прошли</th>
+                        <th>Не прошли</th>
+                        <th>Прогресс</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for name, stats in dept_stats.items %}
+                    <tr>
+                        <td><strong>{{ name }}</strong></td>
+                        <td>{{ stats.total }}</td>
+                        <td class="text-success">{{ stats.completed }}</td>
+                        <td class="text-danger">{{ stats.not_completed }}</td>
+                        <td class="dept-progress">
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-success" role="progressbar" 
+                                     style="width: {{ stats.rate }}%;"></div>
+                            </div>
+                            <small class="text-muted">{{ stats.rate }}%</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Training type breakdown -->
+{% if type_stats %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-mortarboard me-2"></i>По типам обучения</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Обучающий курс</th>
+                        <th>Всего</th>
+                        <th>Прошли</th>
+                        <th>Не прошли</th>
+                        <th>Прогресс</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for name, stats in type_stats.items %}
+                    <tr>
+                        <td><strong>{{ name }}</strong></td>
+                        <td>{{ stats.total }}</td>
+                        <td class="text-success">{{ stats.completed }}</td>
+                        <td class="text-danger">{{ stats.not_completed }}</td>
+                        <td class="type-progress">
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-success" role="progressbar" 
+                                     style="width: {{ stats.rate }}%;"></div>
+                            </div>
+                            <small class="text-muted">{{ stats.rate }}%</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Not completed list -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-exclamation-circle me-2"></i>Сотрудники, не прошедшие обучение</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Сотрудник</th>
+                        <th>Подразделение</th>
+                        <th>Обучающий курс</th>
+                        <th>Статус</th>
+                        <th>Балл</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for enrollment in enrollments %}
+                    {% if enrollment.status != 'completed' %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'accounts:user_general' enrollment.user.pk %}" class="text-decoration-none">
+                                {{ enrollment.user.last_name }} {{ enrollment.user.first_name|first }}. {{ enrollment.user.patronymic|first }}.
+                            </a>
+                        </td>
+                        <td>{{ enrollment.user.department.name|default:"—" }}</td>
+                        <td>{{ enrollment.training.training_type.name }} — {{ enrollment.training.title }}</td>
+                        <td>
+                            <span class="badge {% if enrollment.status == 'in_progress' %}bg-info{% elif enrollment.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {{ enrollment.status_label }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if enrollment.score is not None %}
+                                {{ enrollment.score }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+                            Все сотрудники прошли обучение!
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

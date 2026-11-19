@@ -1,4 +1,4 @@
-{% extends 'equipment/base.html' %}
+{% extends 'base.html' %}
 
 {% block title %}Инвентаризационный поиск{% endblock %}
 
@@ -64,7 +64,7 @@
 {% block content %}
 <!-- Поиск -->
 <div class="search-box mb-3">
-    <form method="get" action="{% url 'equipment:inventory_search' %}">
+    <form method="get" action="{% url 'equipment:inventory' %}">
         <div class="mb-2">
             <input type="text" name="q" class="form-control form-control-lg" 
                    placeholder="Поиск по всем полям..." value="{{ search_query }}"

@@ -1,4 +1,4 @@
-{% extends "siem/base.html" %}
+{% extends "base.html" %}
 
 {% block title %}История входов — SIEM{% endblock %}
 
@@ -47,7 +47,16 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-box-arrow-in-right me-2"></i>История входов</h2>
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            {% block page_title %}<h4 class="mb-0"><i class="bi bi-box-arrow-in-right me-2"></i>История входов</h4>{% endblock %}
+
+        </div>
+
+    </div>
 </div>
 
 <!-- Статистика -->

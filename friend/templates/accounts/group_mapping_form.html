@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-link-45deg me-2"></i>{{ title }}</h4>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    {% if action_en == 'create' %}
+                    <i class="bi bi-plus-circle me-2"></i>Новая связка AD-группы
+                    {% else %}
+                    <i class="bi bi-pencil-square me-2"></i>Редактирование связки
+                    {% endif %}
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.ad_group_name.id_for_label }}" class="form-label fw-bold">
+                            Имя AD-группы <span class="text-danger">*</span>
+                        </label>
+                        {{ form.ad_group_name }}
+                        {% if form.ad_group_name.errors %}
+                        <div class="invalid-feedback d-block">{{ form.ad_group_name.errors|join:", " }}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            CN группы в AD, например: <code>FG_APP_READ</code> или <code>ROLE_EDITORS</code>
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.ad_group_dn.id_for_label }}" class="form-label fw-bold">
+                            DN в Active Directory
+                        </label>
+                        {{ form.ad_group_dn }}
+                        {% if form.ad_group_dn.errors %}
+                        <div class="invalid-feedback d-block">{{ form.ad_group_dn.errors|join:", " }}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Полное Distinguished Name группы, например: <code>CN=FG_APP_READ,OU=Groups,DC=domain,DC=local</code>
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="{{ form.internal_group.id_for_label }}" class="form-label fw-bold">
+                            Внутренняя группа <span class="text-danger">*</span>
+                        </label>
+                        {{ form.internal_group }}
+                        {% if form.internal_group.errors %}
+                        <div class="invalid-feedback d-block">{{ form.internal_group.errors|join:", " }}</div>
+                        {% endif %}
+                        <small class="form-text text-muted">
+                            Внутренняя группа прав, которая будет назначаться пользователям из этой AD-группы
+                        </small>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            {{ form.is_active }}
+                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                Активна
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            Неактивные связки не участвуют в синхронизации групп
+                        </small>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>{{ action }}
+                        </button>
+                        <a href="{% url 'accounts:group_mapping_list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-lg me-1"></i>Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Информация</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <strong>Как работает синхронизация:</strong>
+                </p>
+                <ol class="mb-0">
+                    <li>Создайте внутреннюю группу прав в разделе <a href="{% url 'accounts:internal_group_list' %}">Внутренние группы</a></li>
+                    <li>Свяжите AD-группу с внутренней группой, создав маппинг</li>
+                    <li>При синхронизации (вручную или автоматически) пользователи, состоящие в AD-группе, получат внутреннюю группу</li>
+                </ol>
+                <hr>
+                <p class="mb-0">
+                    <strong>Команды для ручной синхронизации:</strong>
+                </p>
+                <pre class="bg-light p-2 mt-2 rounded"><code># Синхронизация конкретного пользователя
+python manage.py sync_ad_groups --user username
+
+# Проверка без изменений
+python manage.py sync_ad_groups --user username --dry-run
+
+# Массовая синхронизация всех пользователей
+python manage.py sync_ad_groups</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

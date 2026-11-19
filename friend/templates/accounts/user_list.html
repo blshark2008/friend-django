@@ -1,6 +1,45 @@
-{% extends "accounts/base.html" %}
+{% extends "base.html" %}
 
 {% block title %}Список пользователей — «Друг»{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Responsive table columns */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Фиксированная ширина для ключевых колонок */
+    .table th:nth-child(1),
+    .table td:nth-child(1) {
+        width: 90px;
+    }
+    
+    .table th:nth-child(2),
+    .table td:nth-child(2) {
+        width: 120px;
+    }
+    
+    .table th:nth-child(3),
+    .table td:nth-child(3) {
+        min-width: 200px;
+    }
+    
+    .table th:nth-child(11),
+    .table td:nth-child(11) {
+        width: 100px;
+    }
+    
+    .user-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .user-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+</style>
+{% endblock %}
 
 {% block page_title %}
 <div class="d-flex align-items-center gap-3 flex-wrap">
@@ -82,7 +121,7 @@
                                 {% endif %}
                             </a>
                         </th>
-                        <th>Логин
+                        <th class="d-none d-xl-table-cell">Логин
                             <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=username&order={% if current_sort == 'username' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
                                class="text-decoration-none text-dark small">
                                 {% if current_sort == 'username' %}
@@ -114,7 +153,7 @@
                                 {% endif %}
                             </a>
                         </th>
-                        <th>
+                        <th class="d-none d-xxl-table-cell">
                             <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=position&order={% if current_sort == 'position' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
                                class="text-decoration-none text-dark">
                                 Должность
@@ -125,10 +164,46 @@
                                 {% endif %}
                             </a>
                         </th>
-                        <th>Корп. Email</th>
-                        <th>Корп. телефон</th>
-                        <th>Личный Email</th>
-                        <th>Личный телефон</th>
+                        <th class="d-none d-lg-table-cell">Корп. Email
+                            <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=corporate_email&order={% if current_sort == 'corporate_email' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
+                               class="text-decoration-none text-dark small">
+                                {% if current_sort == 'corporate_email' %}
+                                    <i class="bi bi-caret-{% if current_order == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="d-none d-xxl-table-cell">Корп. телефон
+                            <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=corporate_phone&order={% if current_sort == 'corporate_phone' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
+                               class="text-decoration-none text-dark small">
+                                {% if current_sort == 'corporate_phone' %}
+                                    <i class="bi bi-caret-{% if current_order == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="d-none d-xl-table-cell">Личный Email
+                            <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=personal_email&order={% if current_sort == 'personal_email' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
+                               class="text-decoration-none text-dark small">
+                                {% if current_sort == 'personal_email' %}
+                                    <i class="bi bi-caret-{% if current_order == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th class="d-none d-xl-table-cell">Личный телефон
+                            <a href="?{% if show_archived %}show_archived={{ show_archived }}&{% endif %}{% if current_dept_id %}dept_id={{ current_dept_id }}&{% endif %}{% if current_mol %}mol={{ current_mol }}&{% endif %}q={{ request.GET.q|default:'' }}&sort=personal_phone&order={% if current_sort == 'personal_phone' and current_order == 'asc' %}desc{% else %}asc{% endif %}"
+                               class="text-decoration-none text-dark small">
+                                {% if current_sort == 'personal_phone' %}
+                                    <i class="bi bi-caret-{% if current_order == 'asc' %}up{% else %}down{% endif %}-fill"></i>
+                                {% else %}
+                                    <i class="bi bi-chevron-expand text-muted"></i>
+                                {% endif %}
+                            </a>
+                        </th>
                         <th>Статус</th>
                         <th>Действия</th>
                     </tr>
@@ -137,7 +212,7 @@
                     {% for user in users %}
                     <tr {% if user.archive_status == user.STATUS_MARKED %}class="table-warning"{% elif user.archive_status == user.STATUS_ARCHIVED %}class="table-secondary"{% endif %}>
                         <td class="text-nowrap">{{ user.tab_number|default:"—" }}</td>
-                        <td class="text-nowrap text-muted">{{ user.username }}</td>
+                        <td class="text-nowrap text-muted d-none d-xl-table-cell">{{ user.username }}</td>
                         <td class="text-nowrap">
                             <a href="{% url 'accounts:user_general' user.pk %}" class="text-decoration-none fw-semibold">
                                 {{ user.last_name }} {{ user.first_name }}
@@ -145,11 +220,11 @@
                             </a>
                         </td>
                         <td>{{ user.department.name|default:"—" }}</td>
-                        <td>{{ user.position.name|default:"—" }}</td>
-                        <td>{{ user.corporate_email|default:"—" }}</td>
-                        <td class="text-nowrap">{{ user.corporate_phone|default:"—" }}</td>
-                        <td>{{ user.personal_email|default:"—" }}</td>
-                        <td class="text-nowrap">{{ user.personal_phone|default:"—" }}</td>
+                        <td class="d-none d-xxl-table-cell">{{ user.position.name|default:"—" }}</td>
+                        <td class="d-none d-lg-table-cell">{{ user.corporate_email|default:"—" }}</td>
+                        <td class="text-nowrap d-none d-xxl-table-cell">{{ user.corporate_phone|default:"—" }}</td>
+                        <td class="d-none d-xl-table-cell">{{ user.personal_email|default:"—" }}</td>
+                        <td class="text-nowrap d-none d-xl-table-cell">{{ user.personal_phone|default:"—" }}</td>
                         <td>
                             {% if user.is_mol %}
                                 <span class="badge bg-danger">МОЛ</span>
@@ -196,6 +271,117 @@
             </table>
         </div>
     </div>
+</div>
+
+
+<!-- Card view for mobile -->
+<div class="d-md-none user-cards">
+    {% for user in users %}
+    <div class="card user-card mb-3 shadow-sm {% if user.archive_status == user.STATUS_MARKED %}border-warning{% elif user.archive_status == user.STATUS_ARCHIVED %}border-secondary{% else %}border-0{% endif %}">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <a href="{% url 'accounts:user_general' user.pk %}" class="text-decoration-none fw-bold fs-5">
+                        {{ user.last_name }} {{ user.first_name }}{% if user.patronymic %} {{ user.patronymic }}{% endif %}
+                    </a>
+                    {% if user.tab_number %}
+                    <small class="text-muted d-block">Таб. № {{ user.tab_number }}</small>
+                    {% endif %}
+                </div>
+                {% if user.is_mol %}
+                    <span class="badge bg-danger">МОЛ</span>
+                {% elif user.is_admin %}
+                    <span class="badge bg-primary">Админ</span>
+                {% elif user.archive_status == user.STATUS_MARKED %}
+                    <span class="badge bg-warning text-dark">Помечен</span>
+                {% elif user.archive_status == user.STATUS_ARCHIVED %}
+                    <span class="badge bg-secondary">В архиве</span>
+                {% else %}
+                    <span class="badge bg-success">Активный</span>
+                {% endif %}
+            </div>
+            
+            <div class="row g-2 small">
+                {% if user.department %}
+                <div class="col-6">
+                    <i class="bi bi-building text-muted me-1"></i>
+                    <strong>Подразделение:</strong><br>
+                    {{ user.department.name }}
+                </div>
+                {% endif %}
+                {% if user.position %}
+                <div class="col-6">
+                    <i class="bi bi-briefcase text-muted me-1"></i>
+                    <strong>Должность:</strong><br>
+                    {{ user.position.name }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <hr class="my-2">
+            
+            <div class="row g-2 small">
+                {% if user.corporate_email %}
+                <div class="col-12">
+                    <i class="bi bi-envelope text-muted me-1"></i>
+                    <a href="mailto:{{ user.corporate_email }}" class="text-decoration-none">
+                        {{ user.corporate_email }}
+                    </a>
+                </div>
+                {% endif %}
+                {% if user.corporate_phone %}
+                <div class="col-12">
+                    <i class="bi bi-telephone text-muted me-1"></i>
+                    <a href="tel:{{ user.corporate_phone }}" class="text-decoration-none">
+                        {{ user.corporate_phone }}
+                    </a>
+                </div>
+                {% endif %}
+                {% if user.personal_email %}
+                <div class="col-12">
+                    <i class="bi bi-envelope-at text-muted me-1"></i>
+                    <a href="mailto:{{ user.personal_email }}" class="text-decoration-none">
+                        {{ user.personal_email }}
+                    </a>
+                </div>
+                {% endif %}
+                {% if user.personal_phone %}
+                <div class="col-12">
+                    <i class="bi bi-phone text-muted me-1"></i>
+                    <a href="tel:{{ user.personal_phone }}" class="text-decoration-none">
+                        {{ user.personal_phone }}
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="mt-3 pt-2 border-top d-flex gap-2">
+                <a href="{% url 'accounts:user_general' user.pk %}" class="btn btn-sm btn-outline-primary flex-fill">
+                    <i class="bi bi-eye me-1"></i>Подробнее
+                </a>
+                {% if not user.is_admin and user.archive_status != user.STATUS_ARCHIVED %}
+                <form method="post" action="{% url 'accounts:archive_user' user.pk %}" class="d-inline" onsubmit="return confirm('Отправить в архив?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-warning">
+                        <i class="bi bi-archive"></i>
+                    </button>
+                </form>
+                {% elif not user.is_admin and user.archive_status == user.STATUS_ARCHIVED %}
+                <form method="post" action="{% url 'accounts:restore_user' user.pk %}" class="d-inline" onsubmit="return confirm('Восстановить?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-5">
+        {% if request.GET.q %}Ничего не найдено по запросу «{{ request.GET.q }}»{% else %}Пользователи отсутствуют{% endif %}
+    </div>
+    {% endfor %}
 </div>
 
 {% if is_paginated %}

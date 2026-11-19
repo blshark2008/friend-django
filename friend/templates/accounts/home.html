@@ -1,4 +1,4 @@
-{% extends "accounts/base.html" %}
+{% extends "base.html" %}
 
 {% block title %}Главная — «Друг»{% endblock %}
 
@@ -6,9 +6,16 @@
 <!-- Welcome card -->
 <div class="card bg-primary text-white mb-4">
     <div class="card-body">
-        <h4 class="card-title mb-1">
-            <i class="bi bi-hand-thumbs-up-fill me-2"></i>Добро пожаловать в систему «Друг»
-        </h4>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+
+            <div>
+
+                {% block page_title %}<h4 class="mb-0"><i class="bi bi-hand-thumbs-up-fill me-2"></i>Добро пожаловать в систему «Друг»</h4>{% endblock %}
+
+            </div>
+
+        </div>
         <p class="card-text mb-0">
             Вы вошли как: <strong>{{ user.get_full_name|default:user.username }}</strong>
         </p>

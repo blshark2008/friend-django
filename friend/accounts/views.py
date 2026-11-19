@@ -1,18 +1,26 @@
 from django.contrib.auth import views as auth_views
 from django.contrib import messages
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404, redirect, render as render_template
+from django.template.loader import render_to_string
 from django.http import JsonResponse
 from django.utils import timezone
+from django.views.generic import View
 
-from rest_framework import viewsets, serializers
+from rest_framework import viewsets, serializers, decorators
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .forms import LoginForm, UserEditForm
-from .models import Department, Position
-from .serializers import DepartmentSerializer, PositionSerializer
+from .forms import LoginForm, UserEditForm, InternalGroupForm, GroupMappingForm
+from .models import Department, Position, InternalGroup, GroupMapping, ADSyncSettings, User
+from .serializers import (
+    DepartmentSerializer, PositionSerializer,
+    InternalGroupSerializer, InternalGroupDetailSerializer,
+    GroupMappingSerializer, GroupMappingCreateSerializer,
+    ADSyncSettingsSerializer,
+)
+from .services import ADGroupSyncService
 
-from django.views.generic import TemplateView, ListView, DetailView
+from django.views.generic import TemplateView, ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.db import models, transaction
 from django.db.models import CharField, Value
 from django.db.models.functions import Concat
@@ -449,6 +457,49 @@ class UserGeneralView(LoginRequiredMixin, DetailView):
     def get_object(self, queryset=None):
         return User.objects.select_related('department', 'position').get(pk=self.kwargs['pk'])
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Проверяем, есть ли у текущего пользователя нужные внутренние группы
+        allowed_codes = {'security', 'access', 'internal_groups'}
+        user_groups = self.request.user.internal_groups.values_list('code', flat=True)
+        context['has_password_reset_perm'] = bool(set(user_groups) & allowed_codes)
+        return context
+
+
+class UserResetPasswordView(LoginRequiredMixin, View):
+    """Сброс пароля пользователя."""
+    
+    def post(self, request, *args, **kwargs):
+        target_user_id = kwargs['pk']
+        new_password = request.POST.get('new_password', '').strip()
+        confirm_password = request.POST.get('confirm_password', '').strip()
+        
+        # Валидация
+        if not new_password:
+            messages.error(request, 'Пароль не может быть пустым.')
+            return redirect('accounts:user_general', pk=target_user_id)
+        
+        if new_password != confirm_password:
+            messages.error(request, 'Пароли не совпадают.')
+            return redirect('accounts:user_general', pk=target_user_id)
+        
+        if len(new_password) < 8:
+            messages.error(request, 'Пароль должен содержать минимум 8 символов.')
+            return redirect('accounts:user_general', pk=target_user_id)
+        
+        try:
+            target_user = User.objects.get(pk=target_user_id)
+        except User.DoesNotExist:
+            messages.error(request, 'Пользователь не найден.')
+            return redirect('accounts:user_list')
+        
+        # Смена пароля
+        target_user.set_password(new_password)
+        target_user.save()
+        
+        messages.success(request, f'Пароль для "{target_user.get_full_name or target_user.username}" успешно изменён.')
+        return redirect('accounts:user_general', pk=target_user_id)
+
 
 class UserEditContactsView(LoginRequiredMixin, DetailView):
     """Редактирование контактных данных пользователя."""
@@ -710,3 +761,513 @@ def restore_user(request, pk):
 
     messages.success(request, f'Сотрудник {user.get_full_name()} восстановлен.')
     return redirect('accounts:user_list')
+
+
+# ============================================================================
+# API для внутренних групп и AD синхронизации
+# ============================================================================
+
+class InternalGroupViewSet(viewsets.ModelViewSet):
+    """API для управления внутренними группами прав."""
+    queryset = InternalGroup.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return InternalGroupDetailSerializer
+        return InternalGroupSerializer
+
+    def get_queryset(self):
+        qs = InternalGroup.objects.all()
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                models.Q(name__icontains=search) |
+                models.Q(code__icontains=search) |
+                models.Q(description__icontains=search),
+            )
+        return qs.order_by('name')
+
+
+class GroupMappingViewSet(viewsets.ModelViewSet):
+    """API для управления связками AD-групп и внутренних групп."""
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return GroupMappingCreateSerializer
+        return GroupMappingSerializer
+
+    def get_queryset(self):
+        qs = GroupMapping.objects.select_related('internal_group').all()
+        search = self.request.query_params.get('search', '').strip()
+        internal_group = self.request.query_params.get('internal_group', '').strip()
+
+        if search:
+            qs = qs.filter(
+                models.Q(ad_group_name__icontains=search) |
+                models.Q(ad_group_description__icontains=search),
+            )
+        if internal_group:
+            qs = qs.filter(internal_group_id=internal_group)
+
+        return qs.order_by('ad_group_name')
+
+
+class ADSyncSettingsViewSet(viewsets.ModelViewSet):
+    """API для управления настройками AD синхронизации."""
+    queryset = ADSyncSettings.objects.all()
+    serializer_class = ADSyncSettingsSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ADSyncSettings.objects.first()
+
+    def retrieve(self, request, *args, **kwargs):
+        settings = ADSyncSettings.objects.first()
+        if settings is None:
+            # Создаём настройку по умолчанию
+            settings = ADSyncSettings.objects.create()
+        serializer = self.get_serializer(settings)
+        return Response(serializer.data)
+
+    def update(self, request, *args, **kwargs):
+        settings = ADSyncSettings.objects.first()
+        if settings is None:
+            settings = ADSyncSettings.objects.create()
+        serializer = self.get_serializer(settings, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+
+
+class ADGroupSyncView(viewsets.GenericViewSet):
+    """API для синхронизации групп пользователя с AD."""
+    permission_classes = [IsAuthenticated]
+
+    @decorators.action(detail=False, methods=['get'])
+    def status(self, request):
+        """Статус AD синхронизации."""
+        settings = ADSyncSettings.get_settings()
+        if not settings:
+            return Response({
+                'enabled': False,
+                'message': 'AD синхронизация не настроена',
+            })
+        return Response({
+            'enabled': settings.is_enabled,
+            'last_sync': settings.last_sync,
+            'sync_on_login': settings.sync_on_login,
+            'server': settings.ad_server,
+        })
+
+    @decorators.action(detail=False, methods=['post'])
+    def sync(self, request):
+        """Синхронизировать группы текущего пользователя с AD."""
+        result = ADGroupSyncService.sync_user_groups(request.user)
+        return Response({
+            'message': 'Синхронизация завершена',
+            'added': result['added'],
+            'removed': result['removed'],
+            'errors': result['errors'],
+        })
+
+    @decorators.action(detail=False, methods=['post'])
+    def sync_all(self, request):
+        """Синхронизировать группы всех пользователей (требует прав администратора)."""
+        if not request.user.is_staff:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Требуется право администратора.')
+        result = ADGroupSyncService.sync_all_users()
+        return Response(result)
+
+    @decorators.action(detail=False, methods=['get'])
+    def effective(self, request):
+        """Эффективные группы текущего пользователя (ручные + AD)."""
+        groups = ADGroupSyncService.get_user_effective_groups(request.user)
+        return Response(groups)
+
+
+# ============================================================================
+# Страницы управления внутренними группами и AD-синхронизацией
+# ============================================================================
+
+class InternalGroupListView(LoginRequiredMixin, ListView):
+    """Список внутренних групп."""
+    model = InternalGroup
+    template_name = 'accounts/internal_group_list.html'
+    context_object_name = 'groups'
+    paginate_by = 50
+
+    def get_queryset(self):
+        qs = InternalGroup.objects.all().order_by('name')
+        search = self.request.GET.get('search', '').strip()
+        if search:
+            qs = qs.filter(
+                models.Q(name__icontains=search) |
+                models.Q(code__icontains=search) |
+                models.Q(description__icontains=search),
+            )
+        return qs
+
+
+class InternalGroupCreateView(LoginRequiredMixin, CreateView):
+    """Создание внутренней группы."""
+    model = InternalGroup
+    form_class = InternalGroupForm
+    template_name = 'accounts/internal_group_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Создать внутреннюю группу'
+        context['action'] = 'Создать'
+        context['action_en'] = 'create'
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, f'Группа "{self.object.name}" создана.')
+        return self.request.GET.get('next', 'accounts:internal_group_list')
+
+
+class InternalGroupUpdateView(LoginRequiredMixin, UpdateView):
+    """Редактирование внутренней группы."""
+    model = InternalGroup
+    form_class = InternalGroupForm
+    template_name = 'accounts/internal_group_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = f'Редактировать группу: {self.object.name}'
+        context['action'] = 'Сохранить'
+        context['action_en'] = 'edit'
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, f'Группа "{self.object.name}" обновлена.')
+        return self.request.GET.get('next', 'accounts:internal_group_list')
+
+
+class InternalGroupDeleteView(LoginRequiredMixin, DeleteView):
+    """Удаление внутренней группы."""
+    model = InternalGroup
+    success_url = 'accounts:internal_group_list'
+
+    def delete(self, request, *args, **kwargs):
+        group = self.get_object()
+        messages.success(request, f'Группа "{group.name}" удалена.')
+        return super().delete(request, *args, **kwargs)
+
+
+class InternalGroupDetailView(LoginRequiredMixin, DetailView):
+    """Детальная страница группы с пользователями."""
+    model = InternalGroup
+    template_name = 'accounts/internal_group_detail.html'
+    context_object_name = 'group'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['users'] = self.object.users.all().order_by('last_name', 'first_name')
+        return context
+
+
+class InternalGroupAddUserView(LoginRequiredMixin, View):
+    """Добавление пользователя в группу (AJAX)."""
+    
+    def post(self, request, *args, **kwargs):
+        group_id = request.POST.get('group_id')
+        user_id = request.POST.get('user_id')
+        
+        if not group_id or not user_id:
+            return JsonResponse({'error': 'Не указаны group_id или user_id'}, status=400)
+        
+        try:
+            group = InternalGroup.objects.get(pk=group_id)
+            user = User.objects.get(pk=user_id)
+            
+            if user in group.users.all():
+                return JsonResponse({'error': 'Пользователь уже в группе'}, status=400)
+            
+            group.users.add(user)
+            return JsonResponse({
+                'success': True,
+                'message': f'Пользователь "{user.get_full_name or user.username}" добавлен в группу "{group.name}"',
+                'user_html': render_to_string('accounts/_group_user_row.html', {
+                    'user': user,
+                    'group': group,
+                }, request=request)
+            })
+        except (InternalGroup.DoesNotExist, User.DoesNotExist):
+            return JsonResponse({'error': 'Группа или пользователь не найдены'}, status=404)
+
+
+class InternalGroupRemoveUserView(LoginRequiredMixin, View):
+    """Удаление пользователя из группы (AJAX)."""
+    
+    def post(self, request, *args, **kwargs):
+        group_id = request.POST.get('group_id')
+        user_id = request.POST.get('user_id')
+        
+        if not group_id or not user_id:
+            return JsonResponse({'error': 'Не указаны group_id или user_id'}, status=400)
+        
+        try:
+            group = InternalGroup.objects.get(pk=group_id)
+            user = User.objects.get(pk=user_id)
+            
+            if user not in group.users.all():
+                return JsonResponse({'error': 'Пользователь не в группе'}, status=400)
+            
+            group.users.remove(user)
+            return JsonResponse({
+                'success': True,
+                'message': f'Пользователь "{user.get_full_name or user.username}" удалён из группы "{group.name}"',
+            })
+        except (InternalGroup.DoesNotExist, User.DoesNotExist):
+            return JsonResponse({'error': 'Группа или пользователь не найдены'}, status=404)
+
+
+class InternalGroupSearchUsersView(LoginRequiredMixin, View):
+    """Поиск пользователей для добавления в группу (AJAX)."""
+    
+    def get(self, request, *args, **kwargs):
+        query = request.GET.get('q', '').strip()
+        group_id = request.GET.get('group_id', '')
+        
+        if not query:
+            return JsonResponse({'users': []})
+        
+        qs = User.objects.filter(
+            models.Q(last_name__icontains=query) |
+            models.Q(first_name__icontains=query) |
+            models.Q(patronymic__icontains=query) |
+            models.Q(username__icontains=query) |
+            models.Q(tab_number__icontains=query)
+        ).select_related('department', 'position').order_by('last_name', 'first_name')[:20]
+        
+        # Исключаем уже состоящих в группе
+        if group_id:
+            try:
+                group = InternalGroup.objects.get(pk=group_id)
+                qs = qs.exclude(pk__in=group.users.all())
+            except InternalGroup.DoesNotExist:
+                pass
+        
+        users_data = []
+        for user in qs:
+            users_data.append({
+                'id': user.pk,
+                'full_name': user.get_full_name(),
+                'tab_number': user.tab_number or '—',
+                'department': user.department.name if user.department else '—',
+                'position': user.position.name if user.position else '—',
+            })
+        
+        return JsonResponse({'users': users_data})
+
+
+class GroupMappingListView(LoginRequiredMixin, ListView):
+    """Список связок AD-групп."""
+    model = GroupMapping
+    template_name = 'accounts/group_mapping_list.html'
+    context_object_name = 'mappings'
+    paginate_by = 50
+
+    def get_queryset(self):
+        qs = GroupMapping.objects.select_related('internal_group').all().order_by('ad_group_name')
+        search = self.request.GET.get('search', '').strip()
+        internal_group = self.request.GET.get('internal_group', '').strip()
+
+        if search:
+            qs = qs.filter(
+                models.Q(ad_group_name__icontains=search) |
+                models.Q(ad_group_description__icontains=search),
+            )
+        if internal_group:
+            qs = qs.filter(internal_group_id=internal_group)
+        return qs
+
+
+class GroupMappingCreateView(LoginRequiredMixin, CreateView):
+    """Создание связки AD-группы."""
+    model = GroupMapping
+    form_class = GroupMappingForm
+    template_name = 'accounts/group_mapping_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Создать связку AD-группы'
+        context['action'] = 'Создать'
+        context['action_en'] = 'create'
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, f'Связка "{self.object.ad_group_name}" создана.')
+        return self.request.GET.get('next', 'accounts:group_mapping_list')
+
+
+class GroupMappingUpdateView(LoginRequiredMixin, UpdateView):
+    """Редактирование связки AD-группы."""
+    model = GroupMapping
+    form_class = GroupMappingForm
+    template_name = 'accounts/group_mapping_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = f'Редактировать связку: {self.object.ad_group_name}'
+        context['action'] = 'Сохранить'
+        context['action_en'] = 'edit'
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, f'Связка "{self.object.ad_group_name}" обновлена.')
+        return self.request.GET.get('next', 'accounts:group_mapping_list')
+
+
+class GroupMappingDeleteView(LoginRequiredMixin, DeleteView):
+    """Удаление связки AD-группы."""
+    model = GroupMapping
+    success_url = 'accounts:group_mapping_list'
+
+    def delete(self, request, *args, **kwargs):
+        mapping = self.get_object()
+        messages.success(request, f'Связка "{mapping.ad_group_name}" удалена.')
+        return super().delete(request, *args, **kwargs)
+
+
+# ============================================================================
+# Настройка меню
+# ============================================================================
+
+from .models import MenuSection, MenuItem
+
+
+def get_visible_menu_items(request):
+    """Получить пункты меню, видимые для текущего пользователя."""
+    items = MenuItem.objects.filter(is_active=True).select_related('section')
+    
+    # Если пользователь аналитик или выше — показываем всё
+    if request.user.is_superuser or request.user.is_staff:
+        return items
+    
+    # Получаем внутренние группы пользователя
+    user_groups = request.user.internal_groups.all()
+    
+    # Фильтруем пункты меню по внутренним группам
+    # Пункт меню виден, если код раздела совпадает с кодом группы пользователя
+    visible_items = []
+    for item in items:
+        group = user_groups.filter(code=item.section.code).first()
+        if group:
+            visible_items.append(item)
+    
+    return visible_items
+
+
+class MenuSettingsView(LoginRequiredMixin, TemplateView):
+    """Страница настройки меню."""
+    template_name = 'accounts/menu_settings.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['sections'] = MenuSection.objects.all().order_by('order', 'name')
+        context['menu_items'] = MenuItem.objects.select_related('section').order_by('section__order', 'order', 'name')
+        return context
+
+    def post(self, request, *args, **kwargs):
+        action = request.POST.get('action', 'add_section')
+        
+        if action == 'add_section':
+            name = request.POST.get('name', '').strip()
+            code = request.POST.get('code', '').strip()
+            icon = request.POST.get('icon', 'bi-circle').strip()
+            order = int(request.POST.get('order', 0))
+            
+            if name and code:
+                MenuSection.objects.get_or_create(
+                    code=code,
+                    defaults={'name': name, 'icon': icon, 'order': order}
+                )
+                messages.success(request, f'Раздел "{name}" создан.')
+            else:
+                messages.error(request, 'Заполните название и код раздела.')
+        
+        elif action == 'add_item':
+            section_id = request.POST.get('section_id')
+            name = request.POST.get('name', '').strip()
+            url_name = request.POST.get('url_name', '').strip()
+            url_pattern = request.POST.get('url_pattern', '').strip()
+            icon = request.POST.get('icon', '').strip()
+            order = int(request.POST.get('order', 0))
+            
+            if section_id and name:
+                section = get_object_or_404(MenuSection, pk=section_id)
+                MenuItem.objects.get_or_create(
+                    section=section,
+                    url_name=url_name,
+                    defaults={
+                        'name': name,
+                        'url_pattern': url_pattern,
+                        'icon': icon,
+                        'order': order,
+                        'is_active': True,
+                    }
+                )
+                messages.success(request, f'Пункт меню "{name}" добавлен.')
+            else:
+                messages.error(request, 'Выберите раздел и укажите название.')
+        
+        elif action == 'delete_item':
+            item_id = request.POST.get('item_id')
+            if item_id:
+                item = get_object_or_404(MenuItem, pk=item_id)
+                item_name = item.name
+                item.delete()
+                messages.success(request, f'Пункт меню "{item_name}" удалён.')
+            else:
+                messages.error(request, 'Не указан пункт меню.')
+        
+        elif action == 'delete_section':
+            section_id = request.POST.get('section_id')
+            if section_id:
+                section = get_object_or_404(MenuSection, pk=section_id)
+                section_name = section.name
+                section.delete()
+                messages.success(request, f'Раздел "{section_name}" удалён.')
+            else:
+                messages.error(request, 'Не указан раздел.')
+        
+        elif action == 'edit_item':
+            item_id = request.POST.get('item_id')
+            if item_id:
+                item = get_object_or_404(MenuItem, pk=item_id)
+                section_id = request.POST.get('section_id')
+                item.section_id = section_id
+                item.name = request.POST.get('name', '').strip()
+                item.url_name = request.POST.get('url_name', '').strip()
+                item.url_pattern = request.POST.get('url_pattern', '').strip()
+                item.icon = request.POST.get('icon', 'bi-circle').strip()
+                item.order = int(request.POST.get('order', 0))
+                item.is_active = 'is_active' in request.POST
+                item.save()
+                messages.success(request, f'Пункт меню "{item.name}" обновлён.')
+            else:
+                messages.error(request, 'Не указан пункт меню.')
+        
+        elif action == 'edit_section':
+            section_id = request.POST.get('section_id')
+            if section_id:
+                section = get_object_or_404(MenuSection, pk=section_id)
+                section.name = request.POST.get('name', '').strip()
+                section.code = request.POST.get('code', '').strip()
+                section.icon = request.POST.get('icon', 'bi-circle').strip()
+                section.order = int(request.POST.get('order', 0))
+                section.is_active = 'is_active' in request.POST
+                section.save()
+                messages.success(request, f'Раздел "{section.name}" обновлён.')
+            else:
+                messages.error(request, 'Не указан раздел.')
+        
+        return redirect('accounts:menu_settings')

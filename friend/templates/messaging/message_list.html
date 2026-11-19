@@ -1,4 +1,4 @@
-{% extends "messaging/base.html" %}
+{% extends "base.html" %}
 {% load static %}
 
 {% block title %}Сообщения — «Друг»{% endblock %}
@@ -28,7 +28,16 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-envelope-fill me-2"></i>Сообщения</h2>
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            {% block page_title %}<h4 class="mb-0"><i class="bi bi-envelope-fill me-2"></i>Сообщения</h4>{% endblock %}
+
+        </div>
+
+    </div>
     <a href="{% url 'messaging:message_create' %}" class="btn btn-primary">
         <i class="bi bi-plus-lg me-1"></i>Новое сообщение
     </a>

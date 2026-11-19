@@ -41,10 +41,7 @@
 }
 
 /* --- Display --- */
-.d-none { display: none !important; }
-.d-inline { display: inline !important; }
-.d-block { display: block !important; }
-.d-flex { display: flex !important; }
+/* Bootstrap утилиты d-none/d-block/d-flex не переопределяем — они нужны для адаптивности */
 
 /* --- Text --- */
 .text-ellipsis {

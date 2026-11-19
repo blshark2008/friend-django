@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Настройка меню — «Друг»{% endblock %}
+
+{% block page_title %}
+<h4 class="mb-0"><i class="bi bi-list-nested me-2"></i>Настройка меню</h4>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex gap-2 mb-4">
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSectionModal">
+        <i class="bi bi-plus-lg me-1"></i>Добавить раздел
+    </button>
+    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal">
+        <i class="bi bi-plus-lg me-1"></i>Добавить пункт меню
+    </button>
+</div>
+
+<!-- Разделы меню -->
+{% for section in sections %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="{{ section.icon }} me-2"></i>{{ section.name }}
+            <small class="text-muted ms-2">({{ section.menu_items.count }} п.)</small>
+        </h5>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary" onclick="toggleSection('{{ section.pk }}')">
+                <i class="bi bi-chevron-down"></i> Свернуть
+            </button>
+            <button class="btn btn-outline-primary" onclick="editSection({{ section.pk }})">
+                <i class="bi bi-pencil"></i>
+            </button>
+            <form method="post" action="{% url 'accounts:menu_settings' %}" class="d-inline" onsubmit="return confirm('Удалить раздел и все его пункты?')">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_section">
+                <input type="hidden" name="section_id" value="{{ section.pk }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить раздел">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+    <div class="card-body p-0" id="section-{{ section.pk }}">
+        {% if section.menu_items.exists %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Название</th>
+                        <th>URL</th>
+                        <th style="width: 100px;">Активен</th>
+                        <th style="width: 120px;">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in section.menu_items.all %}
+                    <tr>
+                        <td class="text-muted">{{ item.order }}</td>
+                        <td>
+                            <i class="{{ item.icon|default:'bi-circle' }} me-1"></i>
+                            {{ item.name }}
+                        </td>
+                        <td class="text-muted small">
+                            {% if item.url_pattern %}
+                                {{ item.url_pattern }}
+                            {% else %}
+                                {{ item.url_name }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.is_active %}
+                                <span class="badge bg-success">Да</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Нет</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editItem({{ item.pk }}, '{{ item.name|escapejs }}', '{{ item.icon|default:'bi-circle'|escapejs }}', {% if item.url_pattern %}'{{ item.url_pattern|escapejs }}'{% else %}''{% endif %}, {% if item.url_name %}'{{ item.url_name|escapejs }}'{% else %}''{% endif %}, {{ item.order }}, {{ item.is_active|yesno:'true,false' }}, {{ item.section_id }})">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="post" action="{% url 'accounts:menu_settings' %}" class="d-inline" onsubmit="return confirm('Удалить пункт меню?')">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_item">
+                                <input type="hidden" name="item_id" value="{{ item.pk }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            Нет пунктов меню
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% empty %}
+<div class="card shadow-sm">
+    <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-list-nested display-1 d-block mb-3"></i>
+        <p>Разделы меню отсутствуют. Нажмите "Добавить раздел" для создания.</p>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Модальное окно: Добавить раздел -->
+<div class="modal fade" id="addSectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'accounts:menu_settings' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Добавить раздел</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Название раздела</label>
+                        <input type="text" name="name" class="form-control" required placeholder="Например: Обучение">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Код раздела</label>
+                        <input type="text" name="code" class="form-control" required placeholder="Например: training">
+                        <small class="text-muted">Уникальный технический код (латиница, без пробелов)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Иконка (Bootstrap Icons)</label>
+                        <input type="text" name="icon" class="form-control" placeholder="Например: bi-mortarboard">
+                        <small class="text-muted">Например: bi-people, bi-book, bi-building</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Порядок</label>
+                        <input type="number" name="order" class="form-control" value="0" min="0">
+                        <small class="text-muted">Меньшее значение = выше в меню</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-lg me-1"></i>Создать
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно: Добавить пункт меню -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'accounts:menu_settings' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_item">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Добавить пункт меню</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Раздел</label>
+                        <select name="section_id" class="form-select" required>
+                            <option value="">-- Выберите раздел --</option>
+                            {% for section in sections %}
+                            <option value="{{ section.pk }}">{{ section.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Название</label>
+                        <input type="text" name="name" class="form-control" required placeholder="Например: Список пользователей">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Имя URL-шаблона</label>
+                        <input type="text" name="url_name" class="form-control" placeholder="Например: accounts:user_list">
+                        <small class="text-muted">Имя URL-шаблона из urls.py</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Или полный URL</label>
+                        <input type="text" name="url_pattern" class="form-control" placeholder="Например: /admin/ или https://example.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Иконка</label>
+                        <input type="text" name="icon" class="form-control" placeholder="Например: bi-list-ul">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Порядок</label>
+                        <input type="number" name="order" class="form-control" value="0" min="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-lg me-1"></i>Добавить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно: Редактировать пункт меню -->
+<div class="modal fade" id="editItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'accounts:menu_settings' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_item">
+                <input type="hidden" name="item_id" id="editItemId">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Редактировать пункт</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Раздел</label>
+                        <select name="section_id" id="editItemSection" class="form-select" required>
+                            {% for section in sections %}
+                            <option value="{{ section.pk }}">{{ section.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Название</label>
+                        <input type="text" name="name" id="editItemName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Имя URL-шаблона</label>
+                        <input type="text" name="url_name" id="editItemUrlName" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Или полный URL</label>
+                        <input type="text" name="url_pattern" id="editItemUrlPattern" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Иконка</label>
+                        <input type="text" name="icon" id="editItemIcon" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Порядок</label>
+                        <input type="number" name="order" id="editItemOrder" class="form-control" min="0">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" name="is_active" id="editItemActive" class="form-check-input" checked>
+                            <label class="form-check-label" for="editItemActive">Активен</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Сохранить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно: Редактировать раздел -->
+<div class="modal fade" id="editSectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'accounts:menu_settings' %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="edit_section">
+                <input type="hidden" name="section_id" id="editSectionId">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Редактировать раздел</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Название раздела</label>
+                        <input type="text" name="name" id="editSectionName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Код раздела</label>
+                        <input type="text" name="code" id="editSectionCode" class="form-control" required>
+                        <small class="text-muted">Уникальный технический код (латиница, без пробелов)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Иконка (Bootstrap Icons)</label>
+                        <input type="text" name="icon" id="editSectionIcon" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Порядок</label>
+                        <input type="number" name="order" id="editSectionOrder" class="form-control" min="0">
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" name="is_active" id="editSectionActive" class="form-check-input" checked>
+                            <label class="form-check-label" for="editSectionActive">Активен</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>Сохранить
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Данные для редактирования (загружаются при открытии модалки)
+let editItemData = null;
+let editSectionData = null;
+
+function toggleSection(sectionId) {
+    const el = document.getElementById('section-' + sectionId);
+    if (el.style.display === 'none') {
+        el.style.display = '';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+function editItem(itemId, name, icon, url_pattern, url_name, order, is_active, section_id) {
+    document.getElementById('editItemId').value = itemId;
+    document.getElementById('editItemSection').value = section_id;
+    document.getElementById('editItemName').value = name;
+    document.getElementById('editItemIcon').value = icon;
+    document.getElementById('editItemUrlPattern').value = url_pattern || '';
+    document.getElementById('editItemUrlName').value = url_name || '';
+    document.getElementById('editItemOrder').value = order;
+    document.getElementById('editItemActive').checked = is_active;
+    
+    new bootstrap.Modal(document.getElementById('editItemModal')).show();
+}
+
+function editSection(sectionId) {
+    // Находим карточку раздела
+    const card = document.querySelector(`button[onclick*="editSection(${sectionId})"]`).closest('.card');
+    const titleEl = card.querySelector('.card-header h5');
+    const iconEl = titleEl.querySelector('i');
+    const icon = iconEl ? iconEl.className.replace('me-2 ', '').trim() : 'bi-circle';
+    
+    // Извлекаем название (удаляем иконку и количество пунктов)
+    let name = titleEl.textContent;
+    name = name.replace(icon, '').replace(/\d+\s*п\./, '').trim();
+    
+    // Считываем порядок из первой ячейки таблицы
+    const tbody = card.querySelector('tbody');
+    let order = 0;
+    if (tbody) {
+        const firstRow = tbody.querySelector('tr');
+        if (firstRow) {
+            order = parseInt(firstRow.querySelector('td').textContent) || 0;
+        }
+    }
+    
+    document.getElementById('editSectionId').value = sectionId;
+    document.getElementById('editSectionName').value = name;
+    document.getElementById('editSectionIcon').value = icon;
+    document.getElementById('editSectionOrder').value = order;
+    document.getElementById('editSectionActive').checked = true;
+    
+    new bootstrap.Modal(document.getElementById('editSectionModal')).show();
+}
+</script>
+{% endblock %}

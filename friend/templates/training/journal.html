@@ -5,360 +5,468 @@
 {% block title %}Журнал обучения{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/training.css' %}">
-<style>
-    .journal-filter { background: #f8f9fa; }
-    .employee-link { text-decoration: none; color: #0d6efd; }
-    .employee-link:hover { text-decoration: underline; }
-    .status-badge { font-size: 0.85rem; }
-    .nav-tabs .nav-link { color: #495057; }
-    .nav-tabs .nav-link.active { font-weight: 600; }
-</style>
+    <link rel="stylesheet" href="{% static 'css/training.css' %}">
+    <style>
+        .journal-filter { background: #f8f9fa; }
+        .employee-link { text-decoration: none; color: #0d6efd; }
+        .employee-link:hover { text-decoration: underline; }
+        .status-badge { font-size: 0.85rem; }
+        .nav-tabs .nav-link { color: #495057; }
+        .nav-tabs .nav-link.active { font-weight: 600; }
+    </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="bi bi-journal-text me-2"></i>Журнал обучения</h1>
-    <div>
-        <a href="{% url 'training:goal_list' %}" class="btn btn-outline-secondary me-2">
-            <i class="bi bi-list-ul me-1"></i>Цели обучения
-        </a>
-        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#uploadActionModal">
-            <i class="bi bi-upload me-1"></i>Загрузка отчета Актион360
-        </button>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="bi bi-journal-text me-2"></i>Журнал обучения</h1>
+        <div>
+            <a href="{% url 'training:category_list' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-list-ul me-1"></i>Категории обучения
+            </a>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#uploadActionModal">
+                <i class="bi bi-upload me-1"></i>Загрузка отчета Актион360
+            </button>
+        </div>
     </div>
-</div>
 
-<!-- Filters -->
-<div class="card border-0 shadow-sm mb-4 journal-filter">
-    <div class="card-body">
-        <form method="get" id="journalFilterForm">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label">Цель обучения</label>
-                    <select name="goal" class="form-select" id="goalSelect">
-                        <option value="">— Выберите цель —</option>
-                        {% for g in goals %}
-                        <option value="{{ g.pk }}" {% if goal.pk == g.pk %}selected{% endif %}>{{ g.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">С даты</label>
-                    <input type="date" name="date_from" class="form-control" value="{{ date_from }}" id="dateFrom">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label">По дату</label>
-                    <input type="date" name="date_to" class="form-control" value="{{ date_to }}" id="dateTo">
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <div class="form-check mb-0">
-                        <input class="form-check-input" type="checkbox" name="show_without" id="showWithout" value="true" {% if show_without %}checked{% endif %}>
-                        <label class="form-check-label" for="showWithout">
-                            Без обучений
-                        </label>
+    <!-- Filters -->
+    <div class="card border-0 shadow-sm mb-4 journal-filter">
+        <div class="card-body">
+            <form method="get" id="journalFilterForm">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Категория обучения</label>
+                        <select name="category" class="form-select" id="categorySelect">
+                            <option value="">— Выберите категорию —</option>
+                            {% for g in categories %}
+                            <option value="{{ g.pk }}" {% if category.pk == g.pk %}selected{% endif %}>{{ g.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
-                </div>
-                <div class="col-md-3 d-flex align-items-end gap-2">
-                    <button type="submit" class="btn btn-primary flex-grow-1">
-                        <i class="bi bi-funnel me-1"></i>Сформировать
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary" id="resetPeriodBtn" title="Сбросить период на текущий год">
-                        <i class="bi bi-arrow-counterclockwise"></i>
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-{% if goal %}
-<!-- Summary cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body text-center">
-                <div class="text-muted small">Прошли обучение</div>
-                <div class="h3 mb-0 text-success">{{ total_completed }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body text-center">
-                <div class="text-muted small">В процессе</div>
-                <div class="h3 mb-0 text-info">{{ total_in_progress }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body text-center">
-                <div class="text-muted small">Не начато</div>
-                <div class="h3 mb-0 text-warning">{{ total_not_started }}</div>
-            </div>
-        </div>
-    </div>
-    {% if show_without %}
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body text-center">
-                <div class="text-muted small">Без обучений в периоде</div>
-                <div class="h3 mb-0 text-secondary">{{ total_without }}</div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body text-center">
-                <div class="text-muted small">Период</div>
-                <div class="h6 mb-0">{{ date_from|date:"d.m.Y" }} — {{ date_to|date:"d.m.Y" }}</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Journal table -->
-{% if journal_data or in_progress_data or not_started_data or without_trainings %}
-<div class="card border-0 shadow-sm">
-    <div class="card-header bg-white">
-        <h5 class="mb-0">
-            {% if show_without %}
-            <i class="bi bi-exclamation-circle me-2"></i>Сотрудники без обучений
-            {% else %}
-            <i class="bi bi-check-circle me-2"></i>Статусы обучения
-            {% endif %}
-            <small class="text-muted ms-2">({{ goal.name }})</small>
-        </h5>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Сотрудник</th>
-                        <th>Подразделение</th>
-                        {% if not show_without %}
-                        <th>Обучающий курс</th>
-                        <th>Название курса</th>
-                        {% endif %}
-                        <th>Дата назначения</th>
-                        <th>Дата прохождения</th>
-                        <th>Пред. прохождение</th>
-                        {% if not show_without %}
-                        <th>Оценка</th>
-                        {% endif %}
-                        <th>Назначил</th>
-                        <th>Статус</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if show_without %}
-                        {% for item in without_trainings %}
-                        <tr>
-                            <td>
-                                <a href="{% url 'accounts:user_general' item.user.pk %}" class="employee-link">
-                                    {{ item.user.last_name }} {{ item.user.first_name|first }}. {{ item.user.patronymic|first }}.
-                                </a>
-                            </td>
-                            <td>{{ item.user.department.name|default:"—" }}</td>
-                            <td class="text-muted">—</td>
-                            <td class="text-muted">—</td>
-                            <td class="text-muted">—</td>
-                            <td>
-                                <span class="badge bg-secondary status-badge">Нет обучения</span>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
-                                <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
-                                Все сотрудники прошли обучение по данной цели в указанный период
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        {% for entry in journal_data %}
-                        <tr>
-                            <td>
-                                <a href="{% url 'accounts:user_general' entry.user.pk %}" class="employee-link">
-                                    {{ entry.user.last_name }} {{ entry.user.first_name|first }}. {{ entry.user.patronymic|first }}.
-                                </a>
-                            </td>
-                            <td>{{ entry.user.department.name|default:"—" }}</td>
-                            <td>{{ entry.training_type_name }}</td>
-                            <td>{{ entry.training_title }}</td>
-                            <td class="small text-muted">{{ entry.enrolled_at|date:"d.m.Y H:i" }}</td>
-                            <td class="fw-semibold">{{ entry.completed_at|date:"d.m.Y H:i" }}</td>
-                            <td class="small text-muted">
-                                {% if entry.previous_completed_at %}
-                                    {{ entry.previous_completed_at|date:"d.m.Y H:i" }}
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if entry.score is not None %}
-                                    <span class="badge {% if entry.score >= 85 %}bg-success{% elif entry.score >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %} status-badge">
-                                        {{ entry.score }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td class="small">{{ entry.assigned_by.get_full_name|default:"—" }}</td>
-                            <td>
-                                <span class="badge bg-success status-badge">Пройдено</span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                        {% for entry in in_progress_data %}
-                        <tr>
-                            <td>
-                                <a href="{% url 'accounts:user_general' entry.user.pk %}" class="employee-link">
-                                    {{ entry.user.last_name }} {{ entry.user.first_name|first }}. {{ entry.user.patronymic|first }}.
-                                </a>
-                            </td>
-                            <td>{{ entry.user.department.name|default:"—" }}</td>
-                            <td>{{ entry.training_type_name }}</td>
-                            <td>{{ entry.training_title }}</td>
-                            <td class="small text-muted">{{ entry.enrolled_at|date:"d.m.Y H:i" }}</td>
-                            <td class="text-muted">—</td>
-                            <td class="text-muted">—</td>
-                            <td>
-                                {% if entry.score is not None %}
-                                    <span class="badge {% if entry.score >= 85 %}bg-success{% elif entry.score >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %} status-badge">
-                                        {{ entry.score }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td class="small">{{ entry.assigned_by.get_full_name|default:"—" }}</td>
-                            <td>
-                                <span class="badge bg-info status-badge">В процессе</span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                        {% for entry in not_started_data %}
-                        <tr>
-                            <td>
-                                <a href="{% url 'accounts:user_general' entry.user.pk %}" class="employee-link">
-                                    {{ entry.user.last_name }} {{ entry.user.first_name|first }}. {{ entry.user.patronymic|first }}.
-                                </a>
-                            </td>
-                            <td>{{ entry.user.department.name|default:"—" }}</td>
-                            <td>{{ entry.training_type_name }}</td>
-                            <td>{{ entry.training_title }}</td>
-                            <td class="small text-muted">{{ entry.enrolled_at|date:"d.m.Y H:i" }}</td>
-                            <td class="text-muted">—</td>
-                            <td class="text-muted">—</td>
-                            <td>
-                                <span class="text-muted">—</span>
-                            </td>
-                            <td class="small">{{ entry.assigned_by.get_full_name|default:"—" }}</td>
-                            <td>
-                                <span class="badge bg-warning text-dark status-badge">Не начато</span>
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                        {% if not journal_data and not in_progress_data and not not_started_data %}
-                        <tr>
-                            <td colspan="9" class="text-center text-muted py-4">
-                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                В указанный период обучений не найдено
-                            </td>
-                        </tr>
-                        {% endif %}
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-{% else %}
-<!-- No filters applied -->
-<div class="card border-0 shadow-sm">
-    <div class="card-body text-center py-5">
-        <i class="bi bi-mortarboard fs-1 text-muted d-block mb-3"></i>
-        <h5 class="text-muted">Выберите цель обучения и период</h5>
-        <p class="text-muted small">Для формирования журнала выберите цель обучения из списка выше и нажмите "Сформировать"</p>
-    </div>
-</div>
-{% endif %}
-{% else %}
-<!-- No goal selected -->
-<div class="card border-0 shadow-sm">
-    <div class="card-body text-center py-5">
-        <i class="bi bi-bullseye fs-1 text-muted d-block mb-3"></i>
-        <h5 class="text-muted">Выберите цель обучения</h5>
-        <p class="text-muted small">Для формирования журнала выберите цель обучения из списка выше</p>
-        <a href="{% url 'training:goal_list' %}" class="btn btn-outline-primary mt-2">
-            <i class="bi bi-list-ul me-1"></i>К списку целей
-        </a>
-    </div>
-</div>
-{% endif %}
-
-<!-- Upload Action Report Modal -->
-<div class="modal fade" id="uploadActionModal" tabindex="-1" aria-labelledby="uploadActionModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="uploadActionModalLabel">
-                    <i class="bi bi-upload me-2"></i>Загрузка отчета Актион360
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle me-2"></i>
-                    <strong>Формат файла:</strong> Отчет по сотрудникам.xlsx (.xlsx)<br>
-                    <strong>Ожидаемые столбцы:</strong> ФИО, Электронная почта, Телефон, Группа программ и тестов, Статус
-                </div>
-
-                <div id="uploadActionForm">
-                    <input type="hidden" name="csrfmiddlewaretoken" id="modalCsrfToken" value="">
-                    <div class="mb-3">
-                        <label for="reportFile" class="form-label">Выберите файл Excel</label>
-                        <input type="file" class="form-control" id="reportFile" name="report_file" accept=".xlsx" required>
-                        <div class="form-text">Поддерживаются только файлы формата .xlsx</div>
+                    <div class="col-md-2">
+                        <label class="form-label">Сотрудник</label>
+                        <input type="text" name="filter_employee" class="form-control" value="{{ filter_employee }}" placeholder="ФИО">
                     </div>
-                    <button type="button" class="btn btn-success" id="uploadBtn">
-                        <i class="bi bi-upload me-1"></i>Загрузить и обработать
-                    </button>
-                </div>
-
-                <!-- Progress section -->
-                <div id="uploadProgress" class="mt-4" style="display: none;">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                    <div class="col-md-2">
+                        <label class="form-label">Подразделение</label>
+                        <select name="filter_department" class="form-select">
+                            <option value="">— Все —</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept.pk }}"{% if filter_department == dept.pk|stringformat:"s" %} selected{% endif %}>{{ dept.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Обучающий курс</label>
+                        <input type="text" name="filter_training_type" class="form-control" value="{{ filter_training_type }}" placeholder="Название">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Название курса</label>
+                        <input type="text" name="filter_training_title" class="form-control" value="{{ filter_training_title }}" placeholder="Название">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Статус</label>
+                        <select name="filter_status" class="form-select">
+                            <option value="">— Все —</option>
+                            <option value="not_started" {% if filter_status == 'not_started' %}selected{% endif %}>Не начато</option>
+                            <option value="in_progress" {% if filter_status == 'in_progress' %}selected{% endif %}>В процессе</option>
+                            <option value="completed" {% if filter_status == 'completed' %}selected{% endif %}>Пройдено</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label mb-0">Период</label>
+                        <div class="d-flex gap-1">
+                            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" id="dateFrom">
+                            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}" id="dateTo">
                         </div>
-                        <span class="fw-semibold">Обработка файла...</span>
                     </div>
-                    <div class="progress" style="height: 25px;">
-                        <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;">0%</div>
-                    </div>
-                    <div id="uploadStats" class="mt-3"></div>
-                </div>
 
-                <!-- Results section -->
-                <div id="uploadResults" class="mt-4" style="display: none;">
-                    <h6 class="fw-bold mb-3">Результаты обработки</h6>
-                    <div id="uploadResultsContent"></div>
+                    <div class="col-12 d-flex align-items-end gap-2">
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" name="show_without" id="showWithout" value="true" {% if show_without %}checked{% endif %}>
+                            <label class="form-check-label" for="showWithout">
+                                Без обучений
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-funnel me-1"></i>Сформировать
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="resetPeriodBtn" title="Сбросить период на текущий год">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-            </div>
+            </form>
         </div>
     </div>
-</div>
+
+    {% if category or filter_employee or filter_training_type or filter_training_title or filter_status or filter_department %}
+    <!-- Summary cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="text-muted small">Прошли обучение</div>
+                        <div class="h3 mb-0 text-success">{{ total_completed }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="text-muted small">В процессе</div>
+                        <div class="h3 mb-0 text-info">{{ total_in_progress }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="text-muted small">Не начато</div>
+                        <div class="h3 mb-0 text-warning">{{ total_not_started }}</div>
+                    </div>
+                </div>
+            </div>
+            {% if show_without %}
+                <div class="col-md-3">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body text-center">
+                            <div class="text-muted small">Без обучений в периоде</div>
+                            <div class="h3 mb-0 text-secondary">{{ total_without }}</div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="text-muted small">Период</div>
+                        <div class="h6 mb-0">{{ date_from|date:"d.m.Y" }} — {{ date_to|date:"d.m.Y" }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Journal table -->
+        {% if journal_data or in_progress_data or not_started_data or without_trainings %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">
+                        {% if show_without %}
+                        <i class="bi bi-exclamation-circle me-2"></i>Сотрудники без обучений
+                        {% else %}
+                        <i class="bi bi-check-circle me-2"></i>Статусы обучения
+                        {% endif %}
+    {% if category or filter_employee or filter_training_type or filter_training_title or filter_status or filter_department %}
+                        <small class="text-muted ms-2">({{ category.name }})</small>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>
+                                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort=employee&order={% if sort_by == 'employee' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                            Сотрудник
+                                            {% if sort_by == 'employee' %}<i class="bi bi-arrow-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>{% endif %}
+                                        </a>
+                                    </th>
+                                    <th>Подразделение</th>
+                                    {% if not show_without %}
+                                    <th>
+                                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort=category&order={% if sort_by == 'category' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                            Категория
+                                            {% if sort_by == 'category' %}<i class="bi bi-arrow-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>{% endif %}
+                                        </a>
+                                    </th>
+                                    {% endif %}
+                                    <th>
+                                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort=training_type&order={% if sort_by == 'training_type' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                            Обучающий курс
+                                            {% if sort_by == 'training_type' %}<i class="bi bi-arrow-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>{% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort=training_title&order={% if sort_by == 'training_title' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                            Название курса
+                                            {% if sort_by == 'training_title' %}<i class="bi bi-arrow-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>{% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort=enrolled_at&order={% if sort_by == 'enrolled_at' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                            Дата назначения
+                                            {% if sort_by == 'enrolled_at' %}<i class="bi bi-arrow-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>{% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort=completed_at&order={% if sort_by == 'completed_at' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                            Дата прохождения
+                                            {% if sort_by == 'completed_at' %}<i class="bi bi-arrow-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>{% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort=previous_completed_at&order={% if sort_by == 'previous_completed_at' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                            Пред. прохождение
+                                            {% if sort_by == 'previous_completed_at' %}<i class="bi bi-arrow-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>{% endif %}
+                                        </a>
+                                    </th>
+                                    {% if not show_without %}
+                                    <th>
+                                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort=score&order={% if sort_by == 'score' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                            Оценка
+                                            {% if sort_by == 'score' %}<i class="bi bi-arrow-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>{% endif %}
+                                        </a>
+                                    </th>
+                                    {% endif %}
+                                    <th>Назначил</th>
+                                    <th>
+                                        <a href="?{% for key, value in request.GET.items %}{% if key != 'sort' and key != 'order' %}{{ key }}={{ value }}&{% endif %}{% endfor %}sort=status&order={% if sort_by == 'status' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                            Статус
+                                            {% if sort_by == 'status' %}<i class="bi bi-arrow-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>{% endif %}
+                                        </a>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if show_without %}
+                                    {% for item in without_trainings %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'accounts:user_general' item.user.pk %}" class="employee-link">
+                                                {{ item.user.last_name }} {{ item.user.first_name|first }}. {{ item.user.patronymic|first }}.
+                                            </a>
+                                        </td>
+                                        <td>{{ item.user.department.name|default:"—" }}</td>
+                                        <td class="text-muted">—</td>
+                                        <td class="text-muted">—</td>
+                                        <td class="text-muted">—</td>
+                                        <td>
+                                            <span class="badge bg-secondary status-badge">Нет обучения</span>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">
+                                            <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+                                            Все сотрудники прошли обучение по данной цели в указанный период
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    {% for entry in journal_data %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'accounts:user_general' entry.user.pk %}" class="employee-link">
+                                                {{ entry.user.last_name }} {{ entry.user.first_name|first }}. {{ entry.user.patronymic|first }}.
+                                            </a>
+                                        </td>
+                                        <td>{{ entry.user.department.name|default:"—" }}</td>
+                                        <td>{{ entry.category_name }}</td>
+                                        <td>{{ entry.training_type_name }}</td>
+                                        <td>{{ entry.training_title }}</td>
+                                        <td class="small text-muted">{{ entry.enrolled_at|date:"d.m.Y" }}</td>
+                                        <td class="fw-semibold">{{ entry.completed_at|date:"d.m.Y" }}</td>
+                                        <td class="small text-muted">
+                                            {% if entry.previous_completed_at %}
+                                                {{ entry.previous_completed_at|date:"d.m.Y" }}
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if entry.score is not None %}
+                                                <span class="badge {% if entry.score >= 85 %}bg-success{% elif entry.score >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %} status-badge">
+                                                    {{ entry.score }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="small">{{ entry.assigned_by.get_full_name|default:"—" }}</td>
+                                        <td>
+                                            <span class="badge bg-success status-badge">Пройдено</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+
+                                    {% for entry in in_progress_data %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'accounts:user_general' entry.user.pk %}" class="employee-link">
+                                                    {{ entry.user.last_name }} {{ entry.user.first_name|first }}. {{ entry.user.patronymic|first }}.
+                                                </a>
+                                            </td>
+                                            <td>{{ entry.user.department.name|default:"—" }}</td>
+                                            <td>{{ entry.category_name }}</td>
+                                            <td>{{ entry.training_type_name }}</td>
+                                            <td>{{ entry.training_title }}</td>
+                                            <td class="small text-muted">{{ entry.enrolled_at|date:"d.m.Y" }}</td>
+                                            <td class="text-muted">—</td>
+                                            <td class="text-muted">—</td>
+                                            <td>
+                                                {% if entry.score is not None %}
+                                                    <span class="badge {% if entry.score >= 85 %}bg-success{% elif entry.score >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %} status-badge">
+                                                        {{ entry.score }}
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-muted">—</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="small">{{ entry.assigned_by.get_full_name|default:"—" }}</td>
+                                            <td>
+                                                <span class="badge bg-info status-badge">В процессе</span>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+
+                                    {% for entry in not_started_data %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'accounts:user_general' entry.user.pk %}" class="employee-link">
+                                                {{ entry.user.last_name }} {{ entry.user.first_name|first }}. {{ entry.user.patronymic|first }}.
+                                            </a>
+                                        </td>
+                                        <td>{{ entry.user.department.name|default:"—" }}</td>
+                                        <td>{{ entry.category_name }}</td>
+                                        <td>{{ entry.training_type_name }}</td>
+                                        <td>{{ entry.training_title }}</td>
+                                        <td class="small text-muted">{{ entry.enrolled_at|date:"d.m.Y" }}</td>
+                                        <td class="text-muted">—</td>
+                                        <td class="text-muted">—</td>
+                                        <td>
+                                            <span class="text-muted">—</span>
+                                        </td>
+                                        <td class="small">{{ entry.assigned_by.get_full_name|default:"—" }}</td>
+                                        <td>
+                                            <span class="badge bg-warning text-dark status-badge">Не начато</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+
+                                    {% if not show_without and not journal_data and not in_progress_data and not not_started_data %}
+                                        <tr>
+                                            <td colspan="9" class="text-center text-muted py-4">
+                                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                                В указанный период обучений не найдено
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <!-- No category selected -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-bullseye fs-1 text-muted d-block mb-3"></i>
+                    <h5 class="text-muted">Выберите категорию обучения</h5>
+                    <p class="text-muted small">Для формирования журнала выберите категорию обучения из списка выше</p>
+                    <a href="{% url 'training:category_list' %}" class="btn btn-outline-primary mt-2">
+                        <i class="bi bi-list-ul me-1"></i>К списку категорий
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+            <nav aria-label="Навигация по страницам" class="mt-3">
+                <ul class="pagination justify-content-center mb-0">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1">Первая</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}">Предыдущая</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">Первая</span></li>
+                    <li class="page-item disabled"><span class="page-link">Предыдущая</span></li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}">Следующая</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}">Последняя</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">Следующая</span></li>
+                    <li class="page-item disabled"><span class="page-link">Последняя</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+
+        <!-- Upload Action Report Modal -->
+        <div class="modal fade" id="uploadActionModal" tabindex="-1" aria-labelledby="uploadActionModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="uploadActionModalLabel">
+                            <i class="bi bi-upload me-2"></i>Загрузка отчета Актион360
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Формат файла:</strong> Отчет по сотрудникам.xlsx (.xlsx)<br>
+                            <strong>Ожидаемые столбцы:</strong> ФИО, Электронная почта, Телефон, Группа программ и тестов, Статус
+                        </div>
+
+                        <div id="uploadActionForm">
+                            <input type="hidden" name="csrfmiddlewaretoken" id="modalCsrfToken" value="">
+                            <div class="mb-3">
+                                <label for="reportFile" class="form-label">Выберите файл Excel</label>
+                                <input type="file" class="form-control" id="reportFile" name="report_file" accept=".xlsx" required>
+                                <div class="form-text">Поддерживаются только файлы формата .xlsx</div>
+                            </div>
+                            <button type="button" class="btn btn-success" id="uploadBtn">
+                                <i class="bi bi-upload me-1"></i>Загрузить и обработать
+                            </button>
+                        </div>
+
+                        <!-- Progress section -->
+                        <div id="uploadProgress" class="mt-4" style="display: none;">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <span class="fw-semibold">Обработка файла...</span>
+                            </div>
+                            <div class="progress" style="height: 25px;">
+                                <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;">0%</div>
+                            </div>
+                            <div id="uploadStats" class="mt-3"></div>
+                        </div>
+
+                        <!-- Results section -->
+                        <div id="uploadResults" class="mt-4" style="display: none;">
+                            <h6 class="fw-bold mb-3">Результаты обработки</h6>
+                            <div id="uploadResultsContent"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    {% endif %}
+
+
 {% endblock %}
 
 {% block extra_js %}
@@ -422,8 +530,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         var csrfToken = getCSRFToken();
-        console.log('CSRF Token:', csrfToken ? csrfToken.substring(0, 10) + '...' : 'EMPTY');
-        
         var formData = new FormData();
         formData.append('report_file', fileInput.files[0]);
         formData.append('csrfmiddlewaretoken', csrfToken);
@@ -449,95 +555,109 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 200);
 
-        fetch('/training/upload-action-report/', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': csrfToken,
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-            body: formData
-        })
-        .then(function(response) {
-            clearInterval(progressInterval);
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/training/upload-action-report/', true);
+        xhr.setRequestHeader('X-CSRFToken', csrfToken);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+        xhr.upload.addEventListener('progress', function(e) {
+            if (e.lengthComputable) {
+                var pct = Math.round((e.loaded / e.total) * 50);
+                if (progressBar) {
+                    progressBar.style.width = pct + '%';
+                    progressBar.textContent = pct + '%';
+                }
             }
-            return response.json();
-        })
-        .then(function(data) {
-            if (data.error) {
-                progressBar.classList.remove('bg-primary');
-                progressBar.classList.add('bg-danger');
-                progressBar.style.width = '100%';
-                progressBar.textContent = 'Ошибка';
-                statsDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + data.error + '</div>';
-            } else {
+        });
+
+        xhr.addEventListener('load', function() {
+            clearInterval(progressInterval);
+            if (progressBar) {
                 progressBar.classList.remove('bg-primary');
                 progressBar.classList.add('bg-success');
                 progressBar.style.width = '100%';
                 progressBar.textContent = '100%';
+            }
+            if (statsDiv) statsDiv.innerHTML = '';
+            if (resultsDiv) resultsDiv.style.display = 'none';
 
-                var statsHTML = '<div class="row g-3">';
-                statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Всего строк</div><div class="h5 mb-0">' + (data.total || 0) + '</div></div></div></div>';
-                statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Найдено</div><div class="h5 mb-0 text-success">' + (data.users_found || 0) + '</div></div></div></div>';
-                statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Не найдено</div><div class="h5 mb-0 text-danger">' + (data.users_not_found || 0) + '</div></div></div></div>';
-                statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Назначено</div><div class="h5 mb-0 text-primary">' + (data.enrollments_created || 0) + '</div></div></div></div>';
-                statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Назначивших найдено</div><div class="h5 mb-0 text-success">' + (data.assigners_found || 0) + '</div></div></div></div>';
-                statsHTML += '</div>';
+            try {
+                var data = JSON.parse(xhr.responseText);
+                if (data.error) {
+                    progressBar.classList.remove('bg-success');
+                    progressBar.classList.add('bg-danger');
+                    progressBar.textContent = 'Ошибка';
+                    if (statsDiv) statsDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + data.error + '</div>';
+                } else {
+                    var statsHTML = '<div class="row g-3">';
+                    statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Всего строк</div><div class="h5 mb-0">' + (data.total || 0) + '</div></div></div></div>';
+                    statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Найдено</div><div class="h5 mb-0 text-success">' + (data.users_found || 0) + '</div></div></div></div>';
+                    statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Не найдено</div><div class="h5 mb-0 text-danger">' + (data.users_not_found || 0) + '</div></div></div></div>';
+                    statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Назначено</div><div class="h5 mb-0 text-primary">' + (data.enrollments_created || 0) + '</div></div></div></div>';
+                    statsHTML += '<div class="col-md-3"><div class="card border-0 shadow-sm"><div class="card-body text-center"><div class="text-muted small">Назначивших найдено</div><div class="h5 mb-0 text-success">' + (data.assigners_found || 0) + '</div></div></div></div>';
+                    statsHTML += '</div>';
 
-                if (data.emails_updated > 0 || data.phones_updated > 0) {
-                    statsHTML += '<div class="alert alert-success mt-3 mb-0"><ul class="mb-0">';
-                    if (data.emails_updated > 0) statsHTML += '<li>Обновлено email: <strong>' + data.emails_updated + '</strong></li>';
-                    if (data.phones_updated > 0) statsHTML += '<li>Обновлено телефонов: <strong>' + data.phones_updated + '</strong></li>';
-                    statsHTML += '</ul></div>';
-                }
-                if (data.trainings_type_created > 0) {
-                    statsHTML += '<div class="alert alert-info mt-2 mb-0"><i class="bi bi-book me-2"></i>Создано обучающих курсов: <strong>' + data.trainings_type_created + '</strong></div>';
-                }
-                if (data.goals_created > 0) {
-                    statsHTML += '<div class="alert alert-info mt-2 mb-0"><i class="bi bi-bullseye me-2"></i>Создано целей обучения: <strong>' + data.goals_created + '</strong></div>';
-                }
-                if (data.trainings_created > 0) {
-                    statsHTML += '<div class="alert alert-info mt-2 mb-0"><i class="bi bi-info-circle me-2"></i>Создано обучений: <strong>' + data.trainings_created + '</strong></div>';
-                }
-                if (data.enrollments_updated > 0) {
-                    statsHTML += '<div class="alert alert-warning mt-2 mb-0"><i class="bi bi-pencil me-2"></i>Обновлено статусов: <strong>' + data.enrollments_updated + '</strong></div>';
-                }
-                statsDiv.innerHTML = statsHTML;
-
-                var errorsHTML = '';
-                if (data.errors && data.errors.length > 0) {
-                    errorsHTML += '<div class="mt-3"><h6 class="text-danger"><i class="bi bi-x-circle me-2"></i>Ошибки (' + data.errors.length + ')</h6><div class="alert alert-danger py-2"><small>';
-                    for (var i = 0; i < Math.min(data.errors.length, 20); i++) {
-                        errorsHTML += '<div>' + data.errors[i] + '</div>';
+                    if (data.emails_updated > 0 || data.phones_updated > 0) {
+                        statsHTML += '<div class="alert alert-success mt-3 mb-0"><ul class="mb-0">';
+                        if (data.emails_updated > 0) statsHTML += '<li>Обновлено email: <strong>' + data.emails_updated + '</strong></li>';
+                        if (data.phones_updated > 0) statsHTML += '<li>Обновлено телефонов: <strong>' + data.phones_updated + '</strong></li>';
+                        statsHTML += '</ul></div>';
                     }
-                    if (data.errors.length > 20) errorsHTML += '<div class="text-muted">... и еще ' + (data.errors.length - 20) + ' ошибок</div>';
-                    errorsHTML += '</small></div></div>';
-                }
-                if (data.warnings && data.warnings.length > 0) {
-                    errorsHTML += '<div class="mt-3"><h6 class="text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Предупреждения (' + data.warnings.length + ')</h6><div class="alert alert-warning py-2"><small>';
-                    for (var i = 0; i < Math.min(data.warnings.length, 20); i++) {
-                        errorsHTML += '<div>' + data.warnings[i] + '</div>';
+                    if (data.trainings_type_created > 0) {
+                        statsHTML += '<div class="alert alert-info mt-2 mb-0"><i class="bi bi-book me-2"></i>Создано обучающих курсов: <strong>' + data.trainings_type_created + '</strong></div>';
                     }
-                    if (data.warnings.length > 20) errorsHTML += '<div class="text-muted">... и еще ' + (data.warnings.length - 20) + ' предупреждений</div>';
-                    errorsHTML += '</small></div></div>';
+                    if (data.goals_created > 0) {
+                        statsHTML += '<div class="alert alert-info mt-2 mb-0"><i class="bi bi-bullseye me-2"></i>Создано целей обучения: <strong>' + data.goals_created + '</strong></div>';
+                    }
+                    if (data.trainings_created > 0) {
+                        statsHTML += '<div class="alert alert-info mt-2 mb-0"><i class="bi bi-info-circle me-2"></i>Создано обучений: <strong>' + data.trainings_created + '</strong></div>';
+                    }
+                    if (data.enrollments_updated > 0) {
+                        statsHTML += '<div class="alert alert-warning mt-2 mb-0"><i class="bi bi-pencil me-2"></i>Обновлено статусов: <strong>' + data.enrollments_updated + '</strong></div>';
+                    }
+                    if (statsDiv) statsDiv.innerHTML = statsHTML;
+
+                    var errorsHTML = '';
+                    if (data.errors && data.errors.length > 0) {
+                        errorsHTML += '<div class="mt-3"><h6 class="text-danger"><i class="bi bi-x-circle me-2"></i>Ошибки (' + data.errors.length + ')</h6><div class="alert alert-danger py-2"><small>';
+                        for (var i = 0; i < Math.min(data.errors.length, 20); i++) {
+                            errorsHTML += '<div>' + data.errors[i] + '</div>';
+                        }
+                        if (data.errors.length > 20) errorsHTML += '<div class="text-muted">... и еще ' + (data.errors.length - 20) + ' ошибок</div>';
+                        errorsHTML += '</small></div></div>';
+                    }
+                    if (data.warnings && data.warnings.length > 0) {
+                        errorsHTML += '<div class="mt-3"><h6 class="text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Предупреждения (' + data.warnings.length + ')</h6><div class="alert alert-warning py-2"><small>';
+                        for (var i = 0; i < Math.min(data.warnings.length, 20); i++) {
+                            errorsHTML += '<div>' + data.warnings[i] + '</div>';
+                        }
+                        if (data.warnings.length > 20) errorsHTML += '<div class="text-muted">... и еще ' + (data.warnings.length - 20) + ' предупреждений</div>';
+                        errorsHTML += '</small></div></div>';
+                    }
+                    if (resultsContent) resultsContent.innerHTML = errorsHTML;
+                    if (errorsHTML && resultsDiv) resultsDiv.style.display = 'block';
                 }
-                resultsContent.innerHTML = errorsHTML;
-                if (errorsHTML && resultsDiv) resultsDiv.style.display = 'block';
+            } catch(e) {
+                if (statsDiv) statsDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Ошибка парсинга ответа</div>';
             }
             uploadBtn.disabled = false;
             uploadBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Загрузить и обработать';
-        })
-        .catch(function(error) {
+        });
+
+        xhr.addEventListener('error', function() {
             clearInterval(progressInterval);
-            progressBar.classList.remove('bg-primary');
-            progressBar.classList.add('bg-danger');
-            progressBar.style.width = '100%';
-            progressBar.textContent = 'Ошибка';
-            statsDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>' + error.message + '</div>';
+            if (progressBar) {
+                progressBar.classList.remove('bg-primary');
+                progressBar.classList.add('bg-danger');
+                progressBar.style.width = '100%';
+                progressBar.textContent = 'Ошибка';
+            }
+            if (statsDiv) statsDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Ошибка сети</div>';
             uploadBtn.disabled = false;
             uploadBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Загрузить и обработать';
         });
+
+        xhr.send(formData);
     });
 });
 </script>

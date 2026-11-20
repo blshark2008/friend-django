@@ -18,12 +18,6 @@ urlpatterns = [
     path('categories/create/', views.training_category_create, name='category_create'),
     path('categories/<int:pk>/edit/', views.training_category_edit, name='category_edit'),
     path('categories/<int:pk>/delete/', views.training_category_delete, name='category_delete'),
-
-    # Training goals
-    path('goals/', views.training_goal_list, name='goal_list'),
-    path('goals/create/', views.training_goal_create, name='goal_create'),
-    path('goals/<int:pk>/edit/', views.training_goal_edit, name='goal_edit'),
-    path('goals/<int:pk>/delete/', views.training_goal_delete, name='goal_delete'),
     path('journal/', views.training_journal, name='journal'),
     path('types/<int:pk>/edit/', views.training_type_edit, name='type_edit'),
     path('types/<int:pk>/delete/', views.training_type_delete, name='type_delete'),

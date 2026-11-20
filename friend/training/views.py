@@ -1,10 +1,13 @@
 import json
 import logging
+import re
+from datetime import datetime
 from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Count
+from django.core.paginator import Paginator
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -12,8 +15,8 @@ from django.utils.text import slugify
 import openpyxl
 
 from accounts.models import User, Department
-from .models import TrainingType, Training, TrainingEnrollment, TrainingCategory, TrainingGoal, SkillspaceGroup
-from .forms import TrainingTypeForm, TrainingForm, TrainingUserSelectionForm, TrainingCategoryForm, TrainingGoalForm
+from .models import TrainingType, Training, TrainingEnrollment, TrainingCategory, SkillspaceGroup
+from .forms import TrainingTypeForm, TrainingForm, TrainingUserSelectionForm, TrainingCategoryForm
 from .services.skillspace_api import (
     SkillspaceClient, SkillspaceAPIError,
     invite_student_to_training, sync_training_to_skillspace,
@@ -1167,95 +1170,29 @@ def training_report(request):
 
 
 # ============================================================================
-# Training Goals (CRUD)
-# ============================================================================
-
-@login_required
-def training_goal_list(request):
-    """Список целей обучения."""
-    query = request.GET.get('q', '').strip()
-
-    goals = TrainingGoal.objects.all()
-    if query:
-        goals = goals.filter(
-            Q(name__icontains=query) |
-            Q(description__icontains=query)
-        )
-
-    goals = goals.order_by('name')
-
-    return render(request, 'training/goal_list.html', {
-        'goals': goals,
-        'query': query,
-    })
-
-
-@login_required
-def training_goal_create(request):
-    """Создание цели обучения."""
-    if request.method == 'POST':
-        form = TrainingGoalForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Цель обучения создана')
-            return redirect('training:goal_list')
-    else:
-        form = TrainingGoalForm()
-
-    return render(request, 'training/goal_form.html', {
-        'form': form,
-        'action': 'Создание',
-    })
-
-
-@login_required
-def training_goal_edit(request, pk):
-    """Редактирование цели обучения."""
-    goal = get_object_or_404(TrainingGoal, pk=pk)
-
-    if request.method == 'POST':
-        form = TrainingGoalForm(request.POST, instance=goal)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Цель обучения обновлена')
-            return redirect('training:goal_list')
-    else:
-        form = TrainingGoalForm(instance=goal)
-
-    return render(request, 'training/goal_form.html', {
-        'form': form,
-        'goal': goal,
-        'action': 'Редактирование',
-    })
-
-
-@login_required
-def training_goal_delete(request, pk):
-    """Удаление цели обучения."""
-    goal = get_object_or_404(TrainingGoal, pk=pk)
-
-    if request.method == 'POST':
-        goal.delete()
-        messages.success(request, 'Цель обучения удалена')
-        return redirect('training:goal_list')
-
-    return render(request, 'training/goal_confirm_delete.html', {
-        'obj': goal,
-    })
-
-
-# ============================================================================
 # Training Journal
 # ============================================================================
+
+def normalize_training_name(name):
+    """Нормализует название курса, убирая год и разделители."""
+    if not name:
+        return ''
+    return re.sub(r'[\-\(/\s]*\d{4}[\.\)]*', '', name).strip().lower()
+
 
 @login_required
 def training_journal(request):
     """Журнал обучения сотрудников."""
     # Get filter parameters
-    goal_id = request.GET.get('goal', '')
+    category_id = request.GET.get('category', '')
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
     show_without = request.GET.get('show_without', 'false').lower() == 'true'
+    filter_employee = request.GET.get('filter_employee', '').strip()
+    filter_training_type = request.GET.get('filter_training_type', '').strip()
+    filter_training_title = request.GET.get('filter_training_title', '').strip()
+    filter_status = request.GET.get('filter_status', '')
+    filter_department = request.GET.get('filter_department', '')
 
     # Default period: current year
     now = timezone.now()
@@ -1275,14 +1212,14 @@ def training_journal(request):
         date_from_obj = default_date_from.date()
         date_to_obj = default_date_to.date()
 
-    # Get goals
-    goals = TrainingGoal.objects.filter(is_active=True).order_by('name')
-    goal = None
-    if goal_id:
+    # Get categories
+    categories = TrainingCategory.objects.filter(is_active=True).order_by('name')
+    category = None
+    if category_id:
         try:
-            goal = TrainingGoal.objects.get(pk=goal_id, is_active=True)
-        except TrainingGoal.DoesNotExist:
-            goal = None
+            category = TrainingCategory.objects.get(pk=category_id, is_active=True)
+        except TrainingCategory.DoesNotExist:
+            category = None
 
     # Build journal data
     journal_data = []
@@ -1290,9 +1227,13 @@ def training_journal(request):
     in_progress_data = []
     not_started_data = []
 
-    if goal:
-        # Get all training types linked to this goal (including archived)
-        training_types = goal.training_types.all()
+    # Get sort parameters
+    sort_by = request.GET.get('sort', '')  # column name
+    sort_order = request.GET.get('order', 'asc')  # asc or desc
+
+    if category:
+        # Get all training types with this category
+        training_types = TrainingType.objects.filter(category=category)
 
         if training_types.exists():
             # Get all trainings for these types
@@ -1305,12 +1246,33 @@ def training_journal(request):
             enrollments = TrainingEnrollment.objects.filter(
                 training__in=trainings,
             ).select_related(
-                'user', 'user__department', 'training', 'training__training_type', 'assigned_by'
+                'user', 'user__department', 'training', 'training__training_type', 'training__training_type__category', 'assigned_by'
             )
+
+            # Apply filters
+            if filter_employee:
+                enrollments = enrollments.filter(
+                    Q(user__last_name__icontains=filter_employee) |
+                    Q(user__first_name__icontains=filter_employee) |
+                    Q(user__patronymic__icontains=filter_employee) |
+                    Q(user__last_name__icontains=filter_employee) |
+                    Q(user__username__icontains=filter_employee)
+                )
+            if filter_training_type:
+                enrollments = enrollments.filter(
+                    training__training_type__name__icontains=filter_training_type
+                )
+            if filter_training_title:
+                enrollments = enrollments.filter(
+                    training__title__icontains=filter_training_title
+                )
+            if filter_department:
+                enrollments = enrollments.filter(user__department_id=filter_department)
+            if filter_status:
+                enrollments = enrollments.filter(status=filter_status)
 
             # Completed enrollments within the period
             # Use timezone-aware datetime comparison instead of __date
-            from datetime import datetime
             dt_from = timezone.make_aware(datetime.combine(date_from_obj, datetime.min.time()))
             dt_to = timezone.make_aware(datetime.combine(date_to_obj, datetime.max.time()))
             
@@ -1326,19 +1288,39 @@ def training_journal(request):
             )
 
             # Build journal entries for completed
+            # Group by (user, training_type) and keep only the latest completion
+            latest_per_user_type = {}
             for enrollment in completed_enrollments:
+                key = (enrollment.user_id, enrollment.training.training_type_id)
+                if key not in latest_per_user_type or enrollment.completed_at > latest_per_user_type[key].completed_at:
+                    latest_per_user_type[key] = enrollment
+
+            for enrollment in latest_per_user_type.values():
                 # Find previous successful completion for this user and training type
-                previous_completion = TrainingEnrollment.objects.filter(
-                    user=enrollment.user,
-                    training__training_type=enrollment.training.training_type,
-                    status='completed',
-                    completed_at__lt=enrollment.completed_at,
-                ).order_by('-completed_at').first()
+                # Normalize name to match courses with different year suffixes
+                current_normalized = normalize_training_name(enrollment.training.training_type.name)
+                previous_completion = None
+                
+                if current_normalized:
+                    # Get all previous completions for this user
+                    prev_completions = TrainingEnrollment.objects.filter(
+                        user=enrollment.user,
+                        status='completed',
+                        completed_at__lt=enrollment.completed_at,
+                    ).select_related('training__training_type').order_by('-completed_at')
+                    
+                    # Find the first one with matching normalized training type name
+                    for pc in prev_completions:
+                        pc_normalized = normalize_training_name(pc.training.training_type.name)
+                        if pc_normalized == current_normalized:
+                            previous_completion = pc
+                            break
                 
                 journal_data.append({
                     'user': enrollment.user,
                     'training_title': enrollment.training.title,
                     'training_type_name': enrollment.training.training_type.name,
+                    'category_name': enrollment.training.training_type.category.name if enrollment.training.training_type.category else '—',
                     'completed_at': enrollment.completed_at,
                     'previous_completed_at': previous_completion.completed_at if previous_completion else None,
                     'enrolled_at': enrollment.enrolled_at,
@@ -1347,8 +1329,29 @@ def training_journal(request):
                     'assigned_by': enrollment.assigned_by,
                 })
 
-            # Sort by user last name
-            journal_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
+            # Sort by column if specified, otherwise by user last name
+            if sort_by:
+                reverse = sort_order == 'desc'
+                if sort_by == 'employee':
+                    journal_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name), reverse=reverse)
+                elif sort_by == 'category':
+                    journal_data.sort(key=lambda x: x['category_name'] or '', reverse=reverse)
+                elif sort_by == 'training_type':
+                    journal_data.sort(key=lambda x: x['training_type_name'] or '', reverse=reverse)
+                elif sort_by == 'training_title':
+                    journal_data.sort(key=lambda x: x['training_title'] or '', reverse=reverse)
+                elif sort_by == 'enrolled_at':
+                    journal_data.sort(key=lambda x: x['enrolled_at'] or timezone.now(), reverse=reverse)
+                elif sort_by == 'completed_at':
+                    journal_data.sort(key=lambda x: x['completed_at'] or timezone.now(), reverse=reverse)
+                elif sort_by == 'score':
+                    journal_data.sort(key=lambda x: x['score'] if x['score'] is not None else -1, reverse=reverse)
+                elif sort_by == 'status':
+                    journal_data.sort(key=lambda x: x['status'] or '', reverse=reverse)
+                elif sort_by == 'previous_completed_at':
+                    journal_data.sort(key=lambda x: x['previous_completed_at'] or timezone.now(), reverse=reverse)
+            else:
+                journal_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
 
             # In progress enrollments (started but not completed)
             in_progress_enrollments = enrollments.filter(
@@ -1360,13 +1363,32 @@ def training_journal(request):
                     'user': enrollment.user,
                     'training_title': enrollment.training.title,
                     'training_type_name': enrollment.training.training_type.name,
+                    'category_name': enrollment.training.training_type.category.name if enrollment.training.training_type.category else '—',
                     'enrolled_at': enrollment.enrolled_at,
                     'score': enrollment.score,
                     'status': enrollment.status,
                     'assigned_by': enrollment.assigned_by,
                 })
 
-            in_progress_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
+            # Sort in_progress
+            if sort_by:
+                reverse = sort_order == 'desc'
+                if sort_by == 'employee':
+                    in_progress_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name), reverse=reverse)
+                elif sort_by == 'category':
+                    in_progress_data.sort(key=lambda x: x['category_name'] or '', reverse=reverse)
+                elif sort_by == 'training_type':
+                    in_progress_data.sort(key=lambda x: x['training_type_name'] or '', reverse=reverse)
+                elif sort_by == 'training_title':
+                    in_progress_data.sort(key=lambda x: x['training_title'] or '', reverse=reverse)
+                elif sort_by == 'enrolled_at':
+                    in_progress_data.sort(key=lambda x: x['enrolled_at'] or timezone.now(), reverse=reverse)
+                elif sort_by == 'score':
+                    in_progress_data.sort(key=lambda x: x['score'] if x['score'] is not None else -1, reverse=reverse)
+                elif sort_by == 'status':
+                    in_progress_data.sort(key=lambda x: x['status'] or '', reverse=reverse)
+            else:
+                in_progress_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
 
             # Not started enrollments (assigned but not started)
             not_started_enrollments = enrollments.filter(
@@ -1378,12 +1400,29 @@ def training_journal(request):
                     'user': enrollment.user,
                     'training_title': enrollment.training.title,
                     'training_type_name': enrollment.training.training_type.name,
+                    'category_name': enrollment.training.training_type.category.name if enrollment.training.training_type.category else '—',
                     'enrolled_at': enrollment.enrolled_at,
                     'status': enrollment.status,
                     'assigned_by': enrollment.assigned_by,
                 })
 
-            not_started_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
+            # Sort not_started
+            if sort_by:
+                reverse = sort_order == 'desc'
+                if sort_by == 'employee':
+                    not_started_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name), reverse=reverse)
+                elif sort_by == 'category':
+                    not_started_data.sort(key=lambda x: x['category_name'] or '', reverse=reverse)
+                elif sort_by == 'training_type':
+                    not_started_data.sort(key=lambda x: x['training_type_name'] or '', reverse=reverse)
+                elif sort_by == 'training_title':
+                    not_started_data.sort(key=lambda x: x['training_title'] or '', reverse=reverse)
+                elif sort_by == 'enrolled_at':
+                    not_started_data.sort(key=lambda x: x['enrolled_at'] or timezone.now(), reverse=reverse)
+                elif sort_by == 'status':
+                    not_started_data.sort(key=lambda x: x['status'] or '', reverse=reverse)
+            else:
+                not_started_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
 
             # Get all active employees (excluding fired)
             all_employees = User.objects.filter(
@@ -1403,18 +1442,188 @@ def training_journal(request):
                             ).exists(),
                         })
 
+    elif filter_employee or filter_training_type or filter_training_title or filter_status or filter_department:
+        # Search across all categories when filters are set but no category selected
+        trainings = Training.objects.filter(is_active=True).select_related('training_type')
+        enrollments = TrainingEnrollment.objects.filter(
+            training__in=trainings,
+        ).select_related(
+            'user', 'user__department', 'training', 'training__training_type', 'training__training_type__category', 'assigned_by'
+        )
+
+        if filter_employee:
+            enrollments = enrollments.filter(
+                Q(user__last_name__icontains=filter_employee) |
+                Q(user__first_name__icontains=filter_employee) |
+                Q(user__patronymic__icontains=filter_employee) |
+                Q(user__username__icontains=filter_employee)
+            )
+        if filter_training_type:
+            enrollments = enrollments.filter(
+                training__training_type__name__icontains=filter_training_type
+            )
+        if filter_training_title:
+            enrollments = enrollments.filter(
+                training__title__icontains=filter_training_title
+            )
+        if filter_status:
+            enrollments = enrollments.filter(status=filter_status)
+        if filter_department:
+            enrollments = enrollments.filter(user__department_id=filter_department)
+
+        dt_from = timezone.make_aware(datetime.combine(date_from_obj, datetime.min.time()))
+        dt_to = timezone.make_aware(datetime.combine(date_to_obj, datetime.max.time()))
+
+        # Completed
+        completed_enrollments = enrollments.filter(
+            status='completed',
+            completed_at__gte=dt_from,
+            completed_at__lte=dt_to,
+        ).distinct()
+
+        latest_per_user_type = {}
+        for enrollment in completed_enrollments:
+            key = (enrollment.user_id, enrollment.training.training_type_id)
+            if key not in latest_per_user_type or enrollment.completed_at > latest_per_user_type[key].completed_at:
+                latest_per_user_type[key] = enrollment
+
+        for enrollment in latest_per_user_type.values():
+            # Find previous successful completion for this user and training type
+            current_normalized = normalize_training_name(enrollment.training.training_type.name)
+            previous_completion = None
+            
+            if current_normalized:
+                prev_completions = TrainingEnrollment.objects.filter(
+                    user=enrollment.user,
+                    status='completed',
+                    completed_at__lt=enrollment.completed_at,
+                ).select_related('training__training_type').order_by('-completed_at')
+                
+                for pc in prev_completions:
+                    pc_normalized = normalize_training_name(pc.training.training_type.name)
+                    if pc_normalized == current_normalized:
+                        previous_completion = pc
+                        break
+            
+            journal_data.append({
+                'user': enrollment.user,
+                'training_title': enrollment.training.title,
+                'training_type_name': enrollment.training.training_type.name,
+                'category_name': enrollment.training.training_type.category.name if enrollment.training.training_type.category else '—',
+                'completed_at': enrollment.completed_at,
+                'previous_completed_at': previous_completion.completed_at if previous_completion else None,
+                'enrolled_at': enrollment.enrolled_at,
+                'score': enrollment.score,
+                'status': enrollment.status,
+                'assigned_by': enrollment.assigned_by,
+            })
+
+        # Sort journal_data
+        if sort_by:
+            reverse = sort_order == 'desc'
+            if sort_by == 'employee':
+                journal_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name), reverse=reverse)
+            elif sort_by == 'category':
+                journal_data.sort(key=lambda x: x['category_name'] or '', reverse=reverse)
+            elif sort_by == 'training_type':
+                journal_data.sort(key=lambda x: x['training_type_name'] or '', reverse=reverse)
+            elif sort_by == 'training_title':
+                journal_data.sort(key=lambda x: x['training_title'] or '', reverse=reverse)
+            elif sort_by == 'enrolled_at':
+                journal_data.sort(key=lambda x: x['enrolled_at'] or timezone.now(), reverse=reverse)
+            elif sort_by == 'completed_at':
+                journal_data.sort(key=lambda x: x['completed_at'] or timezone.now(), reverse=reverse)
+            elif sort_by == 'score':
+                journal_data.sort(key=lambda x: x['score'] if x['score'] is not None else -1, reverse=reverse)
+            elif sort_by == 'status':
+                journal_data.sort(key=lambda x: x['status'] or '', reverse=reverse)
+        else:
+            journal_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
+
+        # In progress
+        in_progress_enrollments = enrollments.filter(status='in_progress').distinct()
+        for enrollment in in_progress_enrollments:
+            in_progress_data.append({
+                'user': enrollment.user,
+                'training_title': enrollment.training.title,
+                'training_type_name': enrollment.training.training_type.name,
+                'category_name': enrollment.training.training_type.category.name if enrollment.training.training_type.category else '—',
+                'enrolled_at': enrollment.enrolled_at,
+                'score': enrollment.score,
+                'status': enrollment.status,
+                'assigned_by': enrollment.assigned_by,
+            })
+
+        # Sort in_progress
+        if sort_by:
+            reverse = sort_order == 'desc'
+            if sort_by == 'employee':
+                in_progress_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name), reverse=reverse)
+            elif sort_by == 'category':
+                in_progress_data.sort(key=lambda x: x['category_name'] or '', reverse=reverse)
+            elif sort_by == 'training_type':
+                in_progress_data.sort(key=lambda x: x['training_type_name'] or '', reverse=reverse)
+            elif sort_by == 'training_title':
+                in_progress_data.sort(key=lambda x: x['training_title'] or '', reverse=reverse)
+            elif sort_by == 'enrolled_at':
+                in_progress_data.sort(key=lambda x: x['enrolled_at'] or timezone.now(), reverse=reverse)
+            elif sort_by == 'score':
+                in_progress_data.sort(key=lambda x: x['score'] if x['score'] is not None else -1, reverse=reverse)
+            elif sort_by == 'status':
+                in_progress_data.sort(key=lambda x: x['status'] or '', reverse=reverse)
+        else:
+            in_progress_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
+
+        # Not started
+        not_started_enrollments = enrollments.filter(status='not_started').distinct()
+        for enrollment in not_started_enrollments:
+            not_started_data.append({
+                'user': enrollment.user,
+                'training_title': enrollment.training.title,
+                'training_type_name': enrollment.training.training_type.name,
+                'category_name': enrollment.training.training_type.category.name if enrollment.training.training_type.category else '—',
+                'enrolled_at': enrollment.enrolled_at,
+                'status': enrollment.status,
+                'assigned_by': enrollment.assigned_by,
+            })
+
+        # Sort not_started
+        if sort_by:
+            reverse = sort_order == 'desc'
+            if sort_by == 'employee':
+                not_started_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name), reverse=reverse)
+            elif sort_by == 'category':
+                not_started_data.sort(key=lambda x: x['category_name'] or '', reverse=reverse)
+            elif sort_by == 'training_type':
+                not_started_data.sort(key=lambda x: x['training_type_name'] or '', reverse=reverse)
+            elif sort_by == 'training_title':
+                not_started_data.sort(key=lambda x: x['training_title'] or '', reverse=reverse)
+            elif sort_by == 'enrolled_at':
+                not_started_data.sort(key=lambda x: x['enrolled_at'] or timezone.now(), reverse=reverse)
+            elif sort_by == 'status':
+                not_started_data.sort(key=lambda x: x['status'] or '', reverse=reverse)
+        else:
+            not_started_data.sort(key=lambda x: (x['user'].last_name, x['user'].first_name))
+
     # Stats
     total_completed = len(journal_data)
     total_in_progress = len(in_progress_data)
     total_not_started = len(not_started_data)
     total_without = len(without_trainings)
 
+    # Paginate journal_data: 20 per page
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(journal_data, 20)
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'goals': goals,
-        'goal': goal,
+        'categories': categories,
+        'category': category,
+        'departments': Department.objects.filter(is_active=True).order_by('name'),
+        'filter_department': filter_department,
         'date_from': date_from,
         'date_to': date_to,
-        'journal_data': journal_data,
+        'journal_data': page_obj,
         'in_progress_data': in_progress_data,
         'not_started_data': not_started_data,
         'without_trainings': without_trainings,
@@ -1425,6 +1634,9 @@ def training_journal(request):
         'total_without': total_without,
         'default_date_from': default_date_from.strftime('%Y-%m-%d'),
         'default_date_to': default_date_to.strftime('%Y-%m-%d'),
+        'page_obj': page_obj,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
     }
     return render(request, 'training/journal.html', context)
 
@@ -1525,6 +1737,25 @@ def _normalize_status(status_str):
     return STATUS_MAPPING.get(key, 'not_started')
 
 
+def _parse_excel_date(date_val):
+    """Parse date from Excel cell (DD.MM.YYYY format)."""
+    if not date_val:
+        return None
+    try:
+        # Try DD.MM.YYYY format
+        if isinstance(date_val, str) and '.' in date_val:
+            return datetime.strptime(date_val.strip(), '%d.%m.%Y').date()
+        # Try datetime object (from openpyxl)
+        if hasattr(date_val, 'date'):
+            return date_val.date()
+        # Try direct date object
+        if hasattr(date_val, 'strftime'):
+            return date_val
+    except (ValueError, AttributeError):
+        pass
+    return None
+
+
 def _find_user_by_full_name(full_name):
     """Search for user by full name parts."""
     if not full_name:
@@ -1594,52 +1825,6 @@ def _find_assigner_by_full_name(full_name):
     ).exclude(is_fired=True).first()
 
 
-def _find_or_create_goal(goal_name):
-    """Find or create TrainingGoal."""
-    if not goal_name:
-        return None
-    goal_name = str(goal_name).strip()
-    if not goal_name:
-        return None
-    return TrainingGoal.objects.get_or_create(name=goal_name)[0]
-
-
-def _find_training_for_goal(goal, request_user):
-    """Find or create a Training for the given goal."""
-    if not goal:
-        return None
-
-    # Find TrainingType linked to this goal
-    training_types = goal.training_types.filter(is_active=True)
-    if not training_types.exists():
-        # Create a new TrainingType for this goal
-        training_type = TrainingType.objects.create(
-            name=goal.name,
-            description=f'Курс, созданный из отчета Актион360 для цели: {goal.name}',
-        )
-        goal.training_types.add(training_type)
-        training_types = TrainingType.objects.filter(pk=training_type.pk)
-
-    training_type = training_types.first()
-
-    # Find or create Training
-    training = Training.objects.filter(
-        training_type=training_type,
-        title=goal.name,
-        is_active=True,
-    ).first()
-
-    if not training:
-        training = Training.objects.create(
-            training_type=training_type,
-            title=goal.name,
-            description=f'Обучение, созданное из отчета Актион360',
-            status=Training.Status.ACTIVE,
-        )
-
-    return training
-
-
 @login_required
 def upload_action_report(request):
     """Загрузка отчета Актион360 (Excel .xlsx)."""
@@ -1665,6 +1850,8 @@ def upload_action_report(request):
         'trainings_created': 0,
         'enrollments_created': 0,
         'enrollments_updated': 0,
+        'categories_created': 0,
+        'completed_counted': 0,
         'assigners_found': 0,
         'errors': [],
         'warnings': [],
@@ -1718,6 +1905,9 @@ def upload_action_report(request):
         col_assigner = find_column('назначил обучение', 'назначил', 'assigner')
         col_goal = find_column('группа программ и тестов', 'цель обучения', 'training goal')
         col_status = find_column('статус', 'статус обучения', 'status')
+        col_enroll_date = find_column('дата назначения обучения', 'дата назначения')
+        col_test_date = find_column('дата итогового теста', 'итогового теста')
+        col_score = find_column('оценка', 'зачтено')
 
         if col_fio is None:
             return JsonResponse({
@@ -1776,45 +1966,55 @@ def upload_action_report(request):
                 if col_program is not None and col_program < len(row):
                     program_name = str(row[col_program]).strip() if row[col_program] else ''
 
-                # Get training goal from "Группа программ и тестов" column
-                goal_name = ''
+                # Get category from "Группа программ и тестов" column
+                category_name = ''
                 if col_goal is not None and col_goal < len(row):
-                    goal_name = str(row[col_goal]).strip() if row[col_goal] else ''
+                    category_name = str(row[col_goal]).strip() if row[col_goal] else ''
 
-                if not goal_name:
-                    results['warnings'].append(f'Строка {row_idx}: {fio} — нет цели обучения, пропуск')
+                if not category_name:
+                    results['warnings'].append(f'Строка {row_idx}: {fio} — нет категории обучения, пропуск')
                     continue
 
-                # Skip duplicate rows (same FIO + program_name)
-                row_key = f'{fio}|{program_name}'
+                # Skip duplicate rows (same FIO + program_name + category)
+                row_key = f'{fio}|{program_name}|{category_name}'
                 if row_key in seen_rows:
                     results['warnings'].append(f'Строка {row_idx}: {fio} — дубликат, пропуск')
                     continue
                 seen_rows.add(row_key)
 
-                # Find or create TrainingGoal
-                goal = _find_or_create_goal(goal_name)
+                # Find or create TrainingCategory from "Группа программ и тестов"
+                category = None
+                category, cat_created = TrainingCategory.objects.get_or_create(
+                    name=category_name,
+                    defaults={'description': f'Категория, созданная из отчета Актион360'}
+                )
+                if cat_created:
+                    results['categories_created'] = results.get('categories_created', 0) + 1
 
-                # Find or create TrainingType from "Группы"
+                # Find or create TrainingType from "Название программы"
                 training_type = None
-                if group_name:
+                if program_name:
                     training_type, tt_created = TrainingType.objects.get_or_create(
-                        name=group_name,
-                        defaults={'description': f'Курс, созданный из отчета Актион360'}
+                        name=program_name,
+                        defaults={
+                            'description': f'Курс, созданный из отчета Актион360',
+                        }
                     )
                     if tt_created:
                         results['trainings_type_created'] = results.get('trainings_type_created', 0) + 1
+                    # Always set category
+                    training_type.category = category
+                    training_type.save(update_fields=['category'])
 
-                    # Link TrainingType with TrainingGoal
-                    if goal and goal not in training_type.goals.all():
-                        training_type.goals.add(goal)
+                # Training title same as program name
+                training_title = program_name
 
-                # Find or create Training from "Название программы"
+                # Find or create Training
                 training = None
                 if training_type and program_name:
                     training, tr_created = Training.objects.get_or_create(
                         training_type=training_type,
-                        title=program_name,
+                        title=training_title,
                         defaults={
                             'description': f'Обучение, созданное из отчета Актион360',
                             'status': Training.Status.ACTIVE,
@@ -1848,6 +2048,46 @@ def upload_action_report(request):
                         if assigner:
                             results['assigners_found'] = results.get('assigners_found', 0) + 1
 
+                # Parse enrolled_at from "Дата назначения обучения"
+                enroll_date = None
+                if col_enroll_date is not None and col_enroll_date < len(row):
+                    raw_date = row[col_enroll_date]
+                    if raw_date:
+                        if isinstance(raw_date, datetime):
+                            # openpyxl datetime object (datetime with time 00:00:00)
+                            enroll_date = timezone.make_aware(raw_date)
+                        elif hasattr(raw_date, 'date') and not isinstance(raw_date, datetime):
+                            # date object
+                            enroll_date = timezone.make_aware(datetime.combine(raw_date, datetime.min.time()))
+                        elif isinstance(raw_date, str):
+                            try:
+                                parsed = datetime.strptime(raw_date.strip(), '%d.%m.%Y')
+                                enroll_date = timezone.make_aware(parsed)
+                            except ValueError:
+                                pass
+
+                # Parse completed_at from "Дата итогового теста" if "Оценка" == "Зачтено"
+                completed_at = None
+                if col_test_date is not None and col_test_date < len(row):
+                    test_date_val = row[col_test_date]
+                    score_val = ''
+                    if col_score is not None and col_score < len(row):
+                        score_val = str(row[col_score]).strip().lower() if row[col_score] else ''
+                    # Only set completed_at if score is "Зачтено"
+                    if test_date_val and ('зачтено' in score_val):
+                        if isinstance(test_date_val, datetime):
+                            completed_at = timezone.make_aware(test_date_val)
+                        elif hasattr(test_date_val, 'date') and not isinstance(test_date_val, datetime):
+                            completed_at = timezone.make_aware(datetime.combine(test_date_val, datetime.min.time()))
+                        elif isinstance(test_date_val, str):
+                            try:
+                                parsed = datetime.strptime(test_date_val.strip(), '%d.%m.%Y')
+                                completed_at = timezone.make_aware(parsed)
+                            except ValueError:
+                                pass
+                        if completed_at:
+                            results['completed_counted'] = results.get('completed_counted', 0) + 1
+
                 # Create or update enrollment
                 enrollment, created = TrainingEnrollment.objects.get_or_create(
                     training=training,
@@ -1855,6 +2095,8 @@ def upload_action_report(request):
                     defaults={
                         'status': status_code,
                         'assigned_by': assigner if assigner else request.user,
+                        'enrolled_at': enroll_date if enroll_date else timezone.now(),
+                        'completed_at': completed_at,
                     }
                 )
 
@@ -1864,11 +2106,16 @@ def upload_action_report(request):
                     if enrollment.status != status_code:
                         enrollment.status = status_code
                         changed = True
-                    if status_code == 'completed':
-                        enrollment.completed_at = timezone.now()
-                        changed = True
                     if enrollment.assigned_by_id != (assigner.id if assigner else None):
                         enrollment.assigned_by = assigner
+                        changed = True
+                    # Update enrolled_at if provided from Excel
+                    if enroll_date:
+                        if not enrollment.enrolled_at or enrollment.enrolled_at.date() != enroll_date.date():
+                            enrollment.enrolled_at = enroll_date
+                            changed = True
+                    if completed_at and enrollment.completed_at != completed_at:
+                        enrollment.completed_at = completed_at
                         changed = True
                     if changed:
                         enrollment.save()

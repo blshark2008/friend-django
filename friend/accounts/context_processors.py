@@ -1,4 +1,17 @@
+from urllib.parse import urlparse
+
 from .models import MenuSection, MenuItem, InternalGroup
+
+
+def back_url(request):
+    """Добавляет URL предыдущей страницы в контекст каждого шаблона."""
+    referrer = request.META.get('HTTP_REFERER', '')
+    if referrer and '://' in referrer:
+        ref_domain = urlparse(referrer).netloc
+        req_domain = request.get_host()
+        if ref_domain != req_domain:
+            referrer = ''
+    return {'back_url': referrer}
 
 
 def menu_items(request):

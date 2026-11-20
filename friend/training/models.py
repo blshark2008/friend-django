@@ -11,57 +11,6 @@ from accounts.models import Department
 logger = logging.getLogger(__name__)
 
 
-class TrainingGoal(models.Model):
-    """Цель обучения (например: пожарная безопасность, информационная безопасность, охрана труда)."""
-
-    name = models.CharField('Название', max_length=255, db_index=True)
-    description = models.TextField('Описание', blank=True)
-    is_active = models.BooleanField('Активен', default=True)
-    created_at = models.DateTimeField('Создан', auto_now_add=True)
-    updated_at = models.DateTimeField('Обновлён', auto_now=True)
-
-    # Обучения (типы), которые относятся к этой цели
-    training_types = models.ManyToManyField(
-        'TrainingType', through='GoalTrainingType',
-        related_name='goals', verbose_name='Обучающие курсы',
-    )
-
-    class Meta:
-        verbose_name = 'Цель обучения'
-        verbose_name_plural = 'Цели обучения'
-        ordering = ['name']
-
-    def __str__(self):
-        return self.name
-
-    @property
-    def training_types_count(self):
-        """Количество обучающих курсов, привязанных к этой цели."""
-        return self.training_types.count()
-
-
-class GoalTrainingType(models.Model):
-    """Связь цели обучения с типом обучения (промежуточная таблица)."""
-
-    goal = models.ForeignKey(
-        TrainingGoal, on_delete=models.CASCADE, related_name='_goal_training_types',
-        verbose_name='Цель обучения',
-    )
-    training_type = models.ForeignKey(
-        'TrainingType', on_delete=models.CASCADE, related_name='_goal_type_links',
-        verbose_name='Обучающий курс',
-    )
-    created_at = models.DateTimeField('Создан', auto_now_add=True)
-
-    class Meta:
-        verbose_name = 'Связь цели и курса'
-        verbose_name_plural = 'Связи целей и курсов'
-        unique_together = ['goal', 'training_type']
-
-    def __str__(self):
-        return f'{self.goal.name} — {self.training_type.name}'
-
-
 class TrainingCategory(models.Model):
     """Категория типа обучения (например: информационная безопасность, пожарная безопасность и т.д.)"""
 
@@ -465,3 +414,6 @@ class TrainingEnrollment(models.Model):
         else:
             self.display_status = self.DisplayStatus.IN_LIST
         super().save(*args, **kwargs)
+
+
+

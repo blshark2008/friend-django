@@ -1,7 +1,7 @@
 from django import forms
 import logging
 from django.contrib.auth import get_user_model
-from .models import TrainingType, Training, TrainingEnrollment, TrainingCategory, TrainingGoal, SkillspaceGroup
+from .models import TrainingType, Training, TrainingEnrollment, TrainingCategory, SkillspaceGroup
 from accounts.models import Department
 
 User = get_user_model()
@@ -215,26 +215,3 @@ class TrainingUserSelectionForm(forms.Form):
             ).order_by('last_name', 'first_name')
 
 
-class TrainingGoalForm(forms.ModelForm):
-    """Форма для создания/редактирования цели обучения."""
-
-    class Meta:
-        model = TrainingGoal
-        fields = ['name', 'description', 'is_active', 'training_types']
-        widgets = {
-            'name': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Например: Пожарная безопасность',
-            }),
-            'description': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 4,
-                'placeholder': 'Описание цели обучения...',
-            }),
-            'is_active': forms.CheckboxInput(attrs={
-                'class': 'form-check-input',
-            }),
-            'training_types': forms.CheckboxSelectMultiple(attrs={
-                'class': 'form-check-input',
-            }),
-        }
